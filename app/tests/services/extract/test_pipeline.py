@@ -64,22 +64,17 @@ MAKEFILE_SOURCE = b".PHONY: test\ntest:\n\tpytest\n"
 
 
 def _make_constraint(
-    subject_role_general: str = "app.services",
-    subject_role_specific: str = "service",
+    subject: str = "services",
     predicate: PredicateType = PredicateType.PROHIBITS_DEPENDENCY,
-    object_role_general: str = "app.db",
-    object_role_specific: str = "MySQL connector",
+    object: str = "mysql",
     adr_id: str = "ADR-001",
     adr_path: str = "docs/adr/ADR-001-mysql-storage.md",
 ) -> SymbolicConstraint:
     return SymbolicConstraint(
-        subject_role_general=subject_role_general,
-        subject_role_specific=subject_role_specific,
+        subject=subject,
+        object=object,
         predicate=predicate,
-        object_role_general=object_role_general,
-        object_role_specific=object_role_specific,
         justification="Test constraint",
-        extraction_text="test extraction text",
         adr_id=adr_id,
         adr_path=adr_path,
     )
@@ -224,11 +219,9 @@ class TestExtractChangedAdrs:
             ExtractionResult(
                 constraints=[
                     _make_constraint(
-                        subject_role_general="app.api",
-                        subject_role_specific="endpoint",
+                        subject="all API endpoints",
                         predicate=PredicateType.REQUIRES_IMPLEMENTATION,
-                        object_role_general="app.auth",
-                        object_role_specific="auth middleware",
+                        object="auth middleware",
                         adr_id="ADR-003",
                         adr_path="docs/adr/ADR-003-auth-middleware.md",
                     )
@@ -358,9 +351,9 @@ class TestWriteConstraints:
             ExtractionResult(
                 constraints=[
                     _make_constraint(
-                        subject_role_general="app.services",
+                        subject="services",
                         predicate=PredicateType.PROHIBITS_DEPENDENCY,
-                        object_role_general="app.db",
+                        object="mysql",
                     ),
                 ],
                 errors=[],
@@ -375,7 +368,7 @@ class TestWriteConstraints:
         assert "constraints" in data
         assert "errors" in data
         assert len(data["constraints"]) == 1
-        assert data["constraints"][0]["subject_role_general"] == "app.services"
+        assert data["constraints"][0]["subject"] == "services"
         assert data["constraints"][0]["predicate"] == "prohibits_dependency"
 
     def test_writes_multiple_results(self, tmp_path: Path) -> None:
@@ -392,11 +385,9 @@ class TestWriteConstraints:
             ExtractionResult(
                 constraints=[
                     _make_constraint(
-                        subject_role_general="app.api",
-                        subject_role_specific="endpoint",
+                        subject="all API endpoints",
                         predicate=PredicateType.REQUIRES_IMPLEMENTATION,
-                        object_role_general="app.auth",
-                        object_role_specific="auth middleware",
+                        object="auth middleware",
                         adr_id="ADR-003",
                         adr_path="docs/adr/ADR-003.md",
                     ),

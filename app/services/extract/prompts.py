@@ -12,43 +12,37 @@ PROMPT_DESCRIPTION = (
     "Extract architectural constraints from ADR documents.\n"
     "\n"
     "Predicates:\n"
-    "- prohibits_dependency: the subject module must NOT import or call the object module\n"
-    "- requires_dependency: the subject module MUST import or call the object module\n"
-    "- prohibits_implementation: the subject module must NOT define the logic described by the object\n"
-    "- requires_implementation: the subject module MUST define the logic described by the object\n"
+    "- prohibits_dependency: the subject must NOT import or call the object\n"
+    "- requires_dependency: the subject MUST import or call the object\n"
+    "- prohibits_implementation: the subject must NOT define the logic described by the object\n"
+    "- requires_implementation: the subject MUST define the logic described by the object\n"
     "\n"
     "Fields per extraction:\n"
-    "- subject_role_general: the module or namespace the constraint applies to (e.g., 'app.services'). "
-    "MUST be picked from the 'Codebase packages' list if provided. If no list, infer from context.\n"
-    "- subject_role_specific: the ADR's natural-language term for the subject role (e.g., 'endpoint', 'service'). "
-    "Short noun or noun phrase from the ADR text.\n"
-    "- object_role_general: the module or namespace the constraint targets (e.g., 'app.auth', 'mysql'). "
-    "MUST be picked from the 'Codebase packages' list if provided. For external dependencies, use the library name.\n"
-    "- object_role_specific: the ADR's natural-language term for the object role (e.g., 'authentication logic', 'MySQL connector'). "
-    "Short noun or noun phrase from the ADR text.\n"
+    "- subject: who the constraint applies to, in the ADR's own words (e.g., 'all endpoints', 'services', 'database layer'). "
+    "Use natural language directly from the ADR text. Never invent dotted module paths.\n"
+    "- object: what the constraint targets, in the ADR's own words (e.g., 'auth module', 'mysql', 'caching logic'). "
+    "Use natural language directly from the ADR text. Never invent dotted module paths.\n"
     "- predicate: one of prohibits_dependency, requires_dependency, prohibits_implementation, requires_implementation\n"
     "- justification: concise reason for the constraint, from the ADR\n"
-    "- extraction_text: verbatim substring from the ADR that motivates this constraint\n"
     "\n"
     "Scoping:\n"
-    "- Use the root package as subject_role_general for codebase-wide constraints (e.g., 'we will use X' tech-choice ADRs)\n"
-    "- Do NOT use wildcards in role_general fields. Wildcards are implied by kind filter + CONTAINS walk during resolution.\n"
-    "- subject_role_specific and object_role_specific are natural-language terms, NOT code identifiers\n"
+    "- Use 'codebase' as subject for codebase-wide constraints (e.g., 'we will use X' tech-choice ADRs)\n"
+    "- Do NOT use wildcards in subject or object fields.\n"
     "\n"
     "Extraction rules:\n"
     "1. MULTIPLE PREDICATES: emit more than one constraint when a single sentence constrains "
     "both what a module must do (implementation layer) and how (dependency layer). "
     "Example: 'All B must implement Y using X package' → "
-    "subject_role_general=B, object_role_general=X, predicate=requires_implementation + "
-    "subject_role_general=B, object_role_general=X, predicate=requires_dependency.\n"
+    "subject='all B', object='Y', predicate=requires_implementation + "
+    "subject='all B', object='X package', predicate=requires_dependency.\n"
     "\n"
     "2. EXCLUSION PATTERN — 'no module outside X shall do Y': extract TWO constraints:\n"
-    "   a. subject_role_general=codebase_root, predicate=prohibits_*, object_role_general=Y  — general prohibition\n"
-    "   b. subject_role_general=X, predicate=requires_*, object_role_general=Y  — explicit responsibility of X\n"
+    "   a. subject='codebase', predicate=prohibits_*, object=Y  — general prohibition\n"
+    "   b. subject=X, predicate=requires_*, object=Y  — explicit responsibility of X\n"
     "\n"
     "3. REPLACEMENT / SUPERCEDES PATTERN — 'Replace X with Y' or 'Switch to Y' (superceding X): extract TWO constraints:\n"
-    "   a. subject_role_general=codebase_root, predicate=prohibits_dependency, object_role_general=X  — prohibition of old technology\n"
-    "   b. subject_role_general=codebase_root, predicate=requires_dependency, object_role_general=Y  — requirement of new technology\n"
+    "   a. subject='codebase', predicate=prohibits_dependency, object=X  — prohibition of old technology\n"
+    "   b. subject='codebase', predicate=requires_dependency, object=Y  — requirement of new technology\n"
     "\n"
     "4. LAYER DISAMBIGUATION: parse verb and object as a unit.\n"
     "Verbs carry polarity (required vs prohibited). Objects carry layer (dependency vs implementation). Neither is sufficient alone.\n"
@@ -58,7 +52,7 @@ PROMPT_DESCRIPTION = (
     "must not / shall not / may not → prohibited\n"
     "\n"
     "Layer from object:\n"
-    "Looks like a module/class/library reference → *_dependency\n"
+    "Names a module, library, or package → *_dependency\n"
     "Describes a behaviour, pattern, or logic → *_implementation\n"
 )
 
@@ -71,10 +65,8 @@ FEW_SHOT_EXAMPLES = [
                 extraction_class="adr_constraint",
                 extraction_text="Direct MySQL connections are prohibited for services",
                 attributes={
-                    "subject_role_general": "app.services",
-                    "subject_role_specific": "service",
-                    "object_role_general": "mysql",
-                    "object_role_specific": "MySQL connector",
+                    "subject": "services",
+                    "object": "MySQL",
                     "predicate": "prohibits_dependency",
                     "justification": "Direct MySQL connections are prohibited for services.",
                 },
@@ -89,22 +81,18 @@ FEW_SHOT_EXAMPLES = [
                 extraction_class="adr_constraint",
                 extraction_text="All API endpoints shall implement authentication",
                 attributes={
-                    "subject_role_general": "app.api",
-                    "subject_role_specific": "endpoint",
-                    "object_role_general": "app.auth",
-                    "object_role_specific": "middleware",
+                    "subject": "all API endpoints",
+                    "object": "authentication",
                     "predicate": "requires_implementation",
-                    "justification": "All API endpoints must implement authentication through the middleware.",
+                    "justification": "All API endpoints must implement authentication.",
                 },
             ),
             lx.data.Extraction(
                 extraction_class="adr_constraint",
                 extraction_text="through middleware",
                 attributes={
-                    "subject_role_general": "app.api",
-                    "subject_role_specific": "endpoint",
-                    "object_role_general": "app.auth",
-                    "object_role_specific": "middleware",
+                    "subject": "all API endpoints",
+                    "object": "middleware",
                     "predicate": "requires_dependency",
                     "justification": "All API endpoints must use middleware for authentication.",
                 },
@@ -118,12 +106,10 @@ FEW_SHOT_EXAMPLES = [
                 extraction_class="adr_constraint",
                 extraction_text="must import internal logging module",
                 attributes={
-                    "subject_role_general": "app.services",
-                    "subject_role_specific": "service",
-                    "object_role_general": "app.logging",
-                    "object_role_specific": "logging module",
+                    "subject": "all services",
+                    "object": "internal logging module",
                     "predicate": "requires_dependency",
-                    "justification": "All services must import the structured logging module.",
+                    "justification": "All services must import the internal logging module.",
                 },
             ),
         ],
@@ -135,26 +121,22 @@ FEW_SHOT_EXAMPLES = [
         extractions=[
             lx.data.Extraction(
                 extraction_class="adr_constraint",
-                extraction_text="No module outside app.auth",
+                extraction_text="No module outside auth shall implement authentication logic",
                 attributes={
-                    "subject_role_general": "app",
-                    "subject_role_specific": "module",
-                    "object_role_general": "app.auth",
-                    "object_role_specific": "authentication logic",
+                    "subject": "codebase",
+                    "object": "authentication logic",
                     "predicate": "prohibits_implementation",
                     "justification": "No module outside auth shall implement authentication logic.",
                 },
             ),
             lx.data.Extraction(
                 extraction_class="adr_constraint",
-                extraction_text="Only app.auth.middleware is permitted",
+                extraction_text="Only middleware is permitted to define authentication behavior",
                 attributes={
-                    "subject_role_general": "app.auth",
-                    "subject_role_specific": "auth middleware",
-                    "object_role_general": "app.auth",
-                    "object_role_specific": "authentication behavior",
+                    "subject": "auth module",
+                    "object": "authentication logic",
                     "predicate": "requires_implementation",
-                    "justification": "Only middleware is permitted to define authentication behavior.",
+                    "justification": "Only the auth module is permitted to define authentication behavior.",
                 },
             ),
         ],
@@ -167,10 +149,8 @@ FEW_SHOT_EXAMPLES = [
                 extraction_class="adr_constraint",
                 extraction_text="We will use Flask",
                 attributes={
-                    "subject_role_general": "app",
-                    "subject_role_specific": "server",
-                    "object_role_general": "flask",
-                    "object_role_specific": "Flask web framework",
+                    "subject": "codebase",
+                    "object": "Flask",
                     "predicate": "requires_dependency",
                     "justification": "The server will use Flask as its web framework.",
                 },
@@ -184,24 +164,20 @@ FEW_SHOT_EXAMPLES = [
                 extraction_class="adr_constraint",
                 extraction_text="No module outside app.database",
                 attributes={
-                    "subject_role_general": "app",
-                    "subject_role_specific": "module",
-                    "object_role_general": "mysql",
-                    "object_role_specific": "MySQL connector",
+                    "subject": "codebase",
+                    "object": "mysql.connector",
                     "predicate": "prohibits_dependency",
-                    "justification": "No module outside app.database shall import mysql.connector directly.",
+                    "justification": "No module outside database shall import mysql.connector directly.",
                 },
             ),
             lx.data.Extraction(
                 extraction_class="adr_constraint",
-                extraction_text="app.database",
+                extraction_text="database module",
                 attributes={
-                    "subject_role_general": "app.database",
-                    "subject_role_specific": "database module",
-                    "object_role_general": "mysql",
-                    "object_role_specific": "MySQL connector",
+                    "subject": "database module",
+                    "object": "mysql.connector",
                     "predicate": "requires_dependency",
-                    "justification": "app.database is the sole permitted interface for mysql.connector imports.",
+                    "justification": "Only the database module may import mysql.connector.",
                 },
             ),
         ],

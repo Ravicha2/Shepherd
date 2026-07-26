@@ -1,7 +1,7 @@
-"""Symbolic Constraint Resolver (ADR 008).
+"""Symbolic Constraint Resolver (ADR 008 + prose model).
 
-Resolves SymbolicConstraints against the ADG via substring matching and
-kind-filtered CONTAINS walks, producing ResolvedConstraints ready for merge.
+Resolves SymbolicConstraints against the ADG via substring/prefix matching,
+producing ConstraintEdges ready for merge.
 """
 from __future__ import annotations
 
@@ -14,112 +14,67 @@ from services.models import (
     FQNKind,
     FQNNode,
     PredicateType,
-    ResolvedConstraint,
     SymbolicConstraint,
 )
 
 log = logging.getLogger(__name__)
 
 
-def _general_match(role_general: str, candidates: list[FQNNode]) -> list[FQNNode]:
-    """Exact or wildcard match role_general against module FQNs.
+def _prose_match(prose: str, candidates: list[FQNNode]) -> list[FQNNode]:
+    """Match a prose subject/object against ADG nodes.
 
-    role_general is a bare module name like 'app.services' or 'flask'.
-    A node matches if its FQN equals role_general or starts with role_general + '.'.
-    """
-    matched = []
-    for node in candidates:
-        fqn_str = str(node.fqn)
-        if fqn_str == role_general or fqn_str.startswith(role_general + "."):
-            matched.append(node)
-    return matched
-
-
-def _walk_contains(fqn: FQN, edges: list, all_nodes: list[FQNNode]) -> list[FQNNode]:
-    """Walk CONTAINS edges to find all descendants (not just direct children)."""
-    fqn_prefix = str(fqn) + "."
-    return [node for node in all_nodes if str(node.fqn).startswith(fqn_prefix)]
-
-
-def _specific_narrow(role_specific: str, candidates: list[FQNNode]) -> list[FQNNode]:
-    """Substring-match role_specific against the last segment of candidate FQNs.
-
-    Priority: exact > prefix overlap > substring containment.
-    Case-insensitive comparison so "API" matches "api".
+    Strategy (in priority order):
+    1. Exact FQN match: prose equals a node's full FQN string
+    2. Prefix match: prose matches the start of a node's FQN (e.g., "services" matches "app.services")
+    3. Substring match: prose is contained in the last segment of a node's FQN (case-insensitive)
     """
     if not candidates:
         return []
 
-    role_lower = role_specific.lower()
-    exact = []
-    prefix = []
-    substring = []
+    prose_lower = prose.lower()
 
+    # 1. Exact match
+    exact = [n for n in candidates if str(n.fqn) == prose]
+    if exact:
+        return exact
+
+    # 2. Prefix match: prose matches start of dotted FQN segment
+    # e.g., "services" matches "app.services", "app.auth" matches "app.auth.middleware"
+    prefix = [n for n in candidates if str(n.fqn).endswith("." + prose_lower) or str(n.fqn) == prose_lower]
+    # Also match if prose is a full prefix of the FQN (e.g., "app" matches "app.services")
+    prefix += [n for n in candidates if str(n.fqn).lower().startswith(prose_lower + ".")]
+    # Deduplicate
+    seen = set()
+    deduped = []
+    for n in prefix:
+        if id(n) not in seen:
+            seen.add(id(n))
+            deduped.append(n)
+    if deduped:
+        return deduped
+
+    # 3. Substring match on last segment (case-insensitive)
+    substring = []
     for node in candidates:
         short_name = (node.fqn.parts[-1] if node.fqn.parts else "").lower()
-        if short_name == role_lower:
-            exact.append(node)
-        elif short_name.startswith(role_lower) or role_lower.startswith(short_name):
-            prefix.append(node)
-        elif role_lower in short_name:
+        if prose_lower in short_name or short_name in prose_lower:
             substring.append(node)
+    if substring:
+        return substring
 
-    return exact or prefix or substring
-
-
-def _resolve_side(
-    role_general: str,
-    role_specific: str,
-    adg: ADG,
-) -> tuple[list[FQNNode], str]:
-    """Resolve one side (subject or object) of a SymbolicConstraint.
-
-    Returns (matched_nodes, match_source) where match_source is one of:
-      "specific" | "general_wildcard" | "fallback" | "no_match"
-    """
-    general_matches = _general_match(role_general, adg.nodes)
-
-    if general_matches:
-        # Walk all descendants and narrow by role_specific
-        # LLM-generated role_specific may target modules, so search all nodes.
-        children = []
-        for parent in general_matches:
-            children.extend(_walk_contains(parent.fqn, adg.edges, adg.nodes))
-
-        if role_specific:
-            narrowed = _specific_narrow(role_specific, children)
-            if narrowed:
-                return narrowed, "specific"
-
-        # When specific narrowing fails, return only the shallowest (shortest FQN) match 
-        # instead of the entire subtree. CPT walks CONTAINS at
-        # detection time, so pre-expanding just creates cross-product bloom.
-        shallowest = min(general_matches, key=lambda node: len(str(node.fqn).split(".")))
-        return [shallowest], "general_wildcard"
-
-    # Step 5: fallback - substring-match role_specific against all nodes
-    if role_specific:
-        fallback = _specific_narrow(role_specific, adg.nodes)
-        if fallback:
-            return fallback, "fallback"
-
-    return [], "no_match"
+    return []
 
 
 def resolve_symbolic_constraints(
     symbolic: list[SymbolicConstraint], adg: ADG,
     project_root: Path | None = None,
-) -> list[ResolvedConstraint]:
-    """Resolve SymbolicConstraints against the ADG into ResolvedConstraints.
+) -> list[ConstraintEdge]:
+    """Resolve SymbolicConstraints against the ADG into ConstraintEdges.
 
     For each SymbolicConstraint:
-    1. General match role_general against ADG nodes
-    2. Walk CONTAINS and specific narrow with role_specific
-    3. Fallback: substring match role_specific
-    4. No match: skip and log
-
-    External dependencies (dependency predicates with no ADG match) create
-    EXTERNAL nodes directly.
+    1. Match subject/object prose against ADG nodes
+    2. External dependencies (dependency predicates with no ADG match) create EXTERNAL nodes
+    3. No match: skip and log
 
     project_root: optional path to repo root for dev-tool classification.
     """
@@ -128,22 +83,18 @@ def resolve_symbolic_constraints(
 
     extra_dev_packages = _load_dev_packages_from_config(project_root)
     adg = add_external_nodes(adg, project_root=project_root)
-    resolved: list[ResolvedConstraint] = []
+    edges: list[ConstraintEdge] = []
 
     for sym_constraint in symbolic:
         pred_value = sym_constraint.predicate.value
 
-        subject_nodes, subject_source = _resolve_side(
-            sym_constraint.subject_role_general, sym_constraint.subject_role_specific, adg,
-        )
-        object_nodes, object_source = _resolve_side(
-            sym_constraint.object_role_general, sym_constraint.object_role_specific, adg,
-        )
+        subject_nodes = _prose_match(sym_constraint.subject, adg.nodes)
+        object_nodes = _prose_match(sym_constraint.object, adg.nodes)
 
         # External dependency shortcut: if object has no ADG match and this is
         # a dependency predicate, create an EXTERNAL node
         if not object_nodes and pred_value in ("requires_dependency", "prohibits_dependency"):
-            ext_fqn = FQN.from_dotted(sym_constraint.object_role_general)
+            ext_fqn = FQN.from_dotted(sym_constraint.object)
             ext_role = _classify_external_role(str(ext_fqn), extra_dev_packages)
             ext_node = FQNNode(
                 fqn=ext_fqn,
@@ -159,23 +110,22 @@ def resolve_symbolic_constraints(
                 constraint_edges=adg.constraint_edges,
             )
             object_nodes = [ext_node]
-            object_source = "external"
 
         if not subject_nodes:
             log.warning(
-                "resolve: [%s] subject '%s'/%s matched nothing, skipping",
-                sym_constraint.adr_id, sym_constraint.subject_role_general, sym_constraint.subject_role_specific,
+                "resolve: [%s] subject '%s' matched nothing, skipping",
+                sym_constraint.adr_id, sym_constraint.subject,
             )
             continue
 
         if not object_nodes:
             log.warning(
-                "resolve: [%s] object '%s'/%s matched nothing, skipping",
-                sym_constraint.adr_id, sym_constraint.object_role_general, sym_constraint.object_role_specific,
+                "resolve: [%s] object '%s' matched nothing, skipping",
+                sym_constraint.adr_id, sym_constraint.object,
             )
             continue
 
-        # module nodes get wildcard suffix so CPT matches descendants;
+        # Module nodes get wildcard suffix so CPT matches descendants;
         # non-module (class, function, external) stay exact.
         def _pattern(n: FQNNode) -> str:
             return str(n.fqn) + (".*" if n.kind == FQNKind.MODULE else "")
@@ -196,19 +146,13 @@ def resolve_symbolic_constraints(
                     adr_id=sym_constraint.adr_id,
                     adr_path=sym_constraint.adr_path,
                 )
-                resolved.append(ResolvedConstraint(
-                    constraint_edge=edge,
-                    subject_matched_by=subject_source,
-                    object_matched_by=object_source,
-                ))
+                edges.append(edge)
 
         log.info(
-            "resolve: [%s] %s/%s -[%s]-> %s/%s  (subjects=%s, objects=%s)",
+            "resolve: [%s] '%s' -[%s]-> '%s'",
             sym_constraint.adr_id,
-            sym_constraint.subject_role_general, sym_constraint.subject_role_specific,
-            sym_constraint.predicate.value,
-            sym_constraint.object_role_general, sym_constraint.object_role_specific,
-            subject_source, object_source,
+            sym_constraint.subject, sym_constraint.predicate.value,
+            sym_constraint.object,
         )
 
-    return resolved
+    return edges

@@ -103,22 +103,6 @@ class PredicateType(Enum):
     PROHIBITS_IMPLEMENTATION = "prohibits_implementation"
 
 
-# Kind filters for symbolic resolution (ADR 008)
-SUBJECT_KINDS: dict[str, set[str]] = {
-    "requires_dependency": {"module"},
-    "prohibits_dependency": {"module"},
-    "requires_implementation": {"module", "class"},
-    "prohibits_implementation": {"module", "class"},
-}
-
-OBJECT_KINDS: dict[str, set[str]] = {
-    "requires_dependency": {"module"},
-    "prohibits_dependency": {"module"},
-    "requires_implementation": {"class", "function", "method"},
-    "prohibits_implementation": {"class", "function", "method"},
-}
-
-
 @dataclass
 class ConstraintEdge:
     subject: str
@@ -148,44 +132,28 @@ class ConstraintEdge:
 class SymbolicConstraint:
     """Intermediate representation between LLM extraction and ADG resolution.
 
-    Decouples ADR natural-language concepts from code structure. The LLM
-    picks role_general from a bounded module list; role_specific comes from
-    ADR text. Resolution to ConstraintEdge happens later via ADG traversal.
+    Prose model: subject and object are natural-language terms from the ADR.
+    Resolution to ConstraintEdge happens via ADG traversal (substring/prefix
+    matching against FQN nodes).
     """
-    subject_role_general: str
-    subject_role_specific: str
+    subject: str
+    object: str
     predicate: PredicateType
-    object_role_general: str
-    object_role_specific: str
     justification: str
-    extraction_text: str
     adr_id: str
     adr_path: str
 
     def __post_init__(self) -> None:
-        if not self.subject_role_general:
-            raise ValueError("subject_role_general must be non-empty")
-        if not self.object_role_general:
-            raise ValueError("object_role_general must be non-empty")
+        if not self.subject:
+            raise ValueError("subject must be non-empty")
+        if not self.object:
+            raise ValueError("object must be non-empty")
         if not self.justification:
             raise ValueError("justification must be non-empty")
-        if not self.extraction_text:
-            raise ValueError("extraction_text must be non-empty")
         if not self.adr_id:
             raise ValueError("adr_id must be non-empty")
         if not self.adr_path:
             raise ValueError("adr_path must be non-empty")
-
-
-@dataclass
-class ResolvedConstraint:
-    """A SymbolicConstraint resolved against the ADG into a ConstraintEdge.
-
-    Tracks how each side was matched for auditing.
-    """
-    constraint_edge: ConstraintEdge
-    subject_matched_by: str  # "specific" | "general_wildcard" | "fallback" | "human"
-    object_matched_by: str   # same
 
 
 @dataclass

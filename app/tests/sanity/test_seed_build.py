@@ -17,7 +17,6 @@ from cli.config import load_config
 from cli.main import _resolve_repo_path
 from services.adg import parse_repo
 from services.extract import extract_all_adrs
-from services.extract.engine import derive_package_context
 from services.models import FQNKind, SymbolicConstraint, PredicateType
 from services.pipeline import ADGPipeline
 
@@ -25,24 +24,18 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 
 FLASK_CONSTRAINTS = [
     SymbolicConstraint(
-        subject_role_general="app.routes",
-        subject_role_specific="app.routes.*",
+        subject="app.routes",
         predicate=PredicateType.PROHIBITS_DEPENDENCY,
-        object_role_general="app.models",
-        object_role_specific="app.models.*",
+        object="app.models",
         justification="Route handlers must not import anything from models directly.",
-        extraction_text="Route handlers must not import anything from models directly.",
         adr_id="ADR-001",
         adr_path="docs/adr/001-layered-architecture.md",
     ),
     SymbolicConstraint(
-        subject_role_general="app.routes",
-        subject_role_specific="app.routes.*",
+        subject="app.routes",
         predicate=PredicateType.REQUIRES_IMPLEMENTATION,
-        object_role_general="app.middleware",
-        object_role_specific="app.middleware.auth",
+        object="app.middleware",
         justification="Every route handler must apply the @require_auth decorator from auth middleware.",
-        extraction_text="Every route handler must apply the @require_auth decorator from auth middleware.",
         adr_id="ADR-002",
         adr_path="docs/adr/002-auth-middleware-required.md",
     ),

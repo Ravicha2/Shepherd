@@ -172,14 +172,14 @@ def merge_constraints(adg: ADG, constraints: list[SymbolicConstraint], project_r
     extra_dev_packages = _load_dev_packages_from_config(project_root)
     resolved = resolve_symbolic_constraints(constraints, adg, project_root=project_root)
 
-    constraint_edges = [rc.constraint_edge for rc in resolved]
+    constraint_edges = resolved
 
     # Collect all FQNs from the ADG nodes (including EXTERNAL nodes added
     # during resolution)
     all_adg_nodes = set()
-    for rc in resolved:
-        all_adg_nodes.add(rc.constraint_edge.subject)
-        all_adg_nodes.add(rc.constraint_edge.object)
+    for edge in resolved:
+        all_adg_nodes.add(edge.subject)
+        all_adg_nodes.add(edge.object)
 
     known_fqns = {str(n.fqn) for n in adg.nodes}
 

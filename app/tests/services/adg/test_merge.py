@@ -19,7 +19,6 @@ from services.models import (
     FQNKind,
     FQNNode,
     PredicateType,
-    ResolvedConstraint,
     SymbolicConstraint,
 )
 from services.adg.merge import add_external_nodes, merge_constraints
@@ -63,24 +62,18 @@ def sample_symbolic_constraints() -> list[SymbolicConstraint]:
     """Symbolic constraints from ADR extraction."""
     return [
         SymbolicConstraint(
-            subject_role_general="app.api",
-            subject_role_specific="endpoint",
+            subject="app.api",
             predicate=PredicateType.REQUIRES_IMPLEMENTATION,
-            object_role_general="app.auth",
-            object_role_specific="authentication middleware",
+            object="app.auth",
             justification="All API endpoints must implement authentication.",
-            extraction_text="All API endpoints shall implement authentication",
             adr_id="ADR-003",
             adr_path="docs/adr/003-auth-middleware.md",
         ),
         SymbolicConstraint(
-            subject_role_general="app.services",
-            subject_role_specific="service",
+            subject="app.services",
             predicate=PredicateType.PROHIBITS_DEPENDENCY,
-            object_role_general="logging",
-            object_role_specific="bare logging",
+            object="logging",
             justification="No service shall use bare logging directly.",
-            extraction_text="No service shall use bare logging",
             adr_id="ADR-005",
             adr_path="docs/adr/005-centralized-logging.md",
         ),
@@ -137,47 +130,38 @@ class TestResolveSymbolicConstraints:
 
     def test_resolve_exact_match(self, sample_adg: ADG) -> None:
         sc = SymbolicConstraint(
-            subject_role_general="app.api",
-            subject_role_specific="endpoint",
+            subject="app.api",
             predicate=PredicateType.PROHIBITS_DEPENDENCY,
-            object_role_general="mysql",
-            object_role_specific="connector",
+            object="mysql",
             justification="No direct MySQL.",
-            extraction_text="No direct MySQL connections",
             adr_id="ADR-001",
             adr_path="docs/adr/001.md",
         )
         resolved = resolve_symbolic_constraints([sc], sample_adg)
         assert len(resolved) >= 1
-        assert resolved[0].constraint_edge.subject.startswith("app.api")
-        assert resolved[0].constraint_edge.predicate is PredicateType.PROHIBITS_DEPENDENCY
-        assert resolved[0].object_matched_by == "external"
+        assert resolved[0].subject.startswith("app.api")
+        assert resolved[0].predicate is PredicateType.PROHIBITS_DEPENDENCY
+        assert resolved[0].object.startswith("mysql")
 
     def test_resolve_general_wildcard(self, sample_adg: ADG) -> None:
         sc = SymbolicConstraint(
-            subject_role_general="app.services",
-            subject_role_specific="service",
+            subject="app.services",
             predicate=PredicateType.PROHIBITS_DEPENDENCY,
-            object_role_general="logging",
-            object_role_specific="logging module",
+            object="logging",
             justification="No bare logging.",
-            extraction_text="No bare logging",
             adr_id="ADR-005",
             adr_path="docs/adr/005.md",
         )
         resolved = resolve_symbolic_constraints([sc], sample_adg)
         assert len(resolved) >= 1
-        assert resolved[0].subject_matched_by == "general_wildcard"
+        assert resolved[0].subject.startswith("app.services")
 
     def test_resolve_no_match_skips(self, sample_adg: ADG) -> None:
         sc = SymbolicConstraint(
-            subject_role_general="nonexistent",
-            subject_role_specific="phantom",
+            subject="nonexistent",
             predicate=PredicateType.REQUIRES_DEPENDENCY,
-            object_role_general="mysql",
-            object_role_specific="connector",
+            object="mysql",
             justification="Phantom module.",
-            extraction_text="Phantom module",
             adr_id="ADR-999",
             adr_path="docs/adr/999.md",
         )
@@ -186,19 +170,16 @@ class TestResolveSymbolicConstraints:
 
     def test_external_dependency_creates_external_node(self, sample_adg: ADG) -> None:
         sc = SymbolicConstraint(
-            subject_role_general="app.services",
-            subject_role_specific="service",
+            subject="app.services",
             predicate=PredicateType.PROHIBITS_DEPENDENCY,
-            object_role_general="mysql",
-            object_role_specific="MySQL connector",
+            object="mysql",
             justification="No direct MySQL.",
-            extraction_text="No direct MySQL connections",
             adr_id="ADR-001",
             adr_path="docs/adr/001.md",
         )
         resolved = resolve_symbolic_constraints([sc], sample_adg)
         assert len(resolved) >= 1
-        assert resolved[0].object_matched_by == "external"
+        assert resolved[0].object.startswith("mysql")
 
     def test_resolve_implementation_predicate_matches_class(self) -> None:
         """requires_implementation should match class/function/method nodes."""
@@ -214,21 +195,18 @@ class TestResolveSymbolicConstraints:
         adg = ADG(nodes=nodes, edges=edges)
 
         sc = SymbolicConstraint(
-            subject_role_general="app",
-            subject_role_specific="module",
+            subject="app",
             predicate=PredicateType.REQUIRES_IMPLEMENTATION,
-            object_role_general="app.auth",
-            object_role_specific="Middleware",
+            object="app.auth",
             justification="Must implement auth.",
-            extraction_text="Must implement auth",
             adr_id="ADR-010",
             adr_path="docs/adr/010.md",
         )
         resolved = resolve_symbolic_constraints([sc], adg)
         assert len(resolved) >= 1
-        # Object should match the class node
-        object_fqns = {rc.constraint_edge.object for rc in resolved}
-        assert "app.auth.Middleware" in object_fqns
+        # Object "app.auth" matches the app.auth module node (gets wildcard suffix)
+        object_fqns = {rc.object for rc in resolved}
+        assert "app.auth.*" in object_fqns
 
 
 # ===========================================================================
@@ -251,13 +229,10 @@ class TestMergeConstraints:
 
     def test_merge_adds_external_for_orphan_references(self, sample_adg: ADG) -> None:
         sc = SymbolicConstraint(
-            subject_role_general="app.services",
-            subject_role_specific="service",
+            subject="app.services",
             predicate=PredicateType.PROHIBITS_DEPENDENCY,
-            object_role_general="logging",
-            object_role_specific="bare logging",
+            object="logging",
             justification="No bare logging.",
-            extraction_text="No bare logging",
             adr_id="ADR-005",
             adr_path="docs/adr/005-logging.md",
         )
@@ -278,13 +253,10 @@ class TestMergeConstraintsIncremental:
     def test_replace_constraints_by_adr_id(self, sample_adg: ADG) -> None:
         old_constraints = [
             SymbolicConstraint(
-                subject_role_general="app.api",
-                subject_role_specific="endpoint",
+                subject="app.api",
                 predicate=PredicateType.PROHIBITS_DEPENDENCY,
-                object_role_general="mysql",
-                object_role_specific="MySQL connector",
+                object="mysql",
                 justification="Old: no direct MySQL.",
-                extraction_text="No direct MySQL",
                 adr_id="ADR-003",
                 adr_path="docs/adr/003-auth-middleware.md",
             ),
@@ -294,13 +266,10 @@ class TestMergeConstraintsIncremental:
 
         new_constraints = [
             SymbolicConstraint(
-                subject_role_general="app.api",
-                subject_role_specific="endpoint",
+                subject="app.api",
                 predicate=PredicateType.REQUIRES_DEPENDENCY,
-                object_role_general="app.auth",
-                object_role_specific="auth middleware",
+                object="app.auth",
                 justification="Updated: dependency, not implementation.",
-                extraction_text="Updated dependency",
                 adr_id="ADR-003",
                 adr_path="docs/adr/003-auth-middleware.md",
             ),
@@ -318,26 +287,20 @@ class TestMergeConstraintsIncremental:
     def test_other_adr_constraints_preserved(self, sample_adg: ADG) -> None:
         constraints_adr3 = [
             SymbolicConstraint(
-                subject_role_general="app.api",
-                subject_role_specific="endpoint",
+                subject="app.api",
                 predicate=PredicateType.REQUIRES_IMPLEMENTATION,
-                object_role_general="app.auth",
-                object_role_specific="authentication middleware",
+                object="app.auth",
                 justification="Auth required.",
-                extraction_text="Auth required",
                 adr_id="ADR-003",
                 adr_path="docs/adr/003.md",
             ),
         ]
         constraints_adr5 = [
             SymbolicConstraint(
-                subject_role_general="app.services",
-                subject_role_specific="service",
+                subject="app.services",
                 predicate=PredicateType.PROHIBITS_DEPENDENCY,
-                object_role_general="logging",
-                object_role_specific="bare logging",
+                object="logging",
                 justification="No bare logging.",
-                extraction_text="No bare logging",
                 adr_id="ADR-005",
                 adr_path="docs/adr/005.md",
             ),
@@ -347,13 +310,10 @@ class TestMergeConstraintsIncremental:
 
         new_adr3 = [
             SymbolicConstraint(
-                subject_role_general="app.api",
-                subject_role_specific="endpoint",
+                subject="app.api",
                 predicate=PredicateType.REQUIRES_DEPENDENCY,
-                object_role_general="app.auth",
-                object_role_specific="auth middleware",
+                object="app.auth",
                 justification="Updated specific rule.",
-                extraction_text="Updated rule",
                 adr_id="ADR-003",
                 adr_path="docs/adr/003.md",
             ),
@@ -726,13 +686,10 @@ class TestConfigDevToolClassification:
             'dev = ["custom_linter"]\n'
         )
         sc = SymbolicConstraint(
-            subject_role_general="app.services",
-            subject_role_specific="service",
+            subject="app.services",
             predicate=PredicateType.PROHIBITS_DEPENDENCY,
-            object_role_general="custom_linter",
-            object_role_specific="linter",
+            object="custom_linter",
             justification="No custom linter.",
-            extraction_text="No custom linter",
             adr_id="ADR-012",
             adr_path="docs/adr/012.md",
         )

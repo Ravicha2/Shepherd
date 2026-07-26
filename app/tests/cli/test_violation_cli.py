@@ -201,12 +201,11 @@ class TestSeedBuildWipesDismissals:
     @patch("cli.main.GraphStore")
     @patch("cli.main.ADGPipeline")
     @patch("cli.main.extract_all_adrs")
-    @patch("cli.main.derive_package_context")
     @patch("cli.main.parse_repo")
     @patch("cli.main._get_repo")
     @patch("cli.main.load_config")
     def test_seed_build_calls_delete_all_dismissals(
-        self, mock_config, mock_get_repo, mock_parse, mock_derive,
+        self, mock_config, mock_get_repo, mock_parse,
         mock_extract, mock_pipeline_cls, mock_store_cls
     ):
         from services.models import ADG as ADGModel
@@ -216,7 +215,6 @@ class TestSeedBuildWipesDismissals:
 
         with patch.object(Path, "exists", return_value=True):
             mock_parse.return_value = ADGModel(nodes=[], edges=[], constraint_edges=[])
-            mock_derive.return_value = {}
             mock_extract.return_value = []
             mock_pipeline = MagicMock()
             mock_pipeline.build_seed.return_value = ADGModel(nodes=[], edges=[], constraint_edges=[])

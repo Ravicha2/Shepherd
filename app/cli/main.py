@@ -19,7 +19,6 @@ from services.cpt import GitAdapter, process_diff
 from services.cpt.dismissal import Dismissal, compute_identity_hash, filter_dismissed, violation_identity, violation_short_id
 from services.cpt.resolution import Violation
 from services.extract import extract_all_adrs
-from services.extract.engine import derive_package_context
 from services.graph.connector import GraphStore
 from services.models import Diff, DiffResult, FQNKind, SymbolicConstraint
 from services.commit_update import UpdateResult, commit_update
@@ -540,11 +539,10 @@ def seed_build(
     console.print("[bold]Step 1:[/] Parsing repository structure...")
     adg = parse_repo(repo_path)
     console.print(f"  Found {len(adg.nodes)} nodes, {len(adg.edges)} edges")
-    package_context = derive_package_context(adg)
 
     # extract ADR constraints
     console.print("[bold]Step 2:[/] Extracting ADR constraints...")
-    results = extract_all_adrs(repo_path, repo_cfg.adr_dir, config.langextract, package_context=package_context)
+    results = extract_all_adrs(repo_path, repo_cfg.adr_dir, config.langextract)
     all_constraints: list[SymbolicConstraint] = []
     total_errors = 0
     for result in results:

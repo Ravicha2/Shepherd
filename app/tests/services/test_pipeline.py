@@ -224,13 +224,10 @@ def _make_adg() -> ADG:
 def _make_constraints() -> list[SymbolicConstraint]:
     return [
         SymbolicConstraint(
-            subject_role_general="app",
-            subject_role_specific="service",
+            subject="app",
+            object="app",
             predicate=PredicateType.PROHIBITS_DEPENDENCY,
-            object_role_general="app",
-            object_role_specific="repo",
             justification="Services must not depend on repositories directly",
-            extraction_text="services should not import repos",
             adr_id="ADR-001",
             adr_path="docs/adr/001.md",
         ),

@@ -340,11 +340,9 @@ class TestJudgeEvaluation:
         return json.dumps(
             [
                 {
-                    "subject_role_general": c.subject_role_general,
-                    "subject_role_specific": c.subject_role_specific,
+                    "subject": c.subject,
                     "predicate": c.predicate.value,
-                    "object_role_general": c.object_role_general,
-                    "object_role_specific": c.object_role_specific,
+                    "object": c.object,
                     "justification": c.justification,
                 }
                 for c in constraints
@@ -482,8 +480,8 @@ class TestDeterminism:
         the decision log). If it fails, it indicates non-determinism in
         the LLM provider, not a bug in the extraction module.
         """
-        first_subjects = {c.subject_role_general for c in first_result.constraints}
-        second_subjects = {c.subject_role_general for c in second_result.constraints}
+        first_subjects = {c.subject for c in first_result.constraints}
+        second_subjects = {c.subject for c in second_result.constraints}
         assert first_subjects == second_subjects, (
             f"Non-deterministic extraction: {first_subjects} != {second_subjects}"
         )

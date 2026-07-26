@@ -4,7 +4,7 @@ Date: 2026-06-17
 
 ## Status
 
-superceded by [ADR8](./008-symbolic-constraint-resolution.md)
+Superseded by [ADR 14](./014-agent-driven-adg-resolution.md)
 
 ## Context
 

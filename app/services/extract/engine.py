@@ -27,48 +27,14 @@ from services.models import (
 )
 
 
-def derive_package_context(adg: "ADG") -> list[str]:  # noqa: F821
-    """Return all top-level module packages from the ADG, excluding 'tests'.
-
-    The LLM uses this list to pick role_general values instead of inventing
-    FQN strings. Every top-level module is included so both subject and object
-    general roles have a bounded vocabulary to draw from.
-    """
-    if not adg.nodes:
-        return []
-    top_modules: set[str] = set()
-    for n in adg.nodes:
-        parts = n.fqn.parts
-        if not parts or len(parts) <= 1:
-            continue
-        top = parts[0]
-        if top == "tests":
-            continue
-        top_modules.add(top)
-    return sorted(top_modules)
-
-
 class ADRExtractor:
     def __init__(
         self,
         config: LangExtractConfig,
         log_path: Path | None = None,
-        package_context: list[str] | None = None,
     ) -> None:
         self.config = config
         self.log_path = log_path
-        self.package_context = package_context
-
-    def _build_prompt(self) -> str:
-        if not self.package_context:
-            return PROMPT_DESCRIPTION
-        packages = ", ".join(self.package_context)
-        return (
-            PROMPT_DESCRIPTION
-            + "\nCodebase packages (use these as role_general values):\n"
-            + packages
-            + "\n"
-        )
 
     def extract_constraints(
         self, adr_text: str, adr_id: str, adr_path: str
@@ -90,7 +56,7 @@ class ADRExtractor:
             )
             result = lx.extract(
                 text_or_documents=adr_text,
-                prompt_description=self._build_prompt(),
+                prompt_description=PROMPT_DESCRIPTION,
                 examples=FEW_SHOT_EXAMPLES,
                 config=model_config,
                 prompt_validation_level=lx.prompt_validation.PromptValidationLevel.OFF,
@@ -135,7 +101,7 @@ class ADRExtractor:
             except ValueError:
                 log.warning("extract_constraints: invalid predicate '%s' in %s", pred_str, adr_id)
                 errors.append(ExtractionError(
-                    message=f"Invalid predicate '{pred_str}' in: {ext.extraction_text}",
+                    message=f"Invalid predicate '{pred_str}'",
                     adr_path=adr_path,
                     error_type="parse_failure",
                 ))
@@ -143,20 +109,17 @@ class ADRExtractor:
 
             try:
                 sc = SymbolicConstraint(
-                    subject_role_general=attrs.get("subject_role_general", ""),
-                    subject_role_specific=attrs.get("subject_role_specific", ""),
+                    subject=attrs.get("subject", ""),
+                    object=attrs.get("object", ""),
                     predicate=predicate,
-                    object_role_general=attrs.get("object_role_general", ""),
-                    object_role_specific=attrs.get("object_role_specific", ""),
                     justification=attrs.get("justification", ""),
-                    extraction_text=ext.extraction_text or "",
                     adr_id=adr_id,
                     adr_path=adr_path,
                 )
                 constraints.append(sc)
                 log.info(
                     "extract_constraints: parsed constraint [%s] '%s' -[%s]-> '%s'",
-                    adr_id, sc.subject_role_general, sc.predicate.value, sc.object_role_general,
+                    adr_id, sc.subject, sc.predicate.value, sc.object,
                 )
             except ValueError as exc:
                 log.error("extract_constraints: malformed extraction for %s: %s", adr_id, exc)

@@ -17,7 +17,6 @@ from cli.main import _resolve_repo_path, app
 from services.adg import parse_repo
 from services.cpt.diff_processor import process_diff
 from services.extract import extract_all_adrs
-from services.extract.engine import derive_package_context
 from services.models import (
     Diff,
     FileChange,
@@ -171,11 +170,9 @@ def main() -> None:
     print("\n[detect] parse_repo")
     adg = parse_repo(repo_path)
     print(f"  {len(adg.nodes)} nodes, {len(adg.edges)} edges")
-    package_context = derive_package_context(adg)
-
     print("[detect] extract ADR constraints")
     all_constraints = []
-    for r in extract_all_adrs(repo_path, repo_cfg.adr_dir, config.langextract, package_context=package_context):
+    for r in extract_all_adrs(repo_path, repo_cfg.adr_dir, config.langextract):
         all_constraints.extend(r.constraints)
     print(f"  {len(all_constraints)} constraints")
 
