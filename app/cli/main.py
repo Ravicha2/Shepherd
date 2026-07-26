@@ -569,8 +569,8 @@ def seed_build(
     )
     store.connect()
     store.create_schema()
-    deleted = store.delete_all_dismissals()  # ADR 012: seed rebuild wipes dismissals
-    console.print(f"  Cleared {deleted} previous dismissal(s)")
+    store.clear_all()  # ponytail: wipe entire graph to prevent cross-repo contamination
+    console.print("  Cleared previous graph data")
     store.store_adg(merged)
     store.close()
 
