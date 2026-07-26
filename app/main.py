@@ -6,7 +6,7 @@ from neo4j import GraphDatabase
 from cli.config import load_config
 from services.extract import LangExtractConfig
 
-app = FastAPI(title="ADRLinter", version="0.1.0")
+app = FastAPI(title="Shepherd", version="0.1.0")
 
 NEO4J_URI = os.getenv("NEO4J_URI", "bolt://neo4j:7687")
 NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
