@@ -10,7 +10,7 @@ import pytest
 
 from services.fqn import FQN
 from services.models import ADG, Edge, FQNKind, FQNNode
-from services.adg.adg_tools import list_modules, list_children, list_imports, list_inherits
+from services.adg.adg_tools import list_modules, list_children, list_imports, list_inherits, dive
 
 
 # -- Fixtures ---------------------------------------------------------------
@@ -181,3 +181,65 @@ class TestListInherits:
         """CONTAINS edges for the same source should not appear."""
         result = list_inherits("app.api", sample_adg)
         assert result == []  # app.api has CONTAINS edges but no INHERITS
+
+
+# -- dive --------------------------------------------------------------------
+
+class TestDive:
+    """dive(fqn, depth) returns all nodes + edges within N hops."""
+
+    def test_dive_depth0_returns_only_seed(self, sample_adg: ADG) -> None:
+        result = dive("app.api.users", sample_adg, depth=0)
+        assert result["nodes"] == [{"fqn": "app.api.users", "kind": "module"}]
+        assert result["edges"] == []
+
+    def test_dive_depth1_returns_direct_neighbors(self, sample_adg: ADG) -> None:
+        result = dive("app.api.users", sample_adg, depth=1)
+        node_fqns = {n["fqn"] for n in result["nodes"]}
+        # Direct neighbors: parent (app.api), children (UserView, list_users),
+        # imports (app.auth.middleware)
+        assert "app.api" in node_fqns
+        assert "app.api.users" in node_fqns
+        assert "app.api.users.UserView" in node_fqns
+        assert "app.api.users.list_users" in node_fqns
+        assert "app.auth.middleware" in node_fqns
+
+    def test_dive_depth2_expands_further(self, sample_adg: ADG) -> None:
+        result = dive("app.api.users", sample_adg, depth=2)
+        node_fqns = {n["fqn"] for n in result["nodes"]}
+        # depth 1 gave us UserView; depth 2 adds UserView's children and inherits
+        assert "app.api.users.UserView.get" in node_fqns
+        assert "app.auth.middleware.AuthMiddleware" in node_fqns
+
+    def test_dive_depth3_default(self, sample_adg: ADG) -> None:
+        result = dive("app.api.users", sample_adg, depth=3)
+        node_fqns = {n["fqn"] for n in result["nodes"]}
+        # depth 3 from users reaches AuthMiddleware.check
+        assert "app.auth.middleware.AuthMiddleware.check" in node_fqns
+
+    def test_dive_default_depth_is_3(self, sample_adg: ADG) -> None:
+        result = dive("app.api.users", sample_adg)
+        result3 = dive("app.api.users", sample_adg, depth=3)
+        assert result == result3
+
+    def test_dive_includes_edges(self, sample_adg: ADG) -> None:
+        result = dive("app.api.users", sample_adg, depth=1)
+        edge_set = {(e["source"], e["target"], e["kind"]) for e in result["edges"]}
+        # Should include edges connecting nodes in the neighborhood
+        assert ("app.api.users", "app.api.users.UserView", "CONTAINS") in edge_set
+        assert ("app.api.users", "app.auth.middleware", "IMPORTS") in edge_set
+
+    def test_dive_nonexistent_fqn_returns_empty(self, sample_adg: ADG) -> None:
+        result = dive("does.not.exist", sample_adg, depth=3)
+        assert result["nodes"] == []
+        assert result["edges"] == []
+
+    def test_dive_empty_adg(self, empty_adg: ADG) -> None:
+        result = dive("app", empty_adg, depth=3)
+        assert result["nodes"] == []
+        assert result["edges"] == []
+
+    def test_dive_inherits_edge_included(self, sample_adg: ADG) -> None:
+        result = dive("app.auth.middleware.AuthMiddleware", sample_adg, depth=1)
+        edge_set = {(e["source"], e["target"], e["kind"]) for e in result["edges"]}
+        assert ("app.auth.middleware.AuthMiddleware", "app.api.users.UserView", "INHERITS") in edge_set

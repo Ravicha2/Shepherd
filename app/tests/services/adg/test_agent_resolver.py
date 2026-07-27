@@ -21,8 +21,8 @@ from services.models import (
     PredicateType,
     SymbolicConstraint,
 )
-from services.adg.adg_tools import list_children, list_modules
-from services.adg.agent_resolver import resolve_agent_constraints, _extract_json
+from services.adg.adg_tools import dive, list_modules
+from services.adg.agent_resolver import resolve_agent_constraints, _extract_json, TOOL_CALL_CAP
 
 
 # -- Fixtures ---------------------------------------------------------------
@@ -108,24 +108,24 @@ class TestBasicResolution:
     def test_single_constraint_produces_edge(
         self, sample_adg: ADG, auth_constraint: SymbolicConstraint
     ) -> None:
-        # LLM calls list_modules → gets modules, then list_children on auth →
+        # LLM calls list_modules → gets modules, then dive on auth →
         # resolves to exact FQNs, returns final answer
         modules_result = json.dumps(list_modules(sample_adg))
-        children_result = json.dumps(list_children("app.auth", sample_adg))
-        children_api_result = json.dumps(list_children("app.api", sample_adg))
+        dive_auth_result = json.dumps(dive("app.auth", sample_adg, depth=2))
+        dive_api_result = json.dumps(dive("app.api", sample_adg, depth=2))
 
         responses = [
             # Round 1: LLM asks for modules
             _make_mock_response(
                 tool_calls=[_tool_call("tc1", "list_modules", {})],
             ),
-            # Round 2: LLM sees modules, asks about auth children
+            # Round 2: LLM sees modules, dives into auth
             _make_mock_response(
-                tool_calls=[_tool_call("tc2", "list_children", {"fqn": "app.auth"})],
+                tool_calls=[_tool_call("tc2", "dive", {"fqn": "app.auth", "depth": 2})],
             ),
-            # Round 3: LLM asks about api children too
+            # Round 3: LLM dives into api too
             _make_mock_response(
-                tool_calls=[_tool_call("tc3", "list_children", {"fqn": "app.api"})],
+                tool_calls=[_tool_call("tc3", "dive", {"fqn": "app.api", "depth": 2})],
             ),
             # Round 4: LLM returns resolved constraint
             _make_mock_response(
@@ -174,26 +174,27 @@ class TestBasicResolution:
 # -- Test: tool call cap -----------------------------------------------------
 
 class TestToolCallCap:
-    """Verify that exceeding the tool call cap returns best-effort result."""
+    """Verify that exceeding the tool call cap sends a best-effort request."""
 
-    def test_cap_returns_best_effort(
+    def test_cap_sends_best_effort_request(
         self, sample_adg: ADG, auth_constraint: SymbolicConstraint
     ) -> None:
-        """When LLM exceeds 20 tool calls, return best-effort result."""
-        # LLM keeps making tool calls past the cap
+        """When LLM exceeds tool call cap, a final best-effort request is sent."""
+        # Provide exactly TOOL_CALL_CAP tool-call responses (each with 1 tool call),
+        # then one best-effort response
         many_responses = []
-        for i in range(22):
+        for i in range(TOOL_CALL_CAP):
             many_responses.append(
                 _make_mock_response(
-                    tool_calls=[_tool_call(f"tc{i}", "list_modules", {})],
+                    tool_calls=[_tool_call(f"tc{i}", "dive", {"fqn": "app.auth", "depth": 2})],
                 )
             )
-        # Should never reach this, but provide final answer just in case
+        # After cap, one more call for the best-effort request
         many_responses.append(
             _make_mock_response(
                 content=json.dumps({
-                    "subject": "app.*",
-                    "object": "app.auth.*",
+                    "subject": "app.api.users.*",
+                    "object": "app.auth.middleware.*",
                     "predicate": "prohibits_dependency",
                     "justification": auth_constraint.justification,
                     "adr_id": auth_constraint.adr_id,
@@ -202,9 +203,27 @@ class TestToolCallCap:
             )
         )
 
-        # Should not raise, should return empty list (best-effort: no final answer)
         edges = _run_resolver(auth_constraint, sample_adg, many_responses)
-        # Cap hit means LLM never gave a final answer, so we get empty
+        # The best-effort fallback produces a result from the final LLM call
+        assert len(edges) == 1
+        assert edges[0].subject == "app.api.users.*"
+
+    def test_cap_best_effort_returns_empty_on_failure(
+        self, sample_adg: ADG, auth_constraint: SymbolicConstraint
+    ) -> None:
+        """If best-effort request returns unparseable content, return empty."""
+        from unittest.mock import MagicMock
+        many_responses = []
+        for i in range(TOOL_CALL_CAP):
+            many_responses.append(
+                _make_mock_response(
+                    tool_calls=[_tool_call(f"tc{i}", "dive", {"fqn": "app.auth", "depth": 2})],
+                )
+            )
+        # Best-effort response is empty/garbage
+        many_responses.append(_make_mock_response(content="I cannot resolve this."))
+
+        edges = _run_resolver(auth_constraint, sample_adg, many_responses)
         assert edges == []
 
 

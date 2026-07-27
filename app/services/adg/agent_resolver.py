@@ -12,7 +12,7 @@ import logging
 
 from openai import OpenAI
 
-from services.adg.adg_tools import list_children, list_imports, list_inherits, list_modules
+from services.adg.adg_tools import dive, list_modules
 from services.extract.config import LangExtractConfig
 from services.fqn import FQN
 from services.models import (
@@ -34,42 +34,30 @@ _TOOLS = [
         "type": "function",
         "function": {
             "name": "list_modules",
-            "description": "List all top-level module FQNs in the codebase graph.",
+            "description": "List all module FQNs in the codebase graph. Use this first to find relevant modules, then dive into promising ones.",
             "parameters": {"type": "object", "properties": {}, "required": []},
         },
     },
     {
         "type": "function",
         "function": {
-            "name": "list_children",
-            "description": "List direct children (classes, methods, functions) of a given FQN.",
+            "name": "dive",
+            "description": (
+                "Explore the neighborhood around an FQN. Returns all nodes and edges "
+                "within `depth` hops via CONTAINS, IMPORTS, and INHERITS edges "
+                "(bidirectional: follows edges in both directions). Use depth=1 for "
+                "direct neighbors, depth=2-3 for broader context. Start with modules "
+                "from list_modules, then dive into the ones that match the constraint's "
+                "prose description. Implementation predicates (e.g. 'rate limiting', "
+                "'caching') may map to conceptual labels not present as graph nodes: "
+                "infer the nearest structural FQN from the neighborhood context."
+            ),
             "parameters": {
                 "type": "object",
-                "properties": {"fqn": {"type": "string", "description": "Fully qualified name to inspect"}},
-                "required": ["fqn"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "list_imports",
-            "description": "List modules that a given FQN imports.",
-            "parameters": {
-                "type": "object",
-                "properties": {"fqn": {"type": "string", "description": "Fully qualified name to inspect"}},
-                "required": ["fqn"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "list_inherits",
-            "description": "List classes that a given FQN inherits from.",
-            "parameters": {
-                "type": "object",
-                "properties": {"fqn": {"type": "string", "description": "Fully qualified name to inspect"}},
+                "properties": {
+                    "fqn": {"type": "string", "description": "Fully qualified name to explore around"},
+                    "depth": {"type": "integer", "description": "Number of hops to explore (default 3)", "default": 3},
+                },
                 "required": ["fqn"],
             },
         },
@@ -78,9 +66,7 @@ _TOOLS = [
 
 _TOOL_FUNCTIONS = {
     "list_modules": lambda args, adg: json.dumps(list_modules(adg)),
-    "list_children": lambda args, adg: json.dumps(list_children(args["fqn"], adg)),
-    "list_imports": lambda args, adg: json.dumps(list_imports(args["fqn"], adg)),
-    "list_inherits": lambda args, adg: json.dumps(list_inherits(args["fqn"], adg)),
+    "dive": lambda args, adg: json.dumps(dive(args["fqn"], adg, depth=args.get("depth", 3))),
 }
 
 
@@ -91,7 +77,11 @@ def _execute_tool(tool_call, adg: ADG) -> str:
     return _TOOL_FUNCTIONS[name](arguments, adg)
 
 
-def _system_prompt(constraint: SymbolicConstraint) -> str:
+def _system_prompt(constraint: SymbolicConstraint, adg: ADG) -> str:
+    modules = list_modules(adg)
+    module_hint = ", ".join(modules[:20])
+    if len(modules) > 20:
+        module_hint += ", ..."
     return (
         "You are an architectural decision resolver. Given a SymbolicConstraint "
         "with prose subject/object, traverse the codebase graph using the provided tools "
@@ -102,7 +92,12 @@ def _system_prompt(constraint: SymbolicConstraint) -> str:
         f"  predicate: {constraint.predicate.value}\n"
         f"  justification: {constraint.justification}\n"
         f"  adr_id: {constraint.adr_id}\n\n"
-        "Use the tools to explore the graph, then respond with a JSON object:\n"
+        f"Available modules (use list_modules for the full list): {module_hint}\n\n"
+        "Use list_modules to see all modules, then dive into the ones matching the "
+        "constraint's prose description. Implementation predicates (e.g. 'rate limiting', "
+        "'caching', 'authentication') describe concepts, not necessarily graph node names. "
+        "Map prose concepts to the nearest structural FQN using neighborhood context from dive.\n\n"
+        "Respond with a JSON object:\n"
         '{"subject": "<fqn_pattern>", "object": "<fqn_pattern>", '
         '"predicate": "<predicate_value>", "justification": "<text>", '
         '"adr_id": "<id>", "adr_path": "<path>"}\n\n'
@@ -186,7 +181,7 @@ def _resolve_one(
 ) -> list[ConstraintEdge]:
     """Resolve a single SymbolicConstraint via tool-calling loop."""
     messages = [
-        {"role": "system", "content": _system_prompt(constraint)},
+        {"role": "system", "content": _system_prompt(constraint, adg)},
         {"role": "user", "content": f"Resolve this constraint: {constraint.subject} {constraint.predicate.value} {constraint.object}"},
     ]
 
@@ -236,8 +231,37 @@ def _resolve_one(
                 "content": result,
             })
 
-    # Hit cap: try best-effort from accumulated context
-    log.warning("agent_resolver: hit tool call cap (%d) for %s", TOOL_CALL_CAP, constraint.adr_id)
+    # Hit cap: send one final message requesting best-effort resolution
+    log.warning("agent_resolver: hit tool call cap (%d) for %s, requesting best-effort", TOOL_CALL_CAP, constraint.adr_id)
+    messages.append({
+        "role": "user",
+        "content": (
+            "You have reached the tool call limit. Based on the graph context you have "
+            "already gathered, provide your best-effort resolution now as a JSON object. "
+            "Do not make any more tool calls."
+        ),
+    })
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            # No tools: force text response
+        )
+        content = response.choices[0].message.content
+        if content:
+            edge = _parse_resolution(content, constraint)
+            if edge:
+                edge = ConstraintEdge(
+                    subject=_add_wildcard_for_modules(edge.subject, adg),
+                    predicate=edge.predicate,
+                    object=_add_wildcard_for_modules(edge.object, adg) if _is_internal(edge.object, adg) else edge.object,
+                    justification=edge.justification,
+                    adr_id=edge.adr_id,
+                    adr_path=edge.adr_path,
+                )
+                return [edge]
+    except Exception:
+        log.warning("agent_resolver: best-effort request failed for %s", constraint.adr_id)
     return []
 
 
