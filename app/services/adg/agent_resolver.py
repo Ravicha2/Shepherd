@@ -111,10 +111,33 @@ def _system_prompt(constraint: SymbolicConstraint) -> str:
     )
 
 
+def _extract_json(text: str) -> str:
+    """Extract JSON from LLM response, stripping markdown fences and surrounding text."""
+    import re
+    stripped = text.strip()
+    # Strip markdown code fences: ```json ... ``` or ``` ... ```
+    fence_match = re.search(r"```(?:json)?\s*\n?(.*?)\n?\s*```", stripped, re.DOTALL)
+    if fence_match:
+        return fence_match.group(1).strip()
+    # Find the first { and match to its closing } by brace counting
+    start = stripped.find("{")
+    if start >= 0:
+        depth = 0
+        for i in range(start, len(stripped)):
+            if stripped[i] == "{":
+                depth += 1
+            elif stripped[i] == "}":
+                depth -= 1
+                if depth == 0:
+                    return stripped[start : i + 1]
+    return stripped
+
+
 def _parse_resolution(response_content: str, constraint: SymbolicConstraint) -> ConstraintEdge | None:
     """Parse the LLM's final JSON response into a ConstraintEdge."""
+    cleaned = _extract_json(response_content)
     try:
-        data = json.loads(response_content)
+        data = json.loads(cleaned)
     except (json.JSONDecodeError, TypeError):
         log.warning("agent_resolver: failed to parse LLM response as JSON: %s", response_content[:200])
         return None

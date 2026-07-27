@@ -22,7 +22,7 @@ from services.models import (
     SymbolicConstraint,
 )
 from services.adg.adg_tools import list_children, list_modules
-from services.adg.agent_resolver import resolve_agent_constraints
+from services.adg.agent_resolver import resolve_agent_constraints, _extract_json
 
 
 # -- Fixtures ---------------------------------------------------------------
@@ -402,3 +402,32 @@ def _run_resolver(
          patch.dict("os.environ", {"TEST_API_KEY": "test-key"}):
         config = _make_config()
         return resolve_agent_constraints([constraint], adg, config)
+
+
+# -- Test: JSON extraction from LLM responses ------------------------------
+
+class TestExtractJson:
+    """Verify _extract_json strips markdown fences and surrounding text."""
+
+    def test_plain_json(self) -> None:
+        raw = '{"subject": "app.api.*", "object": "app.db.*"}'
+        assert _extract_json(raw) == raw
+
+    def test_markdown_json_fence(self) -> None:
+        raw = '```json\n{"subject": "app.api.*", "object": "app.db.*"}\n```'
+        assert '"subject"' in _extract_json(raw)
+        assert _extract_json(raw) == '{"subject": "app.api.*", "object": "app.db.*"}'
+
+    def test_markdown_plain_fence(self) -> None:
+        raw = '```\n{"subject": "app.api.*", "object": "app.db.*"}\n```'
+        assert '"subject"' in _extract_json(raw)
+
+    def test_json_with_surrounding_text(self) -> None:
+        raw = 'Here is the result:\n{"subject": "app.api.*", "object": "app.db.*"}\nDone.'
+        assert '"subject"' in _extract_json(raw)
+
+    def test_fence_with_explanation(self) -> None:
+        raw = 'Based on my analysis:\n```json\n{"subject": "app.api.*", "object": "app.db.*"}\n```\nThat resolves it.'
+        result = _extract_json(raw)
+        parsed = json.loads(result)
+        assert parsed["subject"] == "app.api.*"
