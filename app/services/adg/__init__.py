@@ -1,5 +1,6 @@
+from services.adg.adg_tools import list_children, list_imports, list_inherits, list_modules
+from services.adg.agent_resolver import resolve_agent_constraints
 from services.adg.merge import add_external_nodes, merge_constraints
-from services.adg.symbolic_resolver import resolve_symbolic_constraints
 from services.adg.treesitter import parse_file, parse_repo
 from services.resolver import MatchStatus, NameResolver, fqn_matches_pattern
 
@@ -10,6 +11,10 @@ __all__ = [
     "NameResolver",
     "add_external_nodes",
     "merge_constraints",
-    "resolve_symbolic_constraints",
+    "resolve_agent_constraints",
     "fqn_matches_pattern",
+    "list_modules",
+    "list_children",
+    "list_imports",
+    "list_inherits",
 ]

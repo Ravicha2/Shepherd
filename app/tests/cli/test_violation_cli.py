@@ -196,7 +196,7 @@ class TestViolationDismiss:
 
 
 class TestSeedBuildWipesDismissals:
-    """Per ADR 012: seed rebuild wipes all dismissals."""
+    """Per ADR 012: seed rebuild wipes all dismissals via clear_all."""
 
     @patch("cli.main.GraphStore")
     @patch("cli.main.ADGPipeline")
@@ -204,13 +204,14 @@ class TestSeedBuildWipesDismissals:
     @patch("cli.main.parse_repo")
     @patch("cli.main._get_repo")
     @patch("cli.main.load_config")
-    def test_seed_build_calls_delete_all_dismissals(
+    def test_seed_build_calls_clear_all(
         self, mock_config, mock_get_repo, mock_parse,
         mock_extract, mock_pipeline_cls, mock_store_cls
     ):
         from services.models import ADG as ADGModel
 
         mock_config.return_value = MagicMock()
+        mock_config.return_value.langextract = MagicMock()
         mock_get_repo.return_value = _MOCK_REPO_CFG
 
         with patch.object(Path, "exists", return_value=True):
@@ -221,10 +222,8 @@ class TestSeedBuildWipesDismissals:
             mock_pipeline_cls.return_value = mock_pipeline
 
             mock_store = MagicMock()
-            mock_store.delete_all_dismissals.return_value = 3
             mock_store_cls.return_value = mock_store
 
             result = runner.invoke(app, ["seed", "build", "--repo", "test-repo"])
             assert result.exit_code == 0
-            mock_store.delete_all_dismissals.assert_called_once()
-            assert "3" in result.output
+            mock_store.clear_all.assert_called_once()

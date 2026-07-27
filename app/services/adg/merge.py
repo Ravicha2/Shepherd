@@ -18,7 +18,8 @@ from services.models import (
     FQNNode,
     SymbolicConstraint,
 )
-from services.adg.symbolic_resolver import resolve_symbolic_constraints
+from services.adg.agent_resolver import resolve_agent_constraints
+from services.extract.config import LangExtractConfig
 
 log = logging.getLogger(__name__)
 
@@ -158,19 +159,23 @@ def add_external_nodes(adg: ADG, project_root: Path | None = None) -> ADG:
     return ADG(nodes=adg.nodes + external_nodes, edges=adg.edges, constraint_edges=adg.constraint_edges)
 
 
-def merge_constraints(adg: ADG, constraints: list[SymbolicConstraint], project_root: Path | None = None) -> ADG:
+def merge_constraints(adg: ADG, constraints: list[SymbolicConstraint], project_root: Path | None = None, config: LangExtractConfig | None = None) -> ADG:
     """Unify Track A ADG + Track B symbolic constraints into a merged ADG.
 
-    Resolves SymbolicConstraints against ADG nodes, produces ConstraintEdges,
+    Resolves SymbolicConstraints against ADG via agent resolver, produces ConstraintEdges,
     and adds them to the ADG along with any needed EXTERNAL nodes.
 
     project_root: optional path to repo root for dev-tool classification
                   via pyproject.toml / setup.cfg extras.
+    config: LangExtractConfig for the agent resolver (required for resolution).
     """
+    if config is None:
+        raise ValueError("config is required for agent resolver")
+
     log.info("merge_constraints: merging %d symbolic constraints into ADG with %d nodes", len(constraints), len(adg.nodes))
 
     extra_dev_packages = _load_dev_packages_from_config(project_root)
-    resolved = resolve_symbolic_constraints(constraints, adg, project_root=project_root)
+    resolved = resolve_agent_constraints(constraints, adg, config)
 
     constraint_edges = resolved
 

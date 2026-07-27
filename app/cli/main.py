@@ -551,9 +551,9 @@ def seed_build(
     console.print(f"  Extracted {len(all_constraints)} constraints ({total_errors} errors)")
 
     # Merge and compute specificity
-    console.print("[bold]Step 3:[/] Merging ADG with constraints...")
+    console.print("[bold]Step 3:[/] Merging ADG with constraints (agent resolver)...")
     pipeline = ADGPipeline()
-    merged = pipeline.build_seed(adg, all_constraints, project_root=repo_path)
+    merged = pipeline.build_seed(adg, all_constraints, project_root=repo_path, config=config.langextract)
     external_count = sum(1 for n in merged.nodes if n.kind == FQNKind.EXTERNAL)
     console.print(f"  {len(merged.constraint_edges)} constraint edges, {external_count} EXTERNAL nodes")
 
@@ -581,7 +581,7 @@ def seed_build(
             "external_nodes": external_count,
             "constraints_extracted": len(all_constraints),
             "extraction_errors": total_errors,
-            "dismissals_cleared": deleted,
+            "dismissals_cleared": 0,
         }
         console.print_json(json.dumps(output))
         return

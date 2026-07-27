@@ -24,6 +24,7 @@ from services.adg.merge import merge_constraints
 from services.cpt.dismissal import Dismissal, filter_dismissed
 from services.cpt.diff_processor import augment_adg, process_diff
 from services.cpt.engine import detect as cpt_detect
+from services.extract.config import LangExtractConfig
 from services.models import ADG, Diff, ConstraintEdge, DiffResult, SymbolicConstraint
 from services.resolver import MatchStatus
 
@@ -97,6 +98,7 @@ class PipelineInputs:
     diff_result: DiffResult
     diff: Diff | None = None
     project_root: Path | None = None
+    config: LangExtractConfig | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -113,7 +115,7 @@ class ADGPipeline:
         """
         from services.cpt.engine import CPTResult
 
-        merged = merge_constraints(inputs.adg, inputs.constraints, project_root=inputs.project_root)
+        merged = merge_constraints(inputs.adg, inputs.constraints, project_root=inputs.project_root, config=inputs.config)
         merged = adg_with_specificity(merged)
 
         if inputs.diff is not None:
@@ -137,10 +139,10 @@ class ADGPipeline:
         )
 
     @staticmethod
-    def build_seed(adg: ADG, constraints: list[SymbolicConstraint], project_root: Path | None = None) -> ADG:
+    def build_seed(adg: ADG, constraints: list[SymbolicConstraint], project_root: Path | None = None, config: LangExtractConfig | None = None) -> ADG:
         """Merge constraints into ADG and compute specificity. No diff, no detection.
 
         For cli/main.py:seed_build().
         """
-        merged = merge_constraints(adg, constraints, project_root=project_root)
+        merged = merge_constraints(adg, constraints, project_root=project_root, config=config)
         return adg_with_specificity(merged)
