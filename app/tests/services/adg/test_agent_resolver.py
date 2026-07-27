@@ -22,7 +22,14 @@ from services.models import (
     SymbolicConstraint,
 )
 from services.adg.adg_tools import dive, list_modules
-from services.adg.agent_resolver import resolve_agent_constraints, _extract_json, TOOL_CALL_CAP
+from services.adg.agent_resolver import (
+    resolve_agent_constraints,
+    _extract_json,
+    TOOL_CALL_CAP,
+    ResolutionTrace,
+    ResolutionResult,
+    classify_failure,
+)
 
 
 # -- Fixtures ---------------------------------------------------------------
@@ -450,3 +457,94 @@ class TestExtractJson:
         result = _extract_json(raw)
         parsed = json.loads(result)
         assert parsed["subject"] == "app.api.*"
+
+
+# -- Test: failure-mode classification ----------------------------------------
+
+class TestClassifyFailure:
+    """Verify classify_failure categorizes miss types correctly."""
+
+    def test_no_dive(self) -> None:
+        """Model never called dive, only list_modules."""
+        trace = ResolutionTrace(tool_calls=[{"name": "list_modules", "arguments": {}}], hit_cap=False, parse_failed=False)
+        result = classify_failure(trace)
+        assert result == "no_dive"
+
+    def test_wrong_fqn(self, sample_adg: ADG) -> None:
+        """Model called dive on an FQN not in the graph."""
+        trace = ResolutionTrace(tool_calls=[{"name": "dive", "arguments": {"fqn": "nonexistent.module"}}], hit_cap=False, parse_failed=False)
+        result = classify_failure(trace, adg=sample_adg)
+        assert result == "wrong_fqn"
+
+    def test_wrong_specificity(self, sample_adg: ADG) -> None:
+        """Model called dive on a valid FQN (right neighborhood)."""
+        trace = ResolutionTrace(tool_calls=[{"name": "dive", "arguments": {"fqn": "app.api"}}], hit_cap=False, parse_failed=False)
+        result = classify_failure(trace, adg=sample_adg)
+        assert result == "wrong_specificity"
+
+    def test_parse_failure(self) -> None:
+        """Model returned unparseable JSON."""
+        trace = ResolutionTrace(tool_calls=[], hit_cap=False, parse_failed=True)
+        result = classify_failure(trace)
+        assert result == "parse_failure"
+
+    def test_missing_hit_cap(self) -> None:
+        """Model hit the tool call cap and produced no edge."""
+        trace = ResolutionTrace(tool_calls=[], hit_cap=True, parse_failed=False)
+        result = classify_failure(trace)
+        assert result == "missing"
+
+    def test_missing_empty_response(self) -> None:
+        """Model returned nothing (no edge produced)."""
+        trace = ResolutionTrace(tool_calls=[], hit_cap=False, parse_failed=False)
+        result = classify_failure(trace)
+        assert result == "missing"
+
+    def test_parse_failure_takes_priority_over_wrong_specificity(self) -> None:
+        """If parse failed even after dives, classify as parse_failure."""
+        trace = ResolutionTrace(
+            tool_calls=[{"name": "dive", "arguments": {"fqn": "app.api"}}],
+            hit_cap=False,
+            parse_failed=True,
+        )
+        result = classify_failure(trace)
+        assert result == "parse_failure"
+
+
+# -- Test: JSONL trace logging -------------------------------------------------
+
+class TestLogTrace:
+    """Verify _log_trace writes JSONL records."""
+
+    def test_writes_jsonl_on_miss(self, sample_adg: ADG, auth_constraint: SymbolicConstraint, tmp_path) -> None:
+        from services.adg.agent_resolver import _log_trace
+        trace = ResolutionTrace(tool_calls=[{"name": "list_modules", "arguments": {}}], hit_cap=False, parse_failed=False)
+        result = ResolutionResult(edge=None, trace=trace)
+        with patch.dict("os.environ", {"RESOLVER_TRACE_DIR": str(tmp_path)}):
+            _log_trace(auth_constraint, result, sample_adg)
+        trace_file = tmp_path / "resolver_traces.jsonl"
+        assert trace_file.exists()
+        lines = trace_file.read_text().strip().splitlines()
+        assert len(lines) == 1
+        record = json.loads(lines[0])
+        assert record["adr_id"] == "ADR-001"
+        assert record["failure_mode"] == "no_dive"
+        assert record["resolved_subject"] is None
+
+    def test_writes_jsonl_on_success(self, sample_adg: ADG, auth_constraint: SymbolicConstraint, tmp_path) -> None:
+        from services.adg.agent_resolver import _log_trace
+        edge = ConstraintEdge(
+            subject="app.api.*",
+            predicate=PredicateType.PROHIBITS_DEPENDENCY,
+            object="app.auth.*",
+            justification="test",
+            adr_id="ADR-001",
+            adr_path="docs/adr/001.md",
+        )
+        trace = ResolutionTrace(tool_calls=[{"name": "dive", "arguments": {"fqn": "app.api"}}], hit_cap=False, parse_failed=False)
+        result = ResolutionResult(edge=edge, trace=trace)
+        with patch.dict("os.environ", {"RESOLVER_TRACE_DIR": str(tmp_path)}):
+            _log_trace(auth_constraint, result, sample_adg)
+        record = json.loads((tmp_path / "resolver_traces.jsonl").read_text().strip())
+        assert record["failure_mode"] is None
+        assert record["resolved_subject"] == "app.api.*"

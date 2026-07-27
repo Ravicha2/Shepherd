@@ -23,7 +23,7 @@ import sys
 import pytest
 from openai import OpenAI
 
-from services.adg.agent_resolver import resolve_agent_constraints
+from services.adg.agent_resolver import resolve_agent_constraints, _resolve_one, ResolutionTrace, classify_failure
 from services.extract.config import LangExtractConfig
 from services.fqn import FQN
 from services.models import (
@@ -331,7 +331,7 @@ class EvalResult:
         self.miss = 0
         self.total = 0
 
-    def add(self, fixture_id: str, scores: dict, constraint: SymbolicConstraint, resolved: ConstraintEdge) -> None:
+    def add(self, fixture_id: str, scores: dict, constraint: SymbolicConstraint, resolved: ConstraintEdge, failure_mode: str | None = None) -> None:
         self.results.append({
             "fixture": fixture_id,
             "description": constraint.justification,
@@ -342,6 +342,7 @@ class EvalResult:
             "subject_score": scores["subject"],
             "object_score": scores["object"],
             "overall": scores["overall"],
+            "failure_mode": failure_mode,
         })
         self.total += 1
         if scores["overall"] == "exact_match":
@@ -367,8 +368,9 @@ class EvalResult:
             "",
         ]
         for r in self.results:
+            mode = f" [{r['failure_mode']}]" if r["failure_mode"] else ""
             lines.append(
-                f"  {r['fixture']}: {r['overall']} | "
+                f"  {r['fixture']}: {r['overall']}{mode} | "
                 f"subject={r['subject_score']} ({r['prose_subject']} -> {r['resolved_subject']}) | "
                 f"object={r['object_score']} ({r['prose_object']} -> {r['resolved_object']})"
             )
@@ -377,8 +379,10 @@ class EvalResult:
             lines.append("")
             lines.append("=== Failure Modes ===")
             for f in failures:
+                mode = f["failure_mode"] or "unknown"
                 lines.append(
-                    f"  {f['fixture']}: subject={f['subject_score']} object={f['object_score']} "
+                    f"  {f['fixture']}: {mode} | "
+                    f"subject={f['subject_score']} object={f['object_score']} "
                     f"| prose: {f['prose_subject']} -> {f['prose_object']}"
                 )
         return "\n".join(lines)
@@ -406,32 +410,38 @@ def _run_eval(adg: ADG, model: str = EVAL_MODEL) -> EvalResult:
         api_key_env="OPENROUTER_API_KEY",
     )
 
-    constraints = [f["constraint"] for f in FIXTURES]
-    edges = resolve_agent_constraints(constraints, adg, config)
+    from openai import OpenAI as OpenAIClient
+    client = OpenAIClient(api_key=api_key, base_url=config.model_url)
 
     result = EvalResult()
-    for i, fixture in enumerate(FIXTURES):
-        if i >= len(edges):
+    for fixture in FIXTURES:
+        constraint = fixture["constraint"]
+        resolution = _resolve_one(constraint, adg, client, config.model_id)
+
+        if resolution.edge is None:
+            failure_mode = classify_failure(resolution.trace, adg)
             result.results.append({
                 "fixture": fixture["id"],
-                "description": fixture["constraint"].justification,
-                "prose_subject": fixture["constraint"].subject,
-                "prose_object": fixture["constraint"].object,
+                "description": constraint.justification,
+                "prose_subject": constraint.subject,
+                "prose_object": constraint.object,
                 "resolved_subject": "<missing>",
                 "resolved_object": "<missing>",
                 "subject_score": "miss",
                 "object_score": "miss",
                 "overall": "miss",
+                "failure_mode": failure_mode,
             })
             result.total += 1
             result.miss += 1
             continue
 
-        resolved = edges[i]
+        resolved = resolution.edge
         scores = _score_constraint(
             resolved, fixture["expected_subject"], fixture["expected_object"],
         )
-        result.add(fixture["id"], scores, fixture["constraint"], resolved)
+        failure_mode = None if scores["overall"] != "miss" else classify_failure(resolution.trace, adg)
+        result.add(fixture["id"], scores, constraint, resolved, failure_mode=failure_mode)
 
     print(result.report())
     _eval_cache = result
@@ -485,7 +495,8 @@ class TestResolverEval:
         # Always pass; the report is the deliverable
         print(f"\n=== Failure Mode Report ===")
         for r in result.results:
-            print(f"  {r['fixture']}: {r['overall']} | "
+            mode = r.get("failure_mode") or "n/a"
+            print(f"  {r['fixture']}: {r['overall']} [{mode}] | "
                   f"subject={r['subject_score']} ({r['prose_subject']} -> {r['resolved_subject']}) | "
                   f"object={r['object_score']} ({r['prose_object']} -> {r['resolved_object']})")
 

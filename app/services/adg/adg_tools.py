@@ -13,9 +13,9 @@ from services.models import ADG, FQNKind
 _TRAVERSAL_EDGE_KINDS = frozenset({"CONTAINS", "IMPORTS", "INHERITS"})
 
 
-def list_modules(adg: ADG) -> list[str]:
-    """Return FQN strings for all MODULE nodes in the ADG."""
-    return [str(n.fqn) for n in adg.nodes if n.kind == FQNKind.MODULE]
+def list_modules(adg: ADG) -> list[dict[str, str]]:
+    """Return module nodes as dicts with fqn and kind."""
+    return [{"fqn": str(n.fqn), "kind": n.kind.value} for n in adg.nodes if n.kind == FQNKind.MODULE]
 
 
 def dive(fqn: str, adg: ADG, depth: int = 3) -> dict:
@@ -98,7 +98,7 @@ if __name__ == "__main__":
         Edge(source="app.mod.Foo", target="bar.Baz", kind="INHERITS"),
     ]
     adg = ADG(nodes=nodes, edges=edges)
-    assert list_modules(adg) == ["app", "app.mod"]
+    assert list_modules(adg) == [{"fqn": "app", "kind": "module"}, {"fqn": "app.mod", "kind": "module"}]
     assert list_children("app", adg) == [{"fqn": "app.mod", "kind": "module"}]
     assert list_children("app.mod", adg) == [{"fqn": "app.mod.Foo", "kind": "class"}]
     assert list_imports("app.mod", adg) == ["os"]

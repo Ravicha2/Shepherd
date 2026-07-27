@@ -54,16 +54,19 @@ def empty_adg() -> ADG:
 # -- list_modules -----------------------------------------------------------
 
 class TestListModules:
-    def test_returns_top_level_module_fqns(self, sample_adg: ADG) -> None:
+    def test_returns_modules_with_kind(self, sample_adg: ADG) -> None:
         result = list_modules(sample_adg)
-        assert "app" in result
-        # All results are strings
-        assert all(isinstance(fqn, str) for fqn in result)
+        assert all(isinstance(entry, dict) and "fqn" in entry and "kind" in entry for entry in result)
 
     def test_includes_all_modules(self, sample_adg: ADG) -> None:
         result = list_modules(sample_adg)
+        result_fqns = {entry["fqn"] for entry in result}
         expected = {"app", "app.api", "app.api.users", "app.auth", "app.auth.middleware"}
-        assert set(result) == expected
+        assert result_fqns == expected
+
+    def test_kind_values(self, sample_adg: ADG) -> None:
+        result = list_modules(sample_adg)
+        assert all(entry["kind"] == "module" for entry in result)
 
     def test_empty_adg(self, empty_adg: ADG) -> None:
         assert list_modules(empty_adg) == []
@@ -75,7 +78,7 @@ class TestListModules:
         ]
         adg = ADG(nodes=nodes, edges=[])
         result = list_modules(adg)
-        assert result == ["app"]
+        assert result == [{"fqn": "app", "kind": "module"}]
 
 
 # -- list_children -----------------------------------------------------------
