@@ -135,12 +135,14 @@ def _run_detection(repo: str, commit: str | None, base: str | None = None, head:
     adg = store.load_adg()
     store.close()
 
+    config = load_config().langextract
     pipeline = ADGPipeline()
     pipeline_inputs = PipelineInputs(
         adg=adg,
         constraints=[],  # constraints already in ADG from seed
         diff_result=diff_result,
         diff=diff,
+        config=config,
     )
     cpt_result = pipeline.run_prepared(pipeline_inputs)
 

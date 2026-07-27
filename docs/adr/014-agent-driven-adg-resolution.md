@@ -4,7 +4,7 @@ Date: 2026-07-26
 
 ## Status
 
-Accepted (supersedes ADR 7 and ADR 8)
+Partially superseded by [ADR 15](./015-unified-extraction-agent.md) (extraction stage). Resolution approach (ADG tools, provenance) is retained.
 
 ## Context
 
