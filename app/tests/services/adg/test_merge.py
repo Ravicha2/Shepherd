@@ -171,7 +171,7 @@ class TestMergeConstraintEdges:
 
 
 # ===========================================================================
-# 3. merge_constraints: unifying Track A + Track B (now via SymbolicConstraint)
+# 3. merge_constraints: unifying Track A + Track B (now via ConstraintEdge)
 # ===========================================================================
 
 

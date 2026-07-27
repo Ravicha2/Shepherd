@@ -84,7 +84,7 @@ class TestMergeConstraintEdges:
         assert result.constraint_edges[0].subject == "app.api.users.*"
 
     def test_merge_no_symbolic_import(self):
-        """merge.py must NOT import SymbolicConstraint or resolve_agent_constraints."""
+        """merge.py must NOT import resolve_agent_constraints."""
         import services.adg.merge as merge_mod
         assert not hasattr(merge_mod, "resolve_agent_constraints"), (
             "merge.py still imports resolve_agent_constraints; should only merge resolved edges"
