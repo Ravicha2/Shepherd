@@ -1,8 +1,8 @@
-"""Tests for the Merge Layer: agent constraint resolution and ADG merge.
+"""Tests for the Merge Layer: ConstraintEdge merge and EXTERNAL node addition.
 
 Public interface under test:
     add_external_nodes: create EXTERNAL nodes for unmatched import targets
-    merge_constraints: unify Track A ADG + Track B symbolic constraints into merged ADG
+    merge_constraint_edges: merge resolved ConstraintEdges into the ADG
 """
 
 from __future__ import annotations
@@ -21,10 +21,8 @@ from services.models import (
     FQNKind,
     FQNNode,
     PredicateType,
-    SymbolicConstraint,
 )
-from services.adg.merge import add_external_nodes, merge_constraints
-from services.extract.config import LangExtractConfig
+from services.adg.merge import add_external_nodes, merge_constraint_edges
 
 
 # ===========================================================================
@@ -60,19 +58,19 @@ def sample_adg() -> ADG:
 
 
 @pytest.fixture
-def sample_symbolic_constraints() -> list[SymbolicConstraint]:
-    """Symbolic constraints from ADR extraction."""
+def sample_constraint_edges() -> list[ConstraintEdge]:
+    """Resolved ConstraintEdges from ADR resolution."""
     return [
-        SymbolicConstraint(
-            subject="app.api",
+        ConstraintEdge(
+            subject="app.api.*",
             predicate=PredicateType.REQUIRES_IMPLEMENTATION,
-            object="app.auth",
+            object="app.auth.*",
             justification="All API endpoints must implement authentication.",
             adr_id="ADR-003",
             adr_path="docs/adr/003-auth-middleware.md",
         ),
-        SymbolicConstraint(
-            subject="app.services",
+        ConstraintEdge(
+            subject="app.services.*",
             predicate=PredicateType.PROHIBITS_DEPENDENCY,
             object="logging",
             justification="No service shall use bare logging directly.",
@@ -123,52 +121,18 @@ class TestAddExternalNodes:
 
 
 # ===========================================================================
-# 2. merge_constraints: agent resolver integration
+# 2. merge_constraint_edges: merging resolved edges into ADG
 # ===========================================================================
 
 
-def _make_config() -> LangExtractConfig:
-    return LangExtractConfig(
-        model_id="test-model",
-        model_url="https://test.example.com/v1",
-        api_key_env="TEST_API_KEY",
-        provider="openai",
-    )
+class TestMergeConstraintEdges:
+    """merge_constraint_edges merges ConstraintEdges into the ADG."""
 
+    def test_merge_adds_constraint_edges_to_adg(self, sample_adg: ADG, sample_constraint_edges: list[ConstraintEdge]) -> None:
+        result = merge_constraint_edges(sample_adg, sample_constraint_edges)
+        assert len(result.constraint_edges) == 2
 
-def _mock_agent_edges(edges: list[ConstraintEdge]):
-    """Patch resolve_agent_constraints to return the given edges."""
-    return patch("services.adg.merge.resolve_agent_constraints", return_value=edges)
-
-
-class TestMergeConstraintsWithAgent:
-    """merge_constraints delegates to agent resolver and merges edges."""
-
-    def test_merge_adds_constraint_edges_to_adg(self, sample_adg: ADG, sample_symbolic_constraints: list[SymbolicConstraint]) -> None:
-        edges = [
-            ConstraintEdge(
-                subject="app.api.*",
-                predicate=PredicateType.REQUIRES_IMPLEMENTATION,
-                object="app.auth.*",
-                justification="All API endpoints must implement authentication.",
-                adr_id="ADR-003",
-                adr_path="docs/adr/003-auth-middleware.md",
-            ),
-            ConstraintEdge(
-                subject="app.services.*",
-                predicate=PredicateType.PROHIBITS_DEPENDENCY,
-                object="logging",
-                justification="No service shall use bare logging directly.",
-                adr_id="ADR-005",
-                adr_path="docs/adr/005-centralized-logging.md",
-            ),
-        ]
-        config = _make_config()
-        with _mock_agent_edges(edges):
-            result = merge_constraints(sample_adg, sample_symbolic_constraints, config=config)
-        assert len(result.constraint_edges) >= 2
-
-    def test_merge_preserves_structural_nodes_and_edges(self, sample_adg: ADG, sample_symbolic_constraints: list[SymbolicConstraint]) -> None:
+    def test_merge_preserves_structural_nodes_and_edges(self, sample_adg: ADG) -> None:
         edges = [
             ConstraintEdge(
                 subject="app.api.*",
@@ -179,22 +143,12 @@ class TestMergeConstraintsWithAgent:
                 adr_path="docs/adr/003.md",
             ),
         ]
-        config = _make_config()
-        with _mock_agent_edges(edges):
-            result = merge_constraints(sample_adg, sample_symbolic_constraints, config=config)
+        result = merge_constraint_edges(sample_adg, edges)
         structural = [n for n in result.nodes if n.kind != FQNKind.EXTERNAL]
         assert len(structural) == len(sample_adg.nodes)
         assert len(result.edges) == len(sample_adg.edges)
 
     def test_merge_adds_external_for_orphan_references(self, sample_adg: ADG) -> None:
-        sc = SymbolicConstraint(
-            subject="app.services",
-            predicate=PredicateType.PROHIBITS_DEPENDENCY,
-            object="logging",
-            justification="No bare logging.",
-            adr_id="ADR-005",
-            adr_path="docs/adr/005-logging.md",
-        )
         edges = [
             ConstraintEdge(
                 subject="app.services.*",
@@ -205,24 +159,15 @@ class TestMergeConstraintsWithAgent:
                 adr_path="docs/adr/005-logging.md",
             ),
         ]
-        config = _make_config()
-        with _mock_agent_edges(edges):
-            result = merge_constraints(sample_adg, [sc], config=config)
+        result = merge_constraint_edges(sample_adg, edges)
         external_nodes = [n for n in result.nodes if n.kind == FQNKind.EXTERNAL]
         assert any(n.fqn == FQN.from_dotted("logging") for n in external_nodes)
 
-    def test_merge_empty_constraints(self, sample_adg: ADG) -> None:
-        config = _make_config()
-        with _mock_agent_edges([]):
-            result = merge_constraints(sample_adg, [], config=config)
+    def test_merge_empty_edges(self, sample_adg: ADG) -> None:
+        result = merge_constraint_edges(sample_adg, [])
         assert len(result.constraint_edges) == 0
         assert len(result.nodes) == len(sample_adg.nodes)
         assert len(result.edges) == len(sample_adg.edges)
-
-    def test_merge_requires_config(self, sample_adg: ADG) -> None:
-        """merge_constraints must raise ValueError if config is not provided."""
-        with pytest.raises(ValueError, match="config is required"):
-            merge_constraints(sample_adg, [])
 
 
 # ===========================================================================
@@ -230,11 +175,11 @@ class TestMergeConstraintsWithAgent:
 # ===========================================================================
 
 
-# Removed: old TestMergeConstraints replaced by TestMergeConstraintsWithAgent above
+# Removed: old TestMergeConstraints replaced by TestMergeConstraintEdges above
 
 
-class TestMergeConstraintsIncremental:
-    """Full replace per ADR: delete old constraints, insert new ones."""
+class TestMergeConstraintEdgesIncremental:
+    """Incremental merge: replace constraints for a specific ADR."""
 
     def test_replace_constraints_by_adr_id(self, sample_adg: ADG) -> None:
         old_edges = [
@@ -247,13 +192,7 @@ class TestMergeConstraintsIncremental:
                 adr_path="docs/adr/003-auth-middleware.md",
             ),
         ]
-        config = _make_config()
-        with _mock_agent_edges(old_edges):
-            merged = merge_constraints(sample_adg, [SymbolicConstraint(
-                subject="app.api", predicate=PredicateType.PROHIBITS_DEPENDENCY,
-                object="mysql", justification="Old",
-                adr_id="ADR-003", adr_path="docs/adr/003.md",
-            )], config=config)
+        merged = merge_constraint_edges(sample_adg, old_edges)
         assert len(merged.constraint_edges) >= 1
 
         new_edges = [
@@ -272,12 +211,7 @@ class TestMergeConstraintsIncremental:
             edges=merged.edges,
             constraint_edges=remaining,
         )
-        with _mock_agent_edges(new_edges):
-            result = merge_constraints(adg_after_delete, [SymbolicConstraint(
-                subject="app.api", predicate=PredicateType.REQUIRES_DEPENDENCY,
-                object="app.auth", justification="Updated",
-                adr_id="ADR-003", adr_path="docs/adr/003.md",
-            )], config=config)
+        result = merge_constraint_edges(adg_after_delete, new_edges)
         assert len(result.constraint_edges) >= 1
 
     def test_other_adr_constraints_preserved(self, sample_adg: ADG) -> None:
@@ -299,12 +233,7 @@ class TestMergeConstraintsIncremental:
                 adr_path="docs/adr/005.md",
             ),
         ]
-        config = _make_config()
-        with _mock_agent_edges(edges):
-            merged = merge_constraints(sample_adg, [
-                SymbolicConstraint(subject="app.api", predicate=PredicateType.REQUIRES_IMPLEMENTATION, object="app.auth", justification="Auth", adr_id="ADR-003", adr_path="docs/adr/003.md"),
-                SymbolicConstraint(subject="app.services", predicate=PredicateType.PROHIBITS_DEPENDENCY, object="logging", justification="No bare logging", adr_id="ADR-005", adr_path="docs/adr/005.md"),
-            ], config=config)
+        merged = merge_constraint_edges(sample_adg, edges)
         assert len(merged.constraint_edges) >= 2
 
         new_edges = [
@@ -323,12 +252,7 @@ class TestMergeConstraintsIncremental:
             edges=merged.edges,
             constraint_edges=remaining,
         )
-        with _mock_agent_edges(new_edges):
-            result = merge_constraints(adg_after_delete, [SymbolicConstraint(
-                subject="app.api", predicate=PredicateType.REQUIRES_DEPENDENCY,
-                object="app.auth", justification="Updated",
-                adr_id="ADR-003", adr_path="docs/adr/003.md",
-            )], config=config)
+        result = merge_constraint_edges(adg_after_delete, new_edges)
 
         adr5_edges = [ce for ce in result.constraint_edges if ce.adr_id == "ADR-005"]
         assert len(adr5_edges) >= 1
@@ -681,21 +605,13 @@ class TestConfigDevToolClassification:
         ext = [n for n in result.nodes if n.kind == FQNKind.EXTERNAL]
         assert ext[0].role == DependencyRole.DEV_TOOL
 
-    def test_merge_constraints_with_project_root(self, tmp_path) -> None:
-        """merge_constraints also classifies via project config."""
+    def test_merge_constraint_edges_with_project_root(self, tmp_path) -> None:
+        """merge_constraint_edges also classifies via project config."""
         pyproject = tmp_path / "pyproject.toml"
         pyproject.write_text(
             '[project]\nname = "myapp"\n\n'
             "[project.optional-dependencies]\n"
             'dev = ["custom_linter"]\n'
-        )
-        sc = SymbolicConstraint(
-            subject="app.services",
-            predicate=PredicateType.PROHIBITS_DEPENDENCY,
-            object="custom_linter",
-            justification="No custom linter.",
-            adr_id="ADR-012",
-            adr_path="docs/adr/012.md",
         )
         adg = ADG(
             nodes=[
@@ -713,9 +629,7 @@ class TestConfigDevToolClassification:
                 adr_path="docs/adr/012.md",
             ),
         ]
-        config = _make_config()
-        with _mock_agent_edges(edges):
-            result = merge_constraints(adg, [sc], project_root=tmp_path, config=config)
+        result = merge_constraint_edges(adg, edges, project_root=tmp_path)
         ext = [n for n in result.nodes if n.kind == FQNKind.EXTERNAL and str(n.fqn) == "custom_linter"]
         assert len(ext) == 1
         assert ext[0].role == DependencyRole.DEV_TOOL

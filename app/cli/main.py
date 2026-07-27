@@ -18,9 +18,8 @@ from services.adg import parse_repo
 from services.cpt import GitAdapter, process_diff
 from services.cpt.dismissal import Dismissal, compute_identity_hash, filter_dismissed, violation_identity, violation_short_id
 from services.cpt.resolution import Violation
-from services.extract import extract_all_adrs
 from services.graph.connector import GraphStore
-from services.models import Diff, DiffResult, FQNKind, SymbolicConstraint
+from services.models import Diff, DiffResult, FQNKind
 from services.commit_update import UpdateResult, commit_update
 from services.pipeline import ADGPipeline, PipelineInputs
 
@@ -135,14 +134,12 @@ def _run_detection(repo: str, commit: str | None, base: str | None = None, head:
     adg = store.load_adg()
     store.close()
 
-    config = load_config().langextract
     pipeline = ADGPipeline()
     pipeline_inputs = PipelineInputs(
         adg=adg,
-        constraints=[],  # constraints already in ADG from seed
         diff_result=diff_result,
         diff=diff,
-        config=config,
+        project_root=repo_path,
     )
     cpt_result = pipeline.run_prepared(pipeline_inputs)
 
@@ -542,20 +539,10 @@ def seed_build(
     adg = parse_repo(repo_path)
     console.print(f"  Found {len(adg.nodes)} nodes, {len(adg.edges)} edges")
 
-    # extract ADR constraints
-    console.print("[bold]Step 2:[/] Extracting ADR constraints...")
-    results = extract_all_adrs(repo_path, repo_cfg.adr_dir, config.langextract)
-    all_constraints: list[SymbolicConstraint] = []
-    total_errors = 0
-    for result in results:
-        all_constraints.extend(result.constraints)
-        total_errors += len(result.errors)
-    console.print(f"  Extracted {len(all_constraints)} constraints ({total_errors} errors)")
-
-    # Merge and compute specificity
-    console.print("[bold]Step 3:[/] Merging ADG with constraints (agent resolver)...")
+    # resolve ADRs via unified agent
+    console.print("[bold]Step 2:[/] Resolving ADR constraints (unified agent)...")
     pipeline = ADGPipeline()
-    merged = pipeline.build_seed(adg, all_constraints, project_root=repo_path, config=config.langextract)
+    merged = pipeline.build_seed(adg, repo_path / repo_cfg.adr_dir, project_root=repo_path, config=config.langextract)
     external_count = sum(1 for n in merged.nodes if n.kind == FQNKind.EXTERNAL)
     console.print(f"  {len(merged.constraint_edges)} constraint edges, {external_count} EXTERNAL nodes")
 
@@ -581,9 +568,6 @@ def seed_build(
             "edges": len(merged.edges),
             "constraint_edges": len(merged.constraint_edges),
             "external_nodes": external_count,
-            "constraints_extracted": len(all_constraints),
-            "extraction_errors": total_errors,
-            "dismissals_cleared": 0,
         }
         console.print_json(json.dumps(output))
         return

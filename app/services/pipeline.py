@@ -1,32 +1,28 @@
 """ADG Pipeline: orchestrates constraint merge, specificity computation, augmentation, and detection.
 
-Owns the sequencing gap where ConstraintEdge.specificity was never computed
-between merge_constraints and detect. Also normalizes the mixed mutation
-strategy (merge returns new, augment mutates in-place) so callers always
-receive fresh ADG instances.
-
 Usage (production):
     pipeline = ADGPipeline()
     result = pipeline.run(repo_path, adr_dir, config, commit=sha)
 
 Usage (tests, pure data):
-    inputs = PipelineInputs(adg=adg, constraints=constraints, diff_result=diff)
+    inputs = PipelineInputs(adg=adg, diff_result=diff)
     result = pipeline.run_prepared(inputs)
-    assert result.violations[0].constraint.specificity > 0.0
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+import logging
+from dataclasses import dataclass
 from pathlib import Path
 
-from services.adg.merge import merge_constraints
+from services.adg.merge import add_external_nodes, merge_constraint_edges
 from services.cpt.dismissal import Dismissal, filter_dismissed
-from services.cpt.diff_processor import augment_adg, process_diff
+from services.cpt.diff_processor import augment_adg
 from services.cpt.engine import detect as cpt_detect
-from services.extract.config import LangExtractConfig
-from services.models import ADG, Diff, ConstraintEdge, DiffResult, SymbolicConstraint
+from services.models import ADG, ConstraintEdge, Diff, DiffResult
 from services.resolver import MatchStatus
+
+log = logging.getLogger(__name__)
 
 
 def pattern_specificity(pattern: str) -> float:
@@ -47,8 +43,8 @@ def pattern_specificity(pattern: str) -> float:
 def adg_with_specificity(adg: ADG) -> ADG:
     """Return a NEW ADG where every ConstraintEdge has specificity set.
 
-    This closes the gap between merge_constraints (which sets specificity=0.0)
-    and the resolution engine (which compares specificity values).
+    ConstraintEdges start with specificity=0.0 from the unified resolver;
+    this computes pattern depth + exact bonus for each edge.
     """
     new_edges: list[ConstraintEdge] = []
     for edge in adg.constraint_edges:
@@ -94,11 +90,9 @@ def augment_immutable(adg: ADG, diff: Diff) -> ADG:
 class PipelineInputs:
     """Everything needed to run detection without touching git/filesystem/LLM."""
     adg: ADG
-    constraints: list[SymbolicConstraint]
     diff_result: DiffResult
     diff: Diff | None = None
     project_root: Path | None = None
-    config: LangExtractConfig | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -111,11 +105,11 @@ class ADGPipeline:
     def run_prepared(self, inputs: PipelineInputs) -> "CPTResult":
         """Pure pipeline: no io, no mutation surprises.
 
-        Merge constraints, compute specificity, optionally augment, then detect.
+        Add external nodes, compute specificity, optionally augment, then detect.
         """
         from services.cpt.engine import CPTResult
 
-        merged = merge_constraints(inputs.adg, inputs.constraints, project_root=inputs.project_root, config=inputs.config)
+        merged = add_external_nodes(inputs.adg, project_root=inputs.project_root)
         merged = adg_with_specificity(merged)
 
         if inputs.diff is not None:
@@ -139,10 +133,37 @@ class ADGPipeline:
         )
 
     @staticmethod
-    def build_seed(adg: ADG, constraints: list[SymbolicConstraint], project_root: Path | None = None, config: LangExtractConfig | None = None) -> ADG:
-        """Merge constraints into ADG and compute specificity. No diff, no detection.
+    def build_seed(adg: ADG, adr_dir: Path, project_root: Path | None = None, config: "LangExtractConfig | None" = None) -> ADG:
+        """Resolve ADRs via unified agent, merge constraints, compute specificity.
+
+        Discovers ADR markdown files in adr_dir, resolves each to ConstraintEdges,
+        merges them into the ADG, and computes specificity.
 
         For cli/main.py:seed_build().
         """
-        merged = merge_constraints(adg, constraints, project_root=project_root, config=config)
+        from services.adg.unified_resolver import resolve_adr_constraints
+        from services.extract.config import LangExtractConfig
+
+        if config is None:
+            raise ValueError("config is required for unified resolver")
+
+        adr_path = Path(adr_dir)
+        adr_files = sorted(adr_path.glob("*.md"))
+        if not adr_files:
+            log.warning("build_seed: no ADR files found in %s", adr_path)
+            merged = add_external_nodes(adg, project_root=project_root)
+            return adg_with_specificity(merged)
+
+        log.info("build_seed: resolving %d ADR files from %s", len(adr_files), adr_path)
+
+        all_edges: list[ConstraintEdge] = []
+        for adr_file in adr_files:
+            adr_text = adr_file.read_text(encoding="utf-8")
+            adr_id = adr_file.stem
+            edges = resolve_adr_constraints(adr_text, adr_id, str(adr_file), adg, config)
+            log.info("build_seed: %s produced %d constraint edges", adr_id, len(edges))
+            all_edges.extend(edges)
+
+        merged = merge_constraint_edges(adg, all_edges, project_root=project_root)
+        merged = add_external_nodes(merged, project_root=project_root)
         return adg_with_specificity(merged)
