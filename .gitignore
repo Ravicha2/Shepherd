@@ -19,6 +19,7 @@ neo4j_data/
 
 # Logs
 logs/
+resolver_traces.jsonl
 
 # agent doc
 .claude

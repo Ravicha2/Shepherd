@@ -16,8 +16,7 @@ from cli.config import load_config
 from cli.main import _resolve_repo_path, app
 from services.adg import parse_repo
 from services.cpt.diff_processor import process_diff
-from services.extract import extract_all_adrs
-from services.extract.engine import derive_package_context
+from services.extract import LangExtractConfig
 from services.models import (
     Diff,
     FileChange,
@@ -171,13 +170,18 @@ def main() -> None:
     print("\n[detect] parse_repo")
     adg = parse_repo(repo_path)
     print(f"  {len(adg.nodes)} nodes, {len(adg.edges)} edges")
-    package_context = derive_package_context(adg)
-
-    print("[detect] extract ADR constraints")
-    all_constraints = []
-    for r in extract_all_adrs(repo_path, repo_cfg.adr_dir, config.langextract, package_context=package_context):
-        all_constraints.extend(r.constraints)
-    print(f"  {len(all_constraints)} constraints")
+    print("[detect] resolve ADR constraints (unified agent)")
+    from services.adg.unified_resolver import resolve_adr_constraints
+    from pathlib import Path as P
+    adr_dir = repo_path / repo_cfg.adr_dir
+    adr_files = sorted(adr_dir.glob("*.md"))
+    all_edges = []
+    for adr_file in adr_files:
+        adr_text = adr_file.read_text(encoding="utf-8")
+        adr_id = adr_file.stem
+        edges = resolve_adr_constraints(adr_text, adr_id, str(adr_file), adg, config.langextract)
+        all_edges.extend(edges)
+    print(f"  {len(all_edges)} constraint edges")
 
     # Step 3: parse mock diff into changed FQNs
     print("\n[detect] process mock diff -> changed FQNs")
@@ -191,7 +195,6 @@ def main() -> None:
     pipeline = ADGPipeline()
     pipeline_inputs = PipelineInputs(
         adg=adg,
-        constraints=all_constraints,
         diff_result=diff_result,
         diff=mock_diff,
         project_root=repo_path,

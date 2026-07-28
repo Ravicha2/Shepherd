@@ -9,6 +9,8 @@ Boundary tests for:
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 
 from services.fqn import FQN
@@ -23,7 +25,6 @@ from services.models import (
     FQNKind,
     FQNNode,
     PredicateType,
-    SymbolicConstraint,
 )
 from services.pipeline import (
     ADGPipeline,
@@ -221,16 +222,13 @@ def _make_adg() -> ADG:
     )
 
 
-def _make_constraints() -> list[SymbolicConstraint]:
+def _make_constraint_edges() -> list[ConstraintEdge]:
     return [
-        SymbolicConstraint(
-            subject_role_general="app",
-            subject_role_specific="service",
+        ConstraintEdge(
+            subject="app.*",
             predicate=PredicateType.PROHIBITS_DEPENDENCY,
-            object_role_general="app",
-            object_role_specific="repo",
+            object="app.repo.*",
             justification="Services must not depend on repositories directly",
-            extraction_text="services should not import repos",
             adr_id="ADR-001",
             adr_path="docs/adr/001.md",
         ),
@@ -240,8 +238,25 @@ def _make_constraints() -> list[SymbolicConstraint]:
 class TestADGPipelineRunPrepared:
     def test_violations_have_nonzero_specificity(self):
         """The core bug fix: specificity must not be 0.0 after pipeline."""
-        adg = _make_adg()
-        constraints = _make_constraints()
+        adg = ADG(
+            nodes=[
+                FQNNode(fqn=FQN.from_dotted("app.service"), kind=FQNKind.MODULE,
+                        file_path="app/service.py", line_start=0, line_end=10),
+                FQNNode(fqn=FQN.from_dotted("app.repo"), kind=FQNKind.MODULE,
+                        file_path="app/repo.py", line_start=0, line_end=10),
+            ],
+            edges=[Edge(source="app.service", target="app.repo", kind="IMPORTS")],
+            constraint_edges=[
+                ConstraintEdge(
+                    subject="app.*",
+                    predicate=PredicateType.PROHIBITS_DEPENDENCY,
+                    object="app.repo.*",
+                    justification="Services must not depend on repositories directly",
+                    adr_id="ADR-001",
+                    adr_path="docs/adr/001.md",
+                ),
+            ],
+        )
         diff_result = DiffResult(
             to_sha="abc123",
             changed_fqns=[
@@ -255,7 +270,7 @@ class TestADGPipelineRunPrepared:
         )
 
         pipeline = ADGPipeline()
-        inputs = PipelineInputs(adg=adg, constraints=constraints, diff_result=diff_result)
+        inputs = PipelineInputs(adg=adg, diff_result=diff_result)
         result = pipeline.run_prepared(inputs)
 
         for v in result.violations:
@@ -297,7 +312,7 @@ class TestADGPipelineRunPrepared:
         diff_result = DiffResult(to_sha="abc", changed_fqns=[])
 
         pipeline = ADGPipeline()
-        inputs = PipelineInputs(adg=adg, constraints=[], diff_result=diff_result)
+        inputs = PipelineInputs(adg=adg, diff_result=diff_result)
         result = pipeline.run_prepared(inputs)
 
         assert result.violations == []

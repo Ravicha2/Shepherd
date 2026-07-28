@@ -1,7 +1,6 @@
-"""Merge Layer: unify Track A (AST) ADG with Track B (ADR symbolic constraints).
+"""Merge Layer: unify AST ADG with resolved ConstraintEdges.
 
-Delegates symbolic resolution to symbolic_resolver, then merges the resulting
-ConstraintEdges into the ADG.
+Adds EXTERNAL nodes for orphan FQNs and merges constraint edges into the ADG.
 """
 from __future__ import annotations
 
@@ -13,12 +12,11 @@ from pathlib import Path
 from services.fqn import FQN
 from services.models import (
     ADG,
+    ConstraintEdge,
     DependencyRole,
     FQNKind,
     FQNNode,
-    SymbolicConstraint,
 )
-from services.adg.symbolic_resolver import resolve_symbolic_constraints
 
 log = logging.getLogger(__name__)
 
@@ -158,33 +156,24 @@ def add_external_nodes(adg: ADG, project_root: Path | None = None) -> ADG:
     return ADG(nodes=adg.nodes + external_nodes, edges=adg.edges, constraint_edges=adg.constraint_edges)
 
 
-def merge_constraints(adg: ADG, constraints: list[SymbolicConstraint], project_root: Path | None = None) -> ADG:
-    """Unify Track A ADG + Track B symbolic constraints into a merged ADG.
-
-    Resolves SymbolicConstraints against ADG nodes, produces ConstraintEdges,
-    and adds them to the ADG along with any needed EXTERNAL nodes.
+def merge_constraint_edges(adg: ADG, constraint_edges: list[ConstraintEdge], project_root: Path | None = None) -> ADG:
+    """Merge resolved ConstraintEdges into the ADG, adding EXTERNAL nodes for orphans.
 
     project_root: optional path to repo root for dev-tool classification
                   via pyproject.toml / setup.cfg extras.
     """
-    log.info("merge_constraints: merging %d symbolic constraints into ADG with %d nodes", len(constraints), len(adg.nodes))
+    log.info("merge_constraint_edges: merging %d constraint edges into ADG with %d nodes", len(constraint_edges), len(adg.nodes))
 
     extra_dev_packages = _load_dev_packages_from_config(project_root)
-    resolved = resolve_symbolic_constraints(constraints, adg, project_root=project_root)
 
-    constraint_edges = [rc.constraint_edge for rc in resolved]
-
-    # Collect all FQNs from the ADG nodes (including EXTERNAL nodes added
-    # during resolution)
-    all_adg_nodes = set()
-    for rc in resolved:
-        all_adg_nodes.add(rc.constraint_edge.subject)
-        all_adg_nodes.add(rc.constraint_edge.object)
+    all_edge_fqns: set[str] = set()
+    for edge in constraint_edges:
+        all_edge_fqns.add(edge.subject)
+        all_edge_fqns.add(edge.object)
 
     known_fqns = {str(n.fqn) for n in adg.nodes}
 
-    # Add EXTERNAL nodes for any remaining orphans
-    orphan_fqns = sorted(all_adg_nodes - known_fqns)
+    orphan_fqns = sorted(all_edge_fqns - known_fqns)
     external_nodes = [
         FQNNode(
             fqn=FQN.from_dotted(fqn),
@@ -197,7 +186,7 @@ def merge_constraints(adg: ADG, constraints: list[SymbolicConstraint], project_r
         for fqn in orphan_fqns
     ]
     if external_nodes:
-        log.info("merge_constraints: adding %d EXTERNAL nodes for orphans: %s", len(external_nodes), orphan_fqns)
+        log.info("merge_constraint_edges: adding %d EXTERNAL nodes for orphans: %s", len(external_nodes), orphan_fqns)
 
     return ADG(
         nodes=adg.nodes + external_nodes,

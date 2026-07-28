@@ -43,7 +43,7 @@ def merge_preserved_constraints(adg: ADG, constraint_edges: list[ConstraintEdge]
     the ADG. Returns a new ADG with constraint_edges attached.
 
     project_root is accepted for API compatibility but not used here;
-    this function replaces the LLM-based merge_constraints step with
+    this function replaces the LLM-based merge_constraint_edges step with
     a direct merge of already-resolved constraint edges.
     """
     existing_fqns = {str(n.fqn) for n in adg.nodes}

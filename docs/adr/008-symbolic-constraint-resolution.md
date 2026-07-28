@@ -4,7 +4,7 @@ Date: 2026-06-26
 
 ## Status
 
-Accepted (supersedes ADR 7)
+Superseded by [ADR 14](./014-agent-driven-adg-resolution.md)
 
 ## Context
 
