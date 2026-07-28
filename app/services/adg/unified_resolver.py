@@ -67,24 +67,41 @@ class ResolutionTrace:
     parse_failed: bool = False
 
 
-_SYSTEM_PROMPT_TEMPLATE = """\
-You are an architectural decision resolver. Given a full ADR document, identify \
+_SYSTEM_PROMPT_TEMPLATE = """
+You are an architectural decision resolver. Given a full ADR document, identify 
 architectural constraints and map them to FQN patterns in the codebase graph.
 
 CRITICAL: Distinguish prescriptive decisions from prohibitions.
-- A PRESCRIPTIVE decision says "we chose option X" or "we will build Y". These are \
-  the ADR's chosen solution. They produce REQUIRES_IMPLEMENTATION or REQUIRES_DEPENDENCY \
+- A PRESCRIPTIVE decision says "we chose option X" or "we will build Y". These are 
+  the ADR's chosen solution. They produce REQUIRES_IMPLEMENTATION or REQUIRES_DEPENDENCY 
   constraints, NOT prohibitions.
-- A PROHIBITION says "we must not use X" or "X is forbidden". These produce \
+- A PROHIBITION says "we must not use X" or "X is forbidden". These produce
   PROHIBITS_DEPENDENCY or PROHIBITS_IMPLEMENTATION constraints.
 
-Do NOT extract a prohibition from a prescriptive decision. If the ADR says "we chose \
-to build a minimal repository abstraction", that means the repository abstraction IS the \
+Do NOT extract a prohibition from a prescriptive decision. If the ADR says "we chose
+to build a minimal repository abstraction", that means the repository abstraction IS the
 decision outcome, not something to be prohibited.
+
+## Required exploration
+
+Before producing any output, you MUST call list_modules at least once, and dive into any \
+module referenced by the ADR before writing a constraint about it. list_modules only shows \
+top-level modules — submodules and classes are only visible once you dive into a module, and \
+sometimes only after diving more than one level deep. Do not guess FQNs from the ADR's prose \
+alone or from what a typical project of this kind usually looks like. Output produced without \
+a preceding list_modules call will be rejected.
 
 ## ADR Document
 
 {adr_text}
+
+## Module list
+
+The following modules exist in the codebase graph. You MUST use FQN patterns from this list. Do NOT invent module names.
+
+{module_hint}
+
+**CRITICAL**: You MUST use FQN patterns from the module list above. Do NOT invent module names. If the ADR refers to "routes" and the module list shows `app.routes`, use `app.routes.*`. If no module matches a concept from the ADR, return an empty array.
 
 ## Predicate types
 
@@ -93,10 +110,17 @@ decision outcome, not something to be prohibited.
 - prohibits_implementation: subject must not implement (inherit from, subclass) object
 - requires_implementation: subject must implement (inherit from, subclass) object
 
+## Wildcard
+
+The `.*` suffix denotes a wildcard pattern: it matches the prefix itself **and** every descendant FQN that starts with `prefix.`.
+For example, `app.routes.*` matches `app.routes`, `app.routes.user`, and `app.routes.user.get_handler`.
+
+When generating constraints, use wildcards for architectural rules that apply to an entire module or layer (for example, "no route handler may import any model class" becomes `app.routes.*` → `app.models.*`). Use exact FQNs when the rule targets one specific entity (for example, "all services must inherit from `app.services.base.ServiceBase`").
+
 ## Output format
 
 Respond with a JSON array of constraint objects. Each object has:
-- subject: FQN pattern (use .* for module-level, e.g. "app.api.*")
+- subject: FQN pattern
 - object: FQN pattern
 - predicate: one of the four predicate types above
 - justification: short explanation citing the ADR text
@@ -108,23 +132,40 @@ If the ADR contains no enforceable architectural constraints, return an empty ar
 
 ## Examples
 
-Example 1: ADR prescribes a minimal repository abstraction.
+The examples below use the actual module list for this codebase graph — app.routes,
+app.models, app.services, app.middleware.auth — not generic names from a typical project.
+**Always ground your FQNs in the module list you were actually given**, not these examples.
 
-Step 1: Call list_modules → see app.repository, app.models
-Step 2: Call dive("app.repository", depth=2) → see RepositoryBase class
+Example 1: ADR prohibits route handlers from accessing models directly.
+
+Step 1: Call list_modules → see app.routes, app.models, app.services, app.middleware.auth
+Step 2: Call dive("app.routes", depth=1) → see route handler functions
 Step 3: Call dive("app.models", depth=1) → see model classes
 
 Result:
-[{{"subject": "app.repository.*", "object": "app.repository.RepositoryBase", "predicate": "requires_implementation", "justification": "ADR states all repository implementations must inherit RepositoryBase", "adr_id": "{adr_id}", "adr_path": "{adr_path}"}}]
+[{{"subject": "app.routes.*", "object": "app.models.*", "predicate": "prohibits_dependency", "justification": "ADR states route handlers must not import model classes directly; data access must go through the service layer", "adr_id": "{adr_id}", "adr_path": "{adr_path}"}}]
 
-Example 2: ADR prohibits direct database access from API layer.
+Example 2: ADR requires every endpoint to enforce auth middleware.
 
-Step 1: Call list_modules → see app.api, app.database
-Step 2: Call dive("app.api", depth=1) → see route handlers
-Step 3: Call dive("app.database", depth=1) → see query modules
+Step 1: Call list_modules → see app.routes, app.models, app.services, app.middleware.auth
+Step 2: Call dive("app.middleware.auth", depth=1) → see the auth decorator/class
+Step 3: Call dive("app.routes", depth=1) → see route handler functions
 
 Result:
-[{{"subject": "app.api.*", "object": "app.database.*", "predicate": "prohibits_dependency", "justification": "ADR states API layer must not import database modules directly", "adr_id": "{adr_id}", "adr_path": "{adr_path}"}}]
+[{{"subject": "app.routes.*", "object": "app.middleware.auth.*", "predicate": "requires_dependency", "justification": "ADR states every endpoint must apply the auth middleware before handling a request", "adr_id": "{adr_id}", "adr_path": "{adr_path}"}}]
+
+Example 3: ADR requires all service classes to inherit from a shared base service class.
+The base class isn't visible from a depth=1 dive — it lives inside a submodule that only
+appears once you go one level deeper.
+
+Step 1: Call list_modules → see app.routes, app.models, app.services, app.middleware.auth
+Step 2: Call dive("app.services", depth=1) → see submodules app.services.user, 
+app.services.order, app.services.base (no classes visible yet at this depth)
+Step 3: Call dive("app.services", depth=2) → see classes inside each submodule, including 
+app.services.base.ServiceBase
+
+Result:
+[{{"subject": "app.services.*", "object": "app.services.base.ServiceBase", "predicate": "requires_implementation", "justification": "ADR states all service classes must inherit from the shared base service class to standardize transaction handling", "adr_id": "{adr_id}", "adr_path": "{adr_path}"}}]
 """
 
 
@@ -217,6 +258,19 @@ def _is_internal(fqn_pattern: str, adg: ADG) -> bool:
     return False
 
 
+def _validate_edge(edge: ConstraintEdge, adg: ADG) -> bool:
+    """Return True if edge subject and object patterns match at least one node in the ADG."""
+    all_fqns = {str(n.fqn) for n in adg.nodes}
+    for pattern in (edge.subject, edge.object):
+        base = pattern.rstrip(".*")
+        if base in all_fqns:
+            continue
+        if any(f.startswith(base + ".") for f in all_fqns):
+            continue
+        return False
+    return True
+
+
 def _log_trace(
     adr_id: str,
     adr_path: str,
@@ -262,21 +316,23 @@ def resolve_adr_constraints(
 
     client = OpenAI(api_key=api_key, base_url=config.model_url)
 
-    system_prompt = _SYSTEM_PROMPT_TEMPLATE.format(
-        adr_text=adr_text, adr_id=adr_id, adr_path=adr_path,
-    )
     modules = list_modules(adg)
     module_hint = ", ".join(f"{m['fqn']}({m['kind']})" for m in modules[:20])
     if len(modules) > 20:
         module_hint += ", ..."
 
+    system_prompt = _SYSTEM_PROMPT_TEMPLATE.format(
+        adr_text=adr_text, adr_id=adr_id, adr_path=adr_path, module_hint=module_hint,
+    )
+
     messages = [
         {"role": "system", "content": system_prompt},
-        {"role": "user", "content": f"Identify architectural constraints in this ADR and resolve them to FQN patterns. Available modules: {module_hint}"},
+        {"role": "user", "content": "Identify architectural constraints in this ADR and resolve them to FQN patterns."},
     ]
 
     tool_call_count = 0
     tool_call_trace: list[dict] = []
+    last_tool_signature: tuple[str, str] | None = None
     hit_cap = False
 
     while tool_call_count < TOOL_CALL_CAP:
@@ -284,6 +340,7 @@ def resolve_adr_constraints(
             model=config.model_id,
             messages=messages,
             tools=_TOOLS,
+            temperature=config.temperature,
         )
         choice = response.choices[0]
         msg = choice.message
@@ -302,9 +359,13 @@ def resolve_adr_constraints(
                     )
                     for e in edges
                 ]
+                valid_edges = [e for e in edges if _validate_edge(e, adg)]
+                if len(valid_edges) < len(edges):
+                    dropped = [e for e in edges if e not in valid_edges]
+                    log.warning("unified_resolver: dropped %d edges with nonexistent FQNs for %s", len(dropped), adr_id)
                 trace = ResolutionTrace(tool_calls=tool_call_trace, hit_cap=False, parse_failed=False)
-                _log_trace(adr_id, adr_path, edges, trace)
-                return edges
+                _log_trace(adr_id, adr_path, valid_edges, trace)
+                return valid_edges
             log.warning("unified_resolver: LLM returned empty response for %s", adr_id)
             trace = ResolutionTrace(tool_calls=tool_call_trace, hit_cap=False, parse_failed=True)
             _log_trace(adr_id, adr_path, [], trace)
@@ -317,8 +378,16 @@ def resolve_adr_constraints(
 
         for tc in msg.tool_calls:
             tool_call_count += 1
-            tool_call_trace.append({"name": tc.function.name, "arguments": json.loads(tc.function.arguments)})
-            result = _TOOL_FUNCTIONS[tc.function.name](json.loads(tc.function.arguments), adg)
+            args = json.loads(tc.function.arguments)
+            tool_call_trace.append({"name": tc.function.name, "arguments": args})
+            signature = (tc.function.name, tc.function.arguments)
+            if signature == last_tool_signature:
+                messages.append({
+                    "role": "user",
+                    "content": "You just called the same function with identical arguments again. Stop repeating tool calls and produce your final answer as a JSON array now.",
+                })
+            last_tool_signature = signature
+            result = _TOOL_FUNCTIONS[tc.function.name](args, adg)
             messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
 
     # Hit cap: request best-effort resolution
@@ -329,7 +398,7 @@ def resolve_adr_constraints(
         "content": "You have reached the tool call limit. Based on the graph context you have already gathered, provide your best-effort constraints now as a JSON array. Do not make any more tool calls.",
     })
     try:
-        response = client.chat.completions.create(model=config.model_id, messages=messages)
+        response = client.chat.completions.create(model=config.model_id, messages=messages, temperature=config.temperature)
         content = response.choices[0].message.content
         if content:
             edges = _parse_edges(content, adr_id, adr_path)
@@ -344,9 +413,13 @@ def resolve_adr_constraints(
                 )
                 for e in edges
             ]
+            valid_edges = [e for e in edges if _validate_edge(e, adg)]
+            if len(valid_edges) < len(edges):
+                dropped = [e for e in edges if e not in valid_edges]
+                log.warning("unified_resolver: dropped %d edges with nonexistent FQNs for %s", len(dropped), adr_id)
             trace = ResolutionTrace(tool_calls=tool_call_trace, hit_cap=True, parse_failed=False)
-            _log_trace(adr_id, adr_path, edges, trace)
-            return edges
+            _log_trace(adr_id, adr_path, valid_edges, trace)
+            return valid_edges
     except Exception:
         log.warning("unified_resolver: best-effort request failed for %s", adr_id)
 

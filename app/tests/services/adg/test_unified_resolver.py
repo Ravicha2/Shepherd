@@ -24,6 +24,7 @@ from services.adg.unified_resolver import (
     _add_wildcard_for_modules,
     _extract_json,
     _parse_edges,
+    _validate_edge,
     resolve_adr_constraints,
     ResolutionTrace,
     TOOL_CALL_CAP,
@@ -501,3 +502,127 @@ class TestAddWildcardForModules:
 
     def test_unknown_fqn_unchanged(self, sample_adg: ADG) -> None:
         assert _add_wildcard_for_modules("unknown.module", sample_adg) == "unknown.module"
+
+
+# -- Test: _validate_edge ----------------------------------------------------
+
+class TestValidateEdge:
+    def test_valid_module_patterns_pass(self, sample_adg: ADG) -> None:
+        edge = ConstraintEdge(
+            subject="app.api.*",
+            predicate=PredicateType.PROHIBITS_DEPENDENCY,
+            object="app.db.*",
+            justification="test",
+            adr_id="ADR-001",
+            adr_path="docs/adr/001.md",
+        )
+        assert _validate_edge(edge, sample_adg) is True
+
+    def test_valid_class_patterns_pass(self, sample_adg: ADG) -> None:
+        edge = ConstraintEdge(
+            subject="app.repository.*",
+            predicate=PredicateType.REQUIRES_IMPLEMENTATION,
+            object="app.repository.RepositoryBase",
+            justification="test",
+            adr_id="ADR-002",
+            adr_path="docs/adr/002.md",
+        )
+        assert _validate_edge(edge, sample_adg) is True
+
+    def test_hallucinated_subject_fails(self, sample_adg: ADG) -> None:
+        edge = ConstraintEdge(
+            subject="app.nonexistent.*",
+            predicate=PredicateType.PROHIBITS_DEPENDENCY,
+            object="app.db.*",
+            justification="test",
+            adr_id="ADR-001",
+            adr_path="docs/adr/001.md",
+        )
+        assert _validate_edge(edge, sample_adg) is False
+
+    def test_hallucinated_object_fails(self, sample_adg: ADG) -> None:
+        edge = ConstraintEdge(
+            subject="app.api.*",
+            predicate=PredicateType.PROHIBITS_DEPENDENCY,
+            object="app.hallucinated.*",
+            justification="test",
+            adr_id="ADR-001",
+            adr_path="docs/adr/001.md",
+        )
+        assert _validate_edge(edge, sample_adg) is False
+
+    def test_both_hallucinated_fails(self, sample_adg: ADG) -> None:
+        edge = ConstraintEdge(
+            subject="app.api_layer.*",
+            predicate=PredicateType.PROHIBITS_DEPENDENCY,
+            object="app.database_layer.*",
+            justification="test",
+            adr_id="ADR-001",
+            adr_path="docs/adr/001.md",
+        )
+        assert _validate_edge(edge, sample_adg) is False
+
+
+# -- Test: loop detection ------------------------------------------------------
+
+class TestLoopDetection:
+    def test_repeated_tool_call_injects_nudge(self, sample_adg: ADG) -> None:
+        """If LLM repeats the same dive call, a nudge message is injected."""
+        responses = [
+            _make_mock_response(tool_calls=[_tool_call("tc1", "dive", {"fqn": "app.api", "depth": 2})]),
+            _make_mock_response(tool_calls=[_tool_call("tc2", "dive", {"fqn": "app.api", "depth": 2})]),
+            _make_mock_response(
+                content=json.dumps([{
+                    "subject": "app.api.*",
+                    "object": "app.db.*",
+                    "predicate": "prohibits_dependency",
+                    "justification": "after nudge",
+                    "adr_id": "ADR-001",
+                    "adr_path": "docs/adr/001.md",
+                }]),
+            ),
+        ]
+        edges = _run_unified(ADR_PROHIBIT_DEP, "ADR-001", "docs/adr/001.md", sample_adg, responses)
+        assert len(edges) == 1
+        assert edges[0].subject == "app.api.*"
+
+
+# -- Test: end-to-end hallucination filtering ---------------------------------
+
+class TestHallucinationFiltering:
+    def test_hallucinated_fqns_filtered_out(self, sample_adg: ADG) -> None:
+        """Edges with nonexistent FQNs are dropped, valid ones are kept."""
+        responses = [
+            _make_mock_response(
+                content=json.dumps([
+                    {
+                        "subject": "app.api.*",
+                        "object": "app.db.*",
+                        "predicate": "prohibits_dependency",
+                        "justification": "valid edge",
+                        "adr_id": "ADR-001",
+                        "adr_path": "docs/adr/001.md",
+                    },
+                    {
+                        "subject": "app.hallucinated.*",
+                        "object": "app.db.*",
+                        "predicate": "prohibits_dependency",
+                        "justification": "bad subject",
+                        "adr_id": "ADR-001",
+                        "adr_path": "docs/adr/001.md",
+                    },
+                    {
+                        "subject": "app.api.*",
+                        "object": "app.also_fake.*",
+                        "predicate": "prohibits_dependency",
+                        "justification": "bad object",
+                        "adr_id": "ADR-001",
+                        "adr_path": "docs/adr/001.md",
+                    },
+                ]),
+            ),
+        ]
+        edges = _run_unified(ADR_PROHIBIT_DEP, "ADR-001", "docs/adr/001.md", sample_adg, responses)
+        assert len(edges) == 1
+        assert edges[0].subject == "app.api.*"
+        assert edges[0].object == "app.db.*"
