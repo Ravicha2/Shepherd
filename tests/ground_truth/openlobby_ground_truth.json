@@ -1,0 +1,166 @@
+[
+  {
+    "adr_id": "ADR-0001",
+    "adr_path": "docs/architecture/decisions/0001-record-architecture-decisions.md",
+    "constraints": [],
+    "note": "Process ADR about documentation methodology; no code-level architectural constraint"
+  },
+  {
+    "adr_id": "ADR-0002",
+    "adr_path": "docs/architecture/decisions/0002-use-elasticsearch-for-fulltext-search.md",
+    "constraints": [
+      {
+        "subject": "openlobby.core.*",
+        "predicate": "requires_dependency",
+        "object": "elasticsearch",
+        "justification": "ADR-0002 mandates Elasticsearch as the primary database for all data storage and fulltext search"
+      }
+    ]
+  },
+  {
+    "adr_id": "ADR-0003",
+    "adr_path": "docs/architecture/decisions/0003-just-api-without-frontend.md",
+    "constraints": [
+      {
+        "subject": "openlobby.*",
+        "predicate": "prohibits_implementation",
+        "object": "frontend",
+        "justification": "ADR-0003 mandates API-first design; the server provides only an API, no frontend implementation"
+      },
+      {
+        "subject": "openlobby.core.api.*",
+        "predicate": "requires_implementation",
+        "object": "api_endpoint",
+        "justification": "ADR-0003 requires that all functionality be exposed through API endpoints"
+      }
+    ]
+  },
+  {
+    "adr_id": "ADR-0004",
+    "adr_path": "docs/architecture/decisions/0004-graphql-api.md",
+    "constraints": [
+      {
+        "subject": "openlobby.core.api.*",
+        "predicate": "requires_dependency",
+        "object": "graphene",
+        "justification": "ADR-0004 mandates GraphQL as the API standard, implemented via Graphene library"
+      },
+      {
+        "subject": "openlobby.core.api.*",
+        "predicate": "prohibits_dependency",
+        "object": "rest_framework",
+        "justification": "ADR-0004 mandates GraphQL over REST; REST API frameworks should not be used"
+      }
+    ]
+  },
+  {
+    "adr_id": "ADR-0005",
+    "adr_path": "docs/architecture/decisions/0005-python.md",
+    "constraints": [],
+    "note": "Language choice; trivially true for the entire codebase, no meaningful FQN-level constraint"
+  },
+  {
+    "adr_id": "ADR-0006",
+    "adr_path": "docs/architecture/decisions/0006-use-flask.md",
+    "superseded_by": "ADR-0010",
+    "constraints": [
+      {
+        "subject": "openlobby.*",
+        "predicate": "requires_dependency",
+        "object": "flask",
+        "justification": "ADR-0006 mandates Flask as the web framework; superseded by ADR-0010"
+      }
+    ]
+  },
+  {
+    "adr_id": "ADR-0007",
+    "adr_path": "docs/architecture/decisions/0007-adopt-graphql-relay-specification.md",
+    "constraints": [
+      {
+        "subject": "openlobby.core.api.*",
+        "predicate": "requires_dependency",
+        "object": "graphene.relay",
+        "justification": "ADR-0007 mandates adopting GraphQL Relay specification for pagination and Node interface via Graphene Relay"
+      }
+    ]
+  },
+  {
+    "adr_id": "ADR-0008",
+    "adr_path": "docs/architecture/decisions/0008-pytest.md",
+    "constraints": [],
+    "note": "Test files are excluded from ADG by _is_test_file in treesitter.py, so tests.* FQNs do not exist; no evaluable FQN-level constraint"
+  },
+  {
+    "adr_id": "ADR-0009",
+    "adr_path": "docs/architecture/decisions/0009-openid.md",
+    "constraints": [
+      {
+        "subject": "openlobby.core.auth.*",
+        "predicate": "requires_dependency",
+        "object": "openid_connect",
+        "justification": "ADR-0009 mandates OpenID Connect for user authentication"
+      }
+    ]
+  },
+  {
+    "adr_id": "ADR-0010",
+    "adr_path": "docs/architecture/decisions/0010-replace-flask-with-django.md",
+    "supersedes": "ADR-0006",
+    "constraints": [
+      {
+        "subject": "openlobby.*",
+        "predicate": "requires_dependency",
+        "object": "django",
+        "justification": "ADR-0010 mandates Django as the web framework, replacing Flask"
+      },
+      {
+        "subject": "openlobby.*",
+        "predicate": "prohibits_dependency",
+        "object": "flask",
+        "justification": "ADR-0010 prohibits Flask; it is replaced by Django"
+      }
+    ]
+  },
+  {
+    "adr_id": "ADR-0011",
+    "adr_path": "docs/architecture/decisions/0011-add-relational-database.md",
+    "constraints": [
+      {
+        "subject": "openlobby.core.models.*",
+        "predicate": "requires_dependency",
+        "object": "django.db",
+        "justification": "ADR-0011 mandates adding a relational database as primary, accessible via Django ORM"
+      },
+      {
+        "subject": "openlobby.core.search.*",
+        "predicate": "requires_dependency",
+        "object": "elasticsearch",
+        "justification": "ADR-0011 relegates Elasticsearch to denormalized reports and fulltext search, not as primary database"
+      }
+    ]
+  },
+  {
+    "adr_id": "ADR-0012",
+    "adr_path": "docs/architecture/decisions/0012-use-postgresql.md",
+    "constraints": [
+      {
+        "subject": "openlobby.*",
+        "predicate": "requires_dependency",
+        "object": "postgresql",
+        "justification": "ADR-0012 mandates PostgreSQL as the relational database for ACID compliance and JSON/hstore support"
+      },
+      {
+        "subject": "openlobby.*",
+        "predicate": "prohibits_dependency",
+        "object": "mysql",
+        "justification": "ADR-0012 prohibits MySQL/MariaDB due to ACID-breaking bug in schema changes"
+      }
+    ]
+  },
+  {
+    "adr_id": "ADR-0013",
+    "adr_path": "docs/architecture/decisions/0013-black-code-formatter.md",
+    "constraints": [],
+    "note": "Tooling/process ADR about code formatting; no code-level architectural constraint"
+  }
+]
