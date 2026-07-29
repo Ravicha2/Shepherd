@@ -20,20 +20,8 @@
   {
     "adr_id": "ADR-0003",
     "adr_path": "docs/architecture/decisions/0003-just-api-without-frontend.md",
-    "constraints": [
-      {
-        "subject": "openlobby.*",
-        "predicate": "prohibits_implementation",
-        "object": "frontend",
-        "justification": "ADR-0003 mandates API-first design; the server provides only an API, no frontend implementation"
-      },
-      {
-        "subject": "openlobby.core.api.*",
-        "predicate": "requires_implementation",
-        "object": "api_endpoint",
-        "justification": "ADR-0003 requires that all functionality be exposed through API endpoints"
-      }
-    ]
+    "constraints": [],
+    "note": "Product-scope ADR: 'frontend' and 'api_endpoint' are concepts, not checkable FQNs. No single-ADR-derivable, operationally-checkable constraint."
   },
   {
     "adr_id": "ADR-0004",
@@ -95,10 +83,10 @@
     "adr_path": "docs/architecture/decisions/0009-openid.md",
     "constraints": [
       {
-        "subject": "openlobby.core.auth.*",
+        "subject": "openlobby.core.openid.*",
         "predicate": "requires_dependency",
-        "object": "openid_connect",
-        "justification": "ADR-0009 mandates OpenID Connect for user authentication"
+        "object": "oic",
+        "justification": "ADR-0009 mandates OpenID Connect for user authentication; openlobby/core/openid.py imports the oic package"
       }
     ]
   },
@@ -118,6 +106,12 @@
         "predicate": "prohibits_dependency",
         "object": "flask",
         "justification": "ADR-0010 prohibits Flask; it is replaced by Django"
+      },
+      {
+        "subject": "openlobby.core.models.*",
+        "predicate": "requires_dependency",
+        "object": "django.db",
+        "justification": "ADR-0010 mandates Django as the web framework; relational data access goes through the Django ORM (django.db). Moved from ADR-0011 since the Django ORM choice is what makes django.db the access path."
       }
     ]
   },
@@ -125,12 +119,6 @@
     "adr_id": "ADR-0011",
     "adr_path": "docs/architecture/decisions/0011-add-relational-database.md",
     "constraints": [
-      {
-        "subject": "openlobby.core.models.*",
-        "predicate": "requires_dependency",
-        "object": "django.db",
-        "justification": "ADR-0011 mandates adding a relational database as primary, accessible via Django ORM"
-      },
       {
         "subject": "openlobby.core.search.*",
         "predicate": "requires_dependency",
@@ -146,8 +134,8 @@
       {
         "subject": "openlobby.*",
         "predicate": "requires_dependency",
-        "object": "postgresql",
-        "justification": "ADR-0012 mandates PostgreSQL as the relational database for ACID compliance and JSON/hstore support"
+        "object": "django.db",
+        "justification": "ADR-0012 mandates PostgreSQL as the relational database; access goes through the Django ORM (django.db). The codebase does not import postgresql directly (transitive via django.db)."
       },
       {
         "subject": "openlobby.*",

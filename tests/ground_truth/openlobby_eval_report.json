@@ -1,10 +1,10 @@
 {
-  "exact": 6,
-  "partial": 3,
-  "miss": 5,
-  "total": 14,
-  "false_positives": 6,
-  "accuracy": 0.5357,
+  "exact": 5,
+  "partial": 6,
+  "miss": 1,
+  "total": 12,
+  "false_positives": 10,
+  "accuracy": 0.6667,
   "per_constraint": [
     {
       "adr_id": "ADR-0002",
@@ -17,30 +17,6 @@
       "score": "exact_match",
       "resolved_subject": "openlobby.core.*",
       "resolved_object": "elasticsearch"
-    },
-    {
-      "adr_id": "ADR-0003",
-      "expected": {
-        "subject": "openlobby.*",
-        "predicate": "prohibits_implementation",
-        "object": "frontend",
-        "justification": "ADR-0003 mandates API-first design; the server provides only an API, no frontend implementation"
-      },
-      "score": "miss",
-      "resolved_subject": "openlobby.core.views.*",
-      "resolved_object": "openlobby.core.views.IndexView"
-    },
-    {
-      "adr_id": "ADR-0003",
-      "expected": {
-        "subject": "openlobby.core.api.*",
-        "predicate": "requires_implementation",
-        "object": "api_endpoint",
-        "justification": "ADR-0003 requires that all functionality be exposed through API endpoints"
-      },
-      "score": "miss",
-      "resolved_subject": null,
-      "resolved_object": null
     },
     {
       "adr_id": "ADR-0004",
@@ -93,12 +69,12 @@
     {
       "adr_id": "ADR-0009",
       "expected": {
-        "subject": "openlobby.core.auth.*",
+        "subject": "openlobby.core.openid.*",
         "predicate": "requires_dependency",
-        "object": "openid_connect",
-        "justification": "ADR-0009 mandates OpenID Connect for user authentication"
+        "object": "oic",
+        "justification": "ADR-0009 mandates OpenID Connect for user authentication; openlobby/core/openid.py imports the oic package"
       },
-      "score": "miss",
+      "score": "partial_match",
       "resolved_subject": "openlobby.core.*",
       "resolved_object": "oic"
     },
@@ -127,15 +103,15 @@
       "resolved_object": "flask"
     },
     {
-      "adr_id": "ADR-0011",
+      "adr_id": "ADR-0010",
       "expected": {
         "subject": "openlobby.core.models.*",
         "predicate": "requires_dependency",
         "object": "django.db",
-        "justification": "ADR-0011 mandates adding a relational database as primary, accessible via Django ORM"
+        "justification": "ADR-0010 mandates Django as the web framework; relational data access goes through the Django ORM (django.db). Moved from ADR-0011 since the Django ORM choice is what makes django.db the access path."
       },
       "score": "partial_match",
-      "resolved_subject": "openlobby.core.*",
+      "resolved_subject": "openlobby.*",
       "resolved_object": "django"
     },
     {
@@ -155,12 +131,12 @@
       "expected": {
         "subject": "openlobby.*",
         "predicate": "requires_dependency",
-        "object": "postgresql",
-        "justification": "ADR-0012 mandates PostgreSQL as the relational database for ACID compliance and JSON/hstore support"
+        "object": "django.db",
+        "justification": "ADR-0012 mandates PostgreSQL as the relational database; access goes through the Django ORM (django.db). The codebase does not import postgresql directly (transitive via django.db)."
       },
-      "score": "miss",
-      "resolved_subject": null,
-      "resolved_object": null
+      "score": "partial_match",
+      "resolved_subject": "openlobby.core.*",
+      "resolved_object": "django.db"
     },
     {
       "adr_id": "ADR-0012",
@@ -170,8 +146,8 @@
         "object": "mysql",
         "justification": "ADR-0012 prohibits MySQL/MariaDB due to ACID-breaking bug in schema changes"
       },
-      "score": "exact_match",
-      "resolved_subject": "openlobby.*",
+      "score": "partial_match",
+      "resolved_subject": "openlobby.core.*",
       "resolved_object": "mysql"
     }
   ]

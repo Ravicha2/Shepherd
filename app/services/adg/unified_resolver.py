@@ -107,10 +107,12 @@ The following modules exist in the codebase graph. Internal FQN patterns MUST co
 - subject: MUST be an internal FQN pattern from the module list (internal codebase module).
   If you cannot map the ADR's subject concept to a module, return an empty array.
 - object: depends on predicate:
-  - `requires_dependency` / `requires_implementation`: object MUST be either (a) an
-    internal FQN pattern from the module list, or (b) an external package name from the
-    External packages list below (or a submodule of one, e.g. `graphene.relay` when
-    `graphene` is listed). Do NOT invent external package names not in the list.
+  - `requires_dependency` / `requires_implementation`: object is either (a) an
+    internal FQN pattern from the module list, or (b) an external package name. Prefer
+    names from the External packages list when the ADR names one directly. For
+    transitive dependencies reached through a wrapper package (e.g. PostgreSQL reached
+    via `django.db`), use the access-path package (`django.db`), not the underlying
+    engine. Do NOT invent internal FQNs for external packages.
   - `prohibits_dependency` / `prohibits_implementation`: object MAY be an internal FQN
     pattern, OR any external package name, including packages NOT imported by the
     codebase (e.g., `rest_framework`, `mysql`). The linter checks for absence, so
@@ -128,7 +130,7 @@ Example: ADR prohibits REST framework use (REST is not imported in the codebase)
 
 ## External packages
 
-External packages imported by the codebase. `requires_*` object must be a name from this list (or a submodule of one); `prohibits_*` object may be any external name.
+External packages imported by the codebase. Use these as the `requires_*` object when the ADR names one of them directly. For transitive dependencies reached through a wrapper (e.g., `postgresql` via `django.db`), use the access-path package (`django.db`). `prohibits_*` object may be any external name.
 
 {external_packages_hint}
 
@@ -332,13 +334,16 @@ def _validate_edge(edge: ConstraintEdge, adg: ADG, external_packages: set[str]) 
     Subject: internal pattern (first segment in roots) must match an ADG node;
     external subject passes (rare, e.g., framing the ADR from the package's POV).
     Object: predicate-aware.
-      - `requires_*`: external object must be in `external_packages` (no hallucination);
-        internal object must match the ADG.
+      - `requires_*`: external object passes (LLM grounded by prompt's
+        External packages section; transitive deps like `postgresql` reached
+        via `django.db` are not in IMPORTS but should not be dropped).
+        Internal object must match the ADG.
       - `prohibits_*`: external object passes unvalidated (linter checks absence);
         internal object must match the ADG.
     """
     all_fqns = {str(n.fqn) for n in adg.nodes}
     roots = _root_segments(adg)
+    _ = external_packages  # ponytail: kept for API stability; strict-list check removed (transitive deps)
 
     # Subject
     subj_first = edge.subject.split(".")[0].rstrip(".*")
@@ -348,17 +353,13 @@ def _validate_edge(edge: ConstraintEdge, adg: ADG, external_packages: set[str]) 
             return False
     # External subject passes (no ADG check).
 
-    # Object: predicate-aware.
+    # Object: only validate if it looks internal (first segment in roots).
+    # External objects pass for both requires_* (transitive deps) and prohibits_* (absent pkgs).
     obj_first = edge.object.split(".")[0].rstrip(".*")
     if obj_first in roots:
         obj_base = edge.object.rstrip(".*")
         if not (obj_base in all_fqns or any(f.startswith(obj_base + ".") for f in all_fqns)):
             return False
-    elif edge.predicate in (PredicateType.REQUIRES_DEPENDENCY, PredicateType.REQUIRES_IMPLEMENTATION):
-        # Strict: requires_* external object must be in imports list.
-        if obj_first not in external_packages:
-            return False
-    # prohibits_* external object: pass unvalidated.
     return True
 
 
@@ -599,10 +600,10 @@ if __name__ == "__main__":
     assert _validate_edge(ext_obj_edge, adg, ext_pkgs) is True
     print("_validate_edge requires_* external object in list OK")
 
-    # _validate_edge: requires_* external object NOT in list drops (no hallucination)
-    req_halluc_edge = ConstraintEdge(subject="app.api.*", predicate=PredicateType.REQUIRES_DEPENDENCY, object="halluc_pkg", justification="halluc", adr_id="ADR-1", adr_path="docs/adr/1.md")
-    assert _validate_edge(req_halluc_edge, adg, ext_pkgs) is False
-    print("_validate_edge requires_* external object not in list dropped OK")
+    # _validate_edge: requires_* external object NOT in list passes (transitive deps, e.g. postgresql via django.db)
+    req_transitive_edge = ConstraintEdge(subject="app.api.*", predicate=PredicateType.REQUIRES_DEPENDENCY, object="postgresql", justification="transitive", adr_id="ADR-1", adr_path="docs/adr/1.md")
+    assert _validate_edge(req_transitive_edge, adg, ext_pkgs) is True
+    print("_validate_edge requires_* external object not in list (transitive) OK")
 
     # _validate_edge: prohibits_* external object NOT in list passes (linter checks absence)
     pro_absent_edge = ConstraintEdge(subject="app.api.*", predicate=PredicateType.PROHIBITS_DEPENDENCY, object="rest_framework", justification="absent", adr_id="ADR-1", adr_path="docs/adr/1.md")

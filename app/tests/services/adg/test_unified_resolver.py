@@ -600,7 +600,7 @@ class TestValidateEdge:
         assert _validate_edge(edge, sample_adg, set()) is False
 
     def test_requires_external_object_in_list_passes(self, sample_adg: ADG) -> None:
-        # ponytail: requires_* external object must be in external_packages list
+        # ponytail: requires_* external object passes (LLM grounded by External packages prompt section)
         edge = ConstraintEdge(
             subject="app.api.*",
             predicate=PredicateType.REQUIRES_DEPENDENCY,
@@ -611,17 +611,18 @@ class TestValidateEdge:
         )
         assert _validate_edge(edge, sample_adg, {"elasticsearch"}) is True
 
-    def test_requires_external_object_not_in_list_fails(self, sample_adg: ADG) -> None:
-        # ponytail: hallucinated external package for requires_* is dropped
+    def test_requires_external_object_not_in_list_passes(self, sample_adg: ADG) -> None:
+        # ponytail: loosened strict rule — transitive deps (postgresql via django.db) not in IMPORTS still pass;
+        # LLM is grounded by the External packages section, not by the validator
         edge = ConstraintEdge(
             subject="app.api.*",
             predicate=PredicateType.REQUIRES_DEPENDENCY,
-            object="halluc_pkg",
-            justification="not actually imported",
+            object="postgresql",
+            justification="transitive dep reached via django.db",
             adr_id="ADR-001",
             adr_path="docs/adr/001.md",
         )
-        assert _validate_edge(edge, sample_adg, set()) is False
+        assert _validate_edge(edge, sample_adg, set()) is True
 
     def test_prohibits_external_object_not_in_list_passes(self, sample_adg: ADG) -> None:
         # ponytail: prohibits_* external object may be absent (linter checks absence)
