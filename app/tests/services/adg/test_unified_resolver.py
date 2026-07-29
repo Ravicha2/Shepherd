@@ -22,6 +22,7 @@ from services.models import (
 from services.adg.adg_tools import dive, list_modules
 from services.adg.unified_resolver import (
     _add_wildcard_for_modules,
+    _external_packages,
     _extract_json,
     _is_internal,
     _parse_edges,
@@ -518,6 +519,28 @@ class TestRootSegments:
         assert _root_segments(empty_adg) == set()
 
 
+# -- Test: _external_packages -------------------------------------------------
+
+class TestExternalPackages:
+    def test_no_imports_returns_empty_set(self, sample_adg: ADG) -> None:
+        # sample_adg has one internal IMPORTS edge (app.api.users -> app.auth.middleware)
+        assert _external_packages(sample_adg) == set()
+
+    def test_external_imports_returned(self) -> None:
+        adg = ADG(
+            nodes=[FQNNode(fqn=FQN.from_dotted("app"), kind=FQNKind.MODULE, file_path="app/__init__.py", line_start=0, line_end=0, start_byte=0, end_byte=0)],
+            edges=[Edge(source="app", target="elasticsearch", kind="IMPORTS")],
+        )
+        assert _external_packages(adg) == {"elasticsearch"}
+
+    def test_submodule_import_returns_root(self) -> None:
+        adg = ADG(
+            nodes=[FQNNode(fqn=FQN.from_dotted("app"), kind=FQNKind.MODULE, file_path="app/__init__.py", line_start=0, line_end=0, start_byte=0, end_byte=0)],
+            edges=[Edge(source="app", target="graphene.relay.Node", kind="IMPORTS")],
+        )
+        assert _external_packages(adg) == {"graphene"}
+
+
 # -- Test: _validate_edge ----------------------------------------------------
 
 class TestValidateEdge:
@@ -530,7 +553,7 @@ class TestValidateEdge:
             adr_id="ADR-001",
             adr_path="docs/adr/001.md",
         )
-        assert _validate_edge(edge, sample_adg) is True
+        assert _validate_edge(edge, sample_adg, set()) is True
 
     def test_valid_class_patterns_pass(self, sample_adg: ADG) -> None:
         edge = ConstraintEdge(
@@ -541,7 +564,7 @@ class TestValidateEdge:
             adr_id="ADR-002",
             adr_path="docs/adr/002.md",
         )
-        assert _validate_edge(edge, sample_adg) is True
+        assert _validate_edge(edge, sample_adg, set()) is True
 
     def test_hallucinated_subject_fails(self, sample_adg: ADG) -> None:
         edge = ConstraintEdge(
@@ -552,7 +575,7 @@ class TestValidateEdge:
             adr_id="ADR-001",
             adr_path="docs/adr/001.md",
         )
-        assert _validate_edge(edge, sample_adg) is False
+        assert _validate_edge(edge, sample_adg, set()) is False
 
     def test_hallucinated_object_fails(self, sample_adg: ADG) -> None:
         edge = ConstraintEdge(
@@ -563,7 +586,7 @@ class TestValidateEdge:
             adr_id="ADR-001",
             adr_path="docs/adr/001.md",
         )
-        assert _validate_edge(edge, sample_adg) is False
+        assert _validate_edge(edge, sample_adg, set()) is False
 
     def test_both_hallucinated_fails(self, sample_adg: ADG) -> None:
         edge = ConstraintEdge(
@@ -574,10 +597,10 @@ class TestValidateEdge:
             adr_id="ADR-001",
             adr_path="docs/adr/001.md",
         )
-        assert _validate_edge(edge, sample_adg) is False
+        assert _validate_edge(edge, sample_adg, set()) is False
 
-    def test_external_package_object_passes(self, sample_adg: ADG) -> None:
-        # ponytail: external packages are not in ADG, validate only internals
+    def test_requires_external_object_in_list_passes(self, sample_adg: ADG) -> None:
+        # ponytail: requires_* external object must be in external_packages list
         edge = ConstraintEdge(
             subject="app.api.*",
             predicate=PredicateType.REQUIRES_DEPENDENCY,
@@ -586,7 +609,31 @@ class TestValidateEdge:
             adr_id="ADR-001",
             adr_path="docs/adr/001.md",
         )
-        assert _validate_edge(edge, sample_adg) is True
+        assert _validate_edge(edge, sample_adg, {"elasticsearch"}) is True
+
+    def test_requires_external_object_not_in_list_fails(self, sample_adg: ADG) -> None:
+        # ponytail: hallucinated external package for requires_* is dropped
+        edge = ConstraintEdge(
+            subject="app.api.*",
+            predicate=PredicateType.REQUIRES_DEPENDENCY,
+            object="halluc_pkg",
+            justification="not actually imported",
+            adr_id="ADR-001",
+            adr_path="docs/adr/001.md",
+        )
+        assert _validate_edge(edge, sample_adg, set()) is False
+
+    def test_prohibits_external_object_not_in_list_passes(self, sample_adg: ADG) -> None:
+        # ponytail: prohibits_* external object may be absent (linter checks absence)
+        edge = ConstraintEdge(
+            subject="app.api.*",
+            predicate=PredicateType.PROHIBITS_DEPENDENCY,
+            object="rest_framework",
+            justification="ADR prohibits REST framework; not imported in codebase",
+            adr_id="ADR-001",
+            adr_path="docs/adr/001.md",
+        )
+        assert _validate_edge(edge, sample_adg, set()) is True
 
     def test_external_package_subject_passes(self, sample_adg: ADG) -> None:
         edge = ConstraintEdge(
@@ -597,7 +644,7 @@ class TestValidateEdge:
             adr_id="ADR-001",
             adr_path="docs/adr/001.md",
         )
-        assert _validate_edge(edge, sample_adg) is True
+        assert _validate_edge(edge, sample_adg, set()) is True
 
     def test_hallucinated_internal_object_with_external_subject_fails(self, sample_adg: ADG) -> None:
         # External subject passes, but hallucinated internal object must still drop.
@@ -609,7 +656,7 @@ class TestValidateEdge:
             adr_id="ADR-001",
             adr_path="docs/adr/001.md",
         )
-        assert _validate_edge(edge, sample_adg) is False
+        assert _validate_edge(edge, sample_adg, set()) is False
 
 
 # -- Test: _is_internal -------------------------------------------------------

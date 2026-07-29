@@ -1,10 +1,10 @@
 {
-  "exact": 5,
-  "partial": 4,
+  "exact": 6,
+  "partial": 3,
   "miss": 5,
   "total": 14,
-  "false_positives": 8,
-  "accuracy": 0.5,
+  "false_positives": 6,
+  "accuracy": 0.5357,
   "per_constraint": [
     {
       "adr_id": "ADR-0002",
@@ -62,9 +62,9 @@
         "object": "rest_framework",
         "justification": "ADR-0004 mandates GraphQL over REST; REST API frameworks should not be used"
       },
-      "score": "miss",
-      "resolved_subject": null,
-      "resolved_object": null
+      "score": "exact_match",
+      "resolved_subject": "openlobby.core.api.*",
+      "resolved_object": "rest_framework"
     },
     {
       "adr_id": "ADR-0006",
@@ -74,9 +74,9 @@
         "object": "flask",
         "justification": "ADR-0006 mandates Flask as the web framework; superseded by ADR-0010"
       },
-      "score": "exact_match",
-      "resolved_subject": "openlobby.*",
-      "resolved_object": "flask"
+      "score": "miss",
+      "resolved_subject": null,
+      "resolved_object": null
     },
     {
       "adr_id": "ADR-0007",
@@ -99,8 +99,8 @@
         "justification": "ADR-0009 mandates OpenID Connect for user authentication"
       },
       "score": "miss",
-      "resolved_subject": "openlobby.core.api.mutations.*",
-      "resolved_object": "oic.oic"
+      "resolved_subject": "openlobby.core.*",
+      "resolved_object": "oic"
     },
     {
       "adr_id": "ADR-0010",
@@ -134,9 +134,9 @@
         "object": "django.db",
         "justification": "ADR-0011 mandates adding a relational database as primary, accessible via Django ORM"
       },
-      "score": "miss",
+      "score": "partial_match",
       "resolved_subject": "openlobby.core.*",
-      "resolved_object": "postgresql"
+      "resolved_object": "django"
     },
     {
       "adr_id": "ADR-0011",
@@ -158,9 +158,9 @@
         "object": "postgresql",
         "justification": "ADR-0012 mandates PostgreSQL as the relational database for ACID compliance and JSON/hstore support"
       },
-      "score": "partial_match",
-      "resolved_subject": "openlobby.core.*",
-      "resolved_object": "postgresql"
+      "score": "miss",
+      "resolved_subject": null,
+      "resolved_object": null
     },
     {
       "adr_id": "ADR-0012",
@@ -170,8 +170,8 @@
         "object": "mysql",
         "justification": "ADR-0012 prohibits MySQL/MariaDB due to ACID-breaking bug in schema changes"
       },
-      "score": "partial_match",
-      "resolved_subject": "openlobby.core.*",
+      "score": "exact_match",
+      "resolved_subject": "openlobby.*",
       "resolved_object": "mysql"
     }
   ]

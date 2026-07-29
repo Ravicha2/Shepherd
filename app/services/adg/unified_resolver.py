@@ -106,15 +106,31 @@ The following modules exist in the codebase graph. Internal FQN patterns MUST co
 
 - subject: MUST be an internal FQN pattern from the module list (internal codebase module).
   If you cannot map the ADR's subject concept to a module, return an empty array.
-- object: EITHER an internal FQN pattern from the module list, OR an external package
-  name used as-is (e.g., elasticsearch, django, flask, graphene, openid_connect, postgresql).
-  External packages do NOT need to appear in the module list. Do NOT invent internal
-  FQNs for external packages.
+- object: depends on predicate:
+  - `requires_dependency` / `requires_implementation`: object MUST be either (a) an
+    internal FQN pattern from the module list, or (b) an external package name from the
+    External packages list below (or a submodule of one, e.g. `graphene.relay` when
+    `graphene` is listed). Do NOT invent external package names not in the list.
+  - `prohibits_dependency` / `prohibits_implementation`: object MAY be an internal FQN
+    pattern, OR any external package name, including packages NOT imported by the
+    codebase (e.g., `rest_framework`, `mysql`). The linter checks for absence, so
+    naming an absent package is a valid prohibition.
 
 Example: ADR requires Elasticsearch for fulltext search.
   subject: openlobby.core.*  (internal, from module list)
-  object:  elasticsearch     (external package, used as-is)
+  object:  elasticsearch     (external package, from External packages list)
   predicate: requires_dependency
+
+Example: ADR prohibits REST framework use (REST is not imported in the codebase).
+  subject: openlobby.core.api.*  (internal, from module list)
+  object:  rest_framework        (external package, absent from imports)
+  predicate: prohibits_dependency
+
+## External packages
+
+External packages imported by the codebase. `requires_*` object must be a name from this list (or a submodule of one); `prohibits_*` object may be any external name.
+
+{external_packages_hint}
 
 ## Predicate types
 
@@ -300,24 +316,49 @@ def _root_segments(adg: ADG) -> set[str]:
     }
 
 
-def _validate_edge(edge: ConstraintEdge, adg: ADG) -> bool:
+def _external_packages(adg: ADG) -> set[str]:
+    # ponytail: external import roots = first segments of IMPORTS targets not in roots
+    roots = _root_segments(adg)
+    return {
+        e.target.split(".")[0]
+        for e in adg.edges
+        if e.kind == "IMPORTS" and e.target.split(".")[0] not in roots
+    }
+
+
+def _validate_edge(edge: ConstraintEdge, adg: ADG, external_packages: set[str]) -> bool:
     """Return True if edge passes root-namespace-aware validation.
 
-    A pattern is internal iff its first segment is a top-level module in the ADG.
-    Internal patterns must match an ADG node (or have a descendant in the ADG);
-    external patterns (first segment not a root) pass unvalidated, so external
-    packages like ``elasticsearch`` or ``django`` are not dropped.
+    Subject: internal pattern (first segment in roots) must match an ADG node;
+    external subject passes (rare, e.g., framing the ADR from the package's POV).
+    Object: predicate-aware.
+      - `requires_*`: external object must be in `external_packages` (no hallucination);
+        internal object must match the ADG.
+      - `prohibits_*`: external object passes unvalidated (linter checks absence);
+        internal object must match the ADG.
     """
     all_fqns = {str(n.fqn) for n in adg.nodes}
     roots = _root_segments(adg)
-    for pattern in (edge.subject, edge.object):
-        first = pattern.split(".")[0].rstrip(".*")
-        if first not in roots:
-            continue  # external package, cannot validate against ADG
-        base = pattern.rstrip(".*")
-        if base in all_fqns or any(f.startswith(base + ".") for f in all_fqns):
-            continue
-        return False  # claimed internal but no ADG match -> hallucination, drop
+
+    # Subject
+    subj_first = edge.subject.split(".")[0].rstrip(".*")
+    if subj_first in roots:
+        subj_base = edge.subject.rstrip(".*")
+        if not (subj_base in all_fqns or any(f.startswith(subj_base + ".") for f in all_fqns)):
+            return False
+    # External subject passes (no ADG check).
+
+    # Object: predicate-aware.
+    obj_first = edge.object.split(".")[0].rstrip(".*")
+    if obj_first in roots:
+        obj_base = edge.object.rstrip(".*")
+        if not (obj_base in all_fqns or any(f.startswith(obj_base + ".") for f in all_fqns)):
+            return False
+    elif edge.predicate in (PredicateType.REQUIRES_DEPENDENCY, PredicateType.REQUIRES_IMPLEMENTATION):
+        # Strict: requires_* external object must be in imports list.
+        if obj_first not in external_packages:
+            return False
+    # prohibits_* external object: pass unvalidated.
     return True
 
 
@@ -372,8 +413,12 @@ def resolve_adr_constraints(
     if len(modules) > 20:
         module_hint += ", ..."
 
+    external_packages = _external_packages(adg)
+    external_packages_hint = ", ".join(sorted(external_packages)) if external_packages else "(none)"
+
     system_prompt = _SYSTEM_PROMPT_TEMPLATE.format(
-        adr_text=adr_text, adr_id=adr_id, adr_path=adr_path, module_hint=module_hint,
+        adr_text=adr_text, adr_id=adr_id, adr_path=adr_path,
+        module_hint=module_hint, external_packages_hint=external_packages_hint,
     )
 
     messages = [
@@ -410,7 +455,7 @@ def resolve_adr_constraints(
                     )
                     for e in edges
                 ]
-                valid_edges = [e for e in edges if _validate_edge(e, adg)]
+                valid_edges = [e for e in edges if _validate_edge(e, adg, external_packages)]
                 if len(valid_edges) < len(edges):
                     dropped = [e for e in edges if e not in valid_edges]
                     log.warning("unified_resolver: dropped %d edges with nonexistent FQNs for %s", len(dropped), adr_id)
@@ -465,7 +510,7 @@ def resolve_adr_constraints(
                 )
                 for e in edges
             ]
-            valid_edges = [e for e in edges if _validate_edge(e, adg)]
+            valid_edges = [e for e in edges if _validate_edge(e, adg, external_packages)]
             if len(valid_edges) < len(edges):
                 dropped = [e for e in edges if e not in valid_edges]
                 log.warning("unified_resolver: dropped %d edges with nonexistent FQNs for %s", len(dropped), adr_id)
@@ -543,17 +588,33 @@ if __name__ == "__main__":
     assert _root_segments(adg) == {"app"}
     print("_root_segments OK")
 
-    # _validate_edge: external object passes, hallucinated internal object drops, valid internal passes
+    # _external_packages: empty (no IMPORTS edges in test ADG)
+    assert _external_packages(adg) == set()
+    print("_external_packages OK")
+
+    ext_pkgs = {"elasticsearch"}  # simulated imports list
+
+    # _validate_edge: requires_* external object in list passes
     ext_obj_edge = ConstraintEdge(subject="app.api.*", predicate=PredicateType.REQUIRES_DEPENDENCY, object="elasticsearch", justification="ext", adr_id="ADR-1", adr_path="docs/adr/1.md")
-    assert _validate_edge(ext_obj_edge, adg) is True
-    print("_validate_edge external object OK")
+    assert _validate_edge(ext_obj_edge, adg, ext_pkgs) is True
+    print("_validate_edge requires_* external object in list OK")
+
+    # _validate_edge: requires_* external object NOT in list drops (no hallucination)
+    req_halluc_edge = ConstraintEdge(subject="app.api.*", predicate=PredicateType.REQUIRES_DEPENDENCY, object="halluc_pkg", justification="halluc", adr_id="ADR-1", adr_path="docs/adr/1.md")
+    assert _validate_edge(req_halluc_edge, adg, ext_pkgs) is False
+    print("_validate_edge requires_* external object not in list dropped OK")
+
+    # _validate_edge: prohibits_* external object NOT in list passes (linter checks absence)
+    pro_absent_edge = ConstraintEdge(subject="app.api.*", predicate=PredicateType.PROHIBITS_DEPENDENCY, object="rest_framework", justification="absent", adr_id="ADR-1", adr_path="docs/adr/1.md")
+    assert _validate_edge(pro_absent_edge, adg, ext_pkgs) is True
+    print("_validate_edge prohibits_* external object not in list OK")
 
     halluc_obj_edge = ConstraintEdge(subject="app.api.*", predicate=PredicateType.REQUIRES_DEPENDENCY, object="app.hallucinated.*", justification="halluc", adr_id="ADR-1", adr_path="docs/adr/1.md")
-    assert _validate_edge(halluc_obj_edge, adg) is False
+    assert _validate_edge(halluc_obj_edge, adg, ext_pkgs) is False
     print("_validate_edge hallucinated internal object dropped OK")
 
     valid_internal_edge = ConstraintEdge(subject="app.api.*", predicate=PredicateType.PROHIBITS_DEPENDENCY, object="app.db.*", justification="valid", adr_id="ADR-1", adr_path="docs/adr/1.md")
-    assert _validate_edge(valid_internal_edge, adg) is True
+    assert _validate_edge(valid_internal_edge, adg, ext_pkgs) is True
     print("_validate_edge valid internal OK")
 
     print("All self-checks passed")
