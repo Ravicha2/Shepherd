@@ -65,6 +65,7 @@ class ResolutionTrace:
     tool_calls: list[dict] = field(default_factory=list)
     hit_cap: bool = False
     parse_failed: bool = False
+    pre_validation_edges: list[dict] = field(default_factory=list)
 
 
 _SYSTEM_PROMPT_TEMPLATE = """
@@ -97,11 +98,23 @@ a preceding list_modules call will be rejected.
 
 ## Module list
 
-The following modules exist in the codebase graph. You MUST use FQN patterns from this list. Do NOT invent module names.
+The following modules exist in the codebase graph. Internal FQN patterns MUST come from this list. Do NOT invent internal module names.
 
 {module_hint}
 
-**CRITICAL**: You MUST use FQN patterns from the module list above. Do NOT invent module names. If the ADR refers to "routes" and the module list shows `app.routes`, use `app.routes.*`. If no module matches a concept from the ADR, return an empty array.
+## Subject and object rules
+
+- subject: MUST be an internal FQN pattern from the module list (internal codebase module).
+  If you cannot map the ADR's subject concept to a module, return an empty array.
+- object: EITHER an internal FQN pattern from the module list, OR an external package
+  name used as-is (e.g., elasticsearch, django, flask, graphene, openid_connect, postgresql).
+  External packages do NOT need to appear in the module list. Do NOT invent internal
+  FQNs for external packages.
+
+Example: ADR requires Elasticsearch for fulltext search.
+  subject: openlobby.core.*  (internal, from module list)
+  object:  elasticsearch     (external package, used as-is)
+  predicate: requires_dependency
 
 ## Predicate types
 
@@ -115,7 +128,27 @@ The following modules exist in the codebase graph. You MUST use FQN patterns fro
 The `.*` suffix denotes a wildcard pattern: it matches the prefix itself **and** every descendant FQN that starts with `prefix.`.
 For example, `app.routes.*` matches `app.routes`, `app.routes.user`, and `app.routes.user.get_handler`.
 
-When generating constraints, use wildcards for architectural rules that apply to an entire module or layer (for example, "no route handler may import any model class" becomes `app.routes.*` → `app.models.*`). Use exact FQNs when the rule targets one specific entity (for example, "all services must inherit from `app.services.base.ServiceBase`").
+When generating constraints, use wildcards for architectural rules that apply to an entire module or layer (for example, "no route handler may import any model class" becomes `app.routes.*` → `app.models.*`). Use exact FQNs when the rule targets one specific entity (for example, "all services must inherit from `app.services.base.ServiceBase`"). External package objects never take a `.*` wildcard.
+
+## Specificity (general rule + specific exception)
+
+CPT resolves conflicts by subject specificity on the same object. Specificity is computed from the SUBJECT pattern: depth of the dotted path, plus a 1.0 bonus for exact FQNs (no `.*`). Wildcards get depth only. So `app.*` = 1.0, `app.api.*` = 2.0, `app.api` = 3.0, `app.api.users` = 4.0. A `requires_*` edge with higher subject specificity suppresses a `prohibits_*` edge on the same object (and vice versa). This is how exceptions get expressed.
+
+When an ADR says "only X may do Y" or "only through X", emit TWO edges: a general prohibition with a wildcard subject, plus a specific requirement on X. The specific subject is the exception; the wildcard subject is the rule.
+
+Example: ADR says "the only way to instantiate `app.repository.UnitOfWork` is through `app.services.TransactionManager`".
+- subject `app.*` predicate `prohibits_implementation` object `app.repository.UnitOfWork` (general: nobody implements UnitOfWork, specificity 1.0)
+- subject `app.services.TransactionManager` predicate `requires_implementation` object `app.repository.UnitOfWork` (specific exception: TransactionManager implements UnitOfWork, specificity 5.0; suppresses the general prohibit when TransactionManager implements it)
+
+Example: ADR says "only `app.api` may import `flask`".
+- subject `app.*` predicate `prohibits_dependency` object `flask` (general: nobody depends on flask, specificity 1.0)
+- subject `app.api.*` predicate `requires_dependency` object `flask` (specific exception: app.api depends on flask, specificity 2.0)
+
+Use the narrowest wildcard that still captures the general rule (`app.*` over `app.api.*` if the prohibition spans the whole codebase).
+
+## Negative constraints from prescriptive decisions
+
+A prescriptive decision ("we chose X") often implies a prohibition on the alternatives it replaced. If the ADR names the rejected option, emit a `prohibits_*` edge for it too. Example: ADR says "we replace Flask with Django" -> emit `app.* requires_dependency django` AND `app.* prohibits_dependency flask`.
 
 ## Output format
 
@@ -127,7 +160,6 @@ Respond with a JSON array of constraint objects. Each object has:
 - adr_id: "{adr_id}"
 - adr_path: "{adr_path}"
 
-For external packages not in the graph, use the package name as-is (no wildcard).
 If the ADR contains no enforceable architectural constraints, return an empty array [].
 
 ## Examples
@@ -258,16 +290,34 @@ def _is_internal(fqn_pattern: str, adg: ADG) -> bool:
     return False
 
 
+def _root_segments(adg: ADG) -> set[str]:
+    # ponytail: top-level modules = MODULE nodes with no CONTAINS parent
+    children = {e.target for e in adg.edges if e.kind == "CONTAINS"}
+    return {
+        str(n.fqn).split(".")[0]
+        for n in adg.nodes
+        if n.kind == FQNKind.MODULE and str(n.fqn) not in children
+    }
+
+
 def _validate_edge(edge: ConstraintEdge, adg: ADG) -> bool:
-    """Return True if edge subject and object patterns match at least one node in the ADG."""
+    """Return True if edge passes root-namespace-aware validation.
+
+    A pattern is internal iff its first segment is a top-level module in the ADG.
+    Internal patterns must match an ADG node (or have a descendant in the ADG);
+    external patterns (first segment not a root) pass unvalidated, so external
+    packages like ``elasticsearch`` or ``django`` are not dropped.
+    """
     all_fqns = {str(n.fqn) for n in adg.nodes}
+    roots = _root_segments(adg)
     for pattern in (edge.subject, edge.object):
+        first = pattern.split(".")[0].rstrip(".*")
+        if first not in roots:
+            continue  # external package, cannot validate against ADG
         base = pattern.rstrip(".*")
-        if base in all_fqns:
+        if base in all_fqns or any(f.startswith(base + ".") for f in all_fqns):
             continue
-        if any(f.startswith(base + ".") for f in all_fqns):
-            continue
-        return False
+        return False  # claimed internal but no ADG match -> hallucination, drop
     return True
 
 
@@ -289,6 +339,7 @@ def _log_trace(
         "adr_path": adr_path,
         "num_edges": len(edges),
         "edges": [{"subject": e.subject, "object": e.object, "predicate": e.predicate.value} for e in edges],
+        "pre_validation_edges": trace.pre_validation_edges,
         "hit_cap": trace.hit_cap,
         "parse_failed": trace.parse_failed,
         "tool_calls": trace.tool_calls,
@@ -363,7 +414,8 @@ def resolve_adr_constraints(
                 if len(valid_edges) < len(edges):
                     dropped = [e for e in edges if e not in valid_edges]
                     log.warning("unified_resolver: dropped %d edges with nonexistent FQNs for %s", len(dropped), adr_id)
-                trace = ResolutionTrace(tool_calls=tool_call_trace, hit_cap=False, parse_failed=False)
+                pre_val = [{"subject": e.subject, "object": e.object, "predicate": e.predicate.value, "valid": e in valid_edges} for e in edges]
+                trace = ResolutionTrace(tool_calls=tool_call_trace, hit_cap=False, parse_failed=False, pre_validation_edges=pre_val)
                 _log_trace(adr_id, adr_path, valid_edges, trace)
                 return valid_edges
             log.warning("unified_resolver: LLM returned empty response for %s", adr_id)
@@ -417,7 +469,8 @@ def resolve_adr_constraints(
             if len(valid_edges) < len(edges):
                 dropped = [e for e in edges if e not in valid_edges]
                 log.warning("unified_resolver: dropped %d edges with nonexistent FQNs for %s", len(dropped), adr_id)
-            trace = ResolutionTrace(tool_calls=tool_call_trace, hit_cap=True, parse_failed=False)
+            pre_val = [{"subject": e.subject, "object": e.object, "predicate": e.predicate.value, "valid": e in valid_edges} for e in edges]
+            trace = ResolutionTrace(tool_calls=tool_call_trace, hit_cap=True, parse_failed=False, pre_validation_edges=pre_val)
             _log_trace(adr_id, adr_path, valid_edges, trace)
             return valid_edges
     except Exception:
@@ -485,5 +538,22 @@ if __name__ == "__main__":
     )
     assert len(edges_out) == 0
     print("invalid predicate skipped OK")
+
+    # _root_segments tests
+    assert _root_segments(adg) == {"app"}
+    print("_root_segments OK")
+
+    # _validate_edge: external object passes, hallucinated internal object drops, valid internal passes
+    ext_obj_edge = ConstraintEdge(subject="app.api.*", predicate=PredicateType.REQUIRES_DEPENDENCY, object="elasticsearch", justification="ext", adr_id="ADR-1", adr_path="docs/adr/1.md")
+    assert _validate_edge(ext_obj_edge, adg) is True
+    print("_validate_edge external object OK")
+
+    halluc_obj_edge = ConstraintEdge(subject="app.api.*", predicate=PredicateType.REQUIRES_DEPENDENCY, object="app.hallucinated.*", justification="halluc", adr_id="ADR-1", adr_path="docs/adr/1.md")
+    assert _validate_edge(halluc_obj_edge, adg) is False
+    print("_validate_edge hallucinated internal object dropped OK")
+
+    valid_internal_edge = ConstraintEdge(subject="app.api.*", predicate=PredicateType.PROHIBITS_DEPENDENCY, object="app.db.*", justification="valid", adr_id="ADR-1", adr_path="docs/adr/1.md")
+    assert _validate_edge(valid_internal_edge, adg) is True
+    print("_validate_edge valid internal OK")
 
     print("All self-checks passed")

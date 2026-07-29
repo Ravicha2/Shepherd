@@ -23,7 +23,9 @@ from services.adg.adg_tools import dive, list_modules
 from services.adg.unified_resolver import (
     _add_wildcard_for_modules,
     _extract_json,
+    _is_internal,
     _parse_edges,
+    _root_segments,
     _validate_edge,
     resolve_adr_constraints,
     ResolutionTrace,
@@ -506,6 +508,18 @@ class TestAddWildcardForModules:
 
 # -- Test: _validate_edge ----------------------------------------------------
 
+class TestRootSegments:
+    def test_returns_top_level_modules(self, sample_adg: ADG) -> None:
+        # ponytail: top-level modules = MODULE nodes with no CONTAINS parent
+        assert _root_segments(sample_adg) == {"app"}
+
+    def test_empty_adg_returns_empty_set(self) -> None:
+        empty_adg = ADG(nodes=[], edges=[])
+        assert _root_segments(empty_adg) == set()
+
+
+# -- Test: _validate_edge ----------------------------------------------------
+
 class TestValidateEdge:
     def test_valid_module_patterns_pass(self, sample_adg: ADG) -> None:
         edge = ConstraintEdge(
@@ -561,6 +575,61 @@ class TestValidateEdge:
             adr_path="docs/adr/001.md",
         )
         assert _validate_edge(edge, sample_adg) is False
+
+    def test_external_package_object_passes(self, sample_adg: ADG) -> None:
+        # ponytail: external packages are not in ADG, validate only internals
+        edge = ConstraintEdge(
+            subject="app.api.*",
+            predicate=PredicateType.REQUIRES_DEPENDENCY,
+            object="elasticsearch",
+            justification="ADR requires Elasticsearch for fulltext search",
+            adr_id="ADR-001",
+            adr_path="docs/adr/001.md",
+        )
+        assert _validate_edge(edge, sample_adg) is True
+
+    def test_external_package_subject_passes(self, sample_adg: ADG) -> None:
+        edge = ConstraintEdge(
+            subject="django",
+            predicate=PredicateType.REQUIRES_IMPLEMENTATION,
+            object="app.repository.RepositoryBase",
+            justification="external subject, internal object",
+            adr_id="ADR-001",
+            adr_path="docs/adr/001.md",
+        )
+        assert _validate_edge(edge, sample_adg) is True
+
+    def test_hallucinated_internal_object_with_external_subject_fails(self, sample_adg: ADG) -> None:
+        # External subject passes, but hallucinated internal object must still drop.
+        edge = ConstraintEdge(
+            subject="django",
+            predicate=PredicateType.REQUIRES_DEPENDENCY,
+            object="app.hallucinated.*",
+            justification="bad internal object",
+            adr_id="ADR-001",
+            adr_path="docs/adr/001.md",
+        )
+        assert _validate_edge(edge, sample_adg) is False
+
+
+# -- Test: _is_internal -------------------------------------------------------
+
+class TestIsInternal:
+    def test_internal_module_is_internal(self, sample_adg: ADG) -> None:
+        assert _is_internal("app.api.*", sample_adg) is True
+
+    def test_internal_class_is_internal(self, sample_adg: ADG) -> None:
+        assert _is_internal("app.repository.RepositoryBase", sample_adg) is True
+
+    def test_external_package_is_not_internal(self, sample_adg: ADG) -> None:
+        assert _is_internal("elasticsearch", sample_adg) is False
+
+    def test_external_package_with_wildcard_is_not_internal(self, sample_adg: ADG) -> None:
+        assert _is_internal("django.*", sample_adg) is False
+
+    def test_hallucinated_internal_prefix_is_not_internal(self, sample_adg: ADG) -> None:
+        # First segment IS a root, but no ADG node matches -> not internal (hallucination).
+        assert _is_internal("app.hallucinated.*", sample_adg) is False
 
 
 # -- Test: loop detection ------------------------------------------------------
