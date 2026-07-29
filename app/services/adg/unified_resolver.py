@@ -168,6 +168,16 @@ Use the narrowest wildcard that still captures the general rule (`app.*` over `a
 
 A prescriptive decision ("we chose X") often implies a prohibition on the alternatives it replaced. If the ADR names the rejected option, emit a `prohibits_*` edge for it too. Example: ADR says "we replace Flask with Django" -> emit `app.* requires_dependency django` AND `app.* prohibits_dependency flask`.
 
+## When NOT to use requires_implementation
+
+`requires_implementation` means "a set of classes must inherit from this base/interface". Emit it only when the ADR explicitly states that multiple classes must inherit from or implement a shared base. Do NOT emit it when:
+
+- The ADR says where a single class lives ("we will develop `Updater` in `tuf/ngclient/`") — that's a location decision, not an inheritance rule. Emit no constraint.
+- The ADR defines an ABC that other things may extend by choice ("`Repository` is an abstract base class") — the ABC's existence doesn't mean everything must implement it. Emit `requires_implementation` only if the ADR says "all X must subclass `Repository`".
+- The ADR says "X is built on top of Y" or "X is implemented using Y" — that's `requires_dependency`, not `requires_implementation`.
+
+Process/location ADRs ("develop in subdirectory X", "move code to Y", "refactor in place") usually produce no constraint at all. If unsure between `requires_implementation` and `requires_dependency`, prefer `requires_dependency`.
+
 ## Output format
 
 Respond with a JSON array of constraint objects. Each object has:

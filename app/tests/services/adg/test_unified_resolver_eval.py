@@ -23,9 +23,9 @@ from services.models import ConstraintEdge, PredicateType
 
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
-GROUND_TRUTH_PATH = REPO_ROOT / "tests" / "ground_truth" / "openlobby_ground_truth.json"
 REPOS_YAML_PATH = REPO_ROOT / "repos" / "repos.yaml"
-REPORT_PATH = REPO_ROOT / "tests" / "ground_truth" / "openlobby_eval_report.json"
+GROUND_TRUTH_DIR = REPO_ROOT / "tests" / "ground_truth"
+EVAL_REPOS = ["openlobby", "python-tuf"]
 
 HAS_API_KEY = bool(os.environ.get("OPENROUTER_API_KEY"))
 
@@ -119,24 +119,38 @@ class EvalResult:
 
 # -- Fixtures ---------------------------------------------------------------
 
-def _openlobby_repo_root() -> Path:
+def _repo_root(repo_id: str) -> Path:
     with open(REPOS_YAML_PATH) as f:
         repos = yaml.safe_load(f)
-    openlobby = next(r for r in repos["repos"] if r["id"] == "openlobby")
-    repo_path = Path(openlobby["url"])
+    repo = next(r for r in repos["repos"] if r["id"] == repo_id)
+    repo_path = Path(repo["url"])
     if not repo_path.is_absolute():
         repo_path = REPO_ROOT / repo_path
     return repo_path
 
 
-@pytest.fixture(scope="module")
-def openlobby_adg() -> "object":
-    return parse_repo(_openlobby_repo_root())
+def _ground_truth_path(repo_id: str) -> Path:
+    # ponytail: naming convention <repo_id>_ground_truth.json; "-" -> "_" for python-tuf
+    return GROUND_TRUTH_DIR / f"{repo_id.replace('-', '_')}_ground_truth.json"
+
+
+def _report_path(repo_id: str) -> Path:
+    return GROUND_TRUTH_DIR / f"{repo_id.replace('-', '_')}_eval_report.json"
+
+
+@pytest.fixture(scope="module", params=EVAL_REPOS, ids=lambda r: r)
+def repo_id(request) -> str:
+    return request.param
 
 
 @pytest.fixture(scope="module")
-def ground_truth() -> list[dict]:
-    with open(GROUND_TRUTH_PATH) as f:
+def adg(repo_id) -> "object":
+    return parse_repo(_repo_root(repo_id))
+
+
+@pytest.fixture(scope="module")
+def ground_truth(repo_id) -> list[dict]:
+    with open(_ground_truth_path(repo_id)) as f:
         return json.load(f)
 
 
@@ -145,10 +159,11 @@ def ground_truth() -> list[dict]:
 def run_eval(
     ground_truth: list[dict],
     adg,
+    repo_id: str,
     write_report: bool = False,
 ) -> EvalResult:
     """Run the unified resolver on every ADR fixture and score against ground truth."""
-    repo_root = _openlobby_repo_root()
+    repo_root = _repo_root(repo_id)
     result = EvalResult()
 
     for fixture in ground_truth:
@@ -187,17 +202,17 @@ def run_eval(
         result.false_positives += len(resolved_edges) - len(matched_edge_ids)
 
     if write_report:
-        REPORT_PATH.write_text(json.dumps(result.to_report(), indent=2))
+        _report_path(repo_id).write_text(json.dumps(result.to_report(), indent=2))
     return result
 
 
 # -- Test -------------------------------------------------------------------
 
-def test_unified_resolver_eval(openlobby_adg, ground_truth) -> None:
+def test_unified_resolver_eval(adg, ground_truth, repo_id) -> None:
     """End-to-end eval harness. Verifies scoring runs and tallies are consistent.
     Accuracy is reported, not gated — resolver quality is a separate concern."""
-    result = run_eval(ground_truth, openlobby_adg, write_report=True)
-    print(f"\n[resolver_eval] exact={result.exact} partial={result.partial} miss={result.miss} "
+    result = run_eval(ground_truth, adg, repo_id, write_report=True)
+    print(f"\n[resolver_eval:{repo_id}] exact={result.exact} partial={result.partial} miss={result.miss} "
           f"total={result.total} false_positives={result.false_positives} "
           f"accuracy={result.accuracy:.3f}")
     assert result.total > 0
@@ -207,8 +222,10 @@ def test_unified_resolver_eval(openlobby_adg, ground_truth) -> None:
 # -- CLI --------------------------------------------------------------------
 
 if __name__ == "__main__":
-    with open(GROUND_TRUTH_PATH) as f:
+    import sys
+    rid = sys.argv[1] if len(sys.argv) > 1 else "openlobby"
+    with open(_ground_truth_path(rid)) as f:
         gt = json.load(f)
-    adg = parse_repo(_openlobby_repo_root())
-    result = run_eval(gt, adg, write_report=True)
+    adg_obj = parse_repo(_repo_root(rid))
+    result = run_eval(gt, adg_obj, rid, write_report=True)
     print(json.dumps(result.to_report(), indent=2))

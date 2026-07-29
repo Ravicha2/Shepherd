@@ -1,8 +1,12 @@
 """Diff Processor: identify changed FQNs from a git commit diff."""
 
+import logging
+
 from services.fqn import FQN
 from services.models import ADG, ChangedFQN, Diff, DiffResult, FileChange, FQNKind
 from services.adg import parse_file
+
+log = logging.getLogger(__name__)
 
 def process_diff(diff: Diff) -> DiffResult:
     """Process a Diff and return changed FQNs and file changes"""
@@ -12,6 +16,94 @@ def process_diff(diff: Diff) -> DiffResult:
         path = file_change.path
 
         if not path.endswith(".py"):
+            continue
+        # ponytail: skip dot-directories (.github/, .venv/, etc.); FQN parser
+        # rejects leading dots and these aren't application modules.
+        if path.startswith(".") or "/." in path:
+            continue
+        # ponytail: skip unparseable files (vendored/Py2 code); a diff processor
+        # shouldn't crash the whole detection on one bad file.
+        try:
+            status = file_change.status
+            module_fqn = FQN.from_path(path)
+            before = len(changed_fqns)
+
+            if status == "added":
+                source = diff.file_contents.get(path, b"")
+                if source:
+                    nodes, _ = parse_file(source, module_fqn, path)
+                    for node in nodes:
+                        changed_fqns.append(
+                            make_changed_fqn(node, "added", path, module_fqn)
+                        )
+            elif status == "deleted":
+                source = diff.from_contents.get(path, b"")
+                if source:
+                    nodes, _ = parse_file(source, module_fqn, path)
+                    for node in nodes:
+                        changed_fqns.append(
+                            make_changed_fqn(node, "deleted", path, module_fqn)
+                        )
+
+            elif status == "modified":
+                old_source = diff.from_contents.get(path, b"")
+                new_source = diff.file_contents.get(path, b"")
+                old_nodes, _ = parse_file(old_source, module_fqn, path)
+                new_nodes, _ = parse_file(new_source, module_fqn, path)
+
+                old_map = {n.fqn: n for n in old_nodes}
+                new_map = {n.fqn: n for n in new_nodes}
+                old_set = set(old_map)
+                new_set = set(new_map)
+
+                for fqn in old_set - new_set:
+                    changed_fqns.append(
+                        make_changed_fqn(old_map[fqn], "deleted", path, module_fqn)
+                    )
+
+                for fqn in new_set - old_set:
+                    changed_fqns.append(
+                        make_changed_fqn(new_map[fqn], "added", path, module_fqn)
+                    )
+
+                for fqn in old_set & new_set:
+                    old_node = old_map[fqn]
+                    new_node = new_map[fqn]
+                    old_content = old_source[old_node.start_byte:old_node.end_byte]
+                    new_content = new_source[new_node.start_byte:new_node.end_byte]
+                    if old_content != new_content:
+                        changed_fqns.append(
+                            make_changed_fqn(new_node, "modified", path, module_fqn)
+                        )
+
+            elif status == "renamed":
+                old_path = file_change.old_path or path
+                old_module = FQN.from_path(old_path)
+
+                old_source = diff.from_contents.get(old_path, b"")
+                if old_source:
+                    nodes, _ = parse_file(old_source, old_module, old_path)
+                    for node in nodes:
+                        changed_fqns.append(
+                            make_changed_fqn(node, "deleted", old_path, old_module)
+                        )
+
+                new_source = diff.file_contents.get(path, b"")
+                if new_source:
+                    nodes, _ = parse_file(new_source, module_fqn, path)
+                    for node in nodes:
+                        changed_fqns.append(
+                            make_changed_fqn(node, "added", path, module_fqn)
+                        )
+
+            # ponytail: if no def-level FQN was emitted for this .py file but the
+            # file bytes actually changed, emit a module-level ChangedFQN so BFS
+            # still has a starting point. Covers settings.py / config.py edits that
+            # only touch module-level assignments.
+            if len(changed_fqns) == before:
+                _maybe_emit_module_fqn(changed_fqns, file_change, module_fqn, diff)
+        except (SyntaxError, ValueError) as exc:
+            log.debug("skip unparseable file %s: %s", path, exc)
             continue
 
         status = file_change.status
@@ -172,6 +264,9 @@ def augment_adg(adg: ADG, diff: Diff) -> None:
     for file_change in diff.changed_files:
         path = file_change.path
         if not path.endswith(".py"):
+            continue
+        # ponytail: skip dot-directories, same guard as process_diff
+        if path.startswith(".") or "/." in path:
             continue
         # Use new content for added/modified, old content for deleted
         if file_change.status in ("added", "modified"):

@@ -1,0 +1,58 @@
+{
+  "exact": 0,
+  "partial": 1,
+  "miss": 3,
+  "total": 4,
+  "false_positives": 2,
+  "accuracy": 0.125,
+  "per_constraint": [
+    {
+      "adr_id": "ADR-0001",
+      "expected": {
+        "subject": "tuf.*",
+        "predicate": "prohibits_dependency",
+        "object": "python2.7",
+        "justification": "ADR-0001 chooses Python 3.6+ only; Python 2.7 is named as end-of-life and explicitly rejected"
+      },
+      "score": "miss",
+      "resolved_subject": null,
+      "resolved_object": null
+    },
+    {
+      "adr_id": "ADR-0001",
+      "expected": {
+        "subject": "tuf.*",
+        "predicate": "prohibits_dependency",
+        "object": "python3.5",
+        "justification": "ADR-0001 chooses Python 3.6+ only; Python 3.5 is named as end-of-life and explicitly rejected"
+      },
+      "score": "miss",
+      "resolved_subject": null,
+      "resolved_object": null
+    },
+    {
+      "adr_id": "ADR-0006",
+      "expected": {
+        "subject": "tuf.api.metadata.*",
+        "predicate": "requires_dependency",
+        "object": "tuf.api.serialization.*",
+        "justification": "ADR-0006 separates serialization from the metadata class model; metadata classes depend on the serialization package (tuf.api.serialization), not the other way around"
+      },
+      "score": "partial_match",
+      "resolved_subject": "tuf.api.metadata.*",
+      "resolved_object": "tuf.api.serialization.MetadataSerializer"
+    },
+    {
+      "adr_id": "ADR-0010",
+      "expected": {
+        "subject": "tuf.repository.*",
+        "predicate": "requires_dependency",
+        "object": "tuf.api.metadata.*",
+        "justification": "ADR-0010 states the repository library is built on top of the Metadata API; this is a dependency, not an inheritance rule"
+      },
+      "score": "miss",
+      "resolved_subject": null,
+      "resolved_object": null
+    }
+  ]
+}

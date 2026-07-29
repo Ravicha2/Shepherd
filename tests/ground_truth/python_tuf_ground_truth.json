@@ -1,0 +1,51 @@
+[
+  {
+    "adr_id": "ADR-0001",
+    "adr_path": "docs/adr/0001-python-version-3-6-plus.md",
+    "constraints": [
+      {
+        "subject": "tuf.*",
+        "predicate": "prohibits_dependency",
+        "object": "python2.7",
+        "justification": "ADR-0001 chooses Python 3.6+ only; Python 2.7 is named as end-of-life and explicitly rejected"
+      },
+      {
+        "subject": "tuf.*",
+        "predicate": "prohibits_dependency",
+        "object": "python3.5",
+        "justification": "ADR-0001 chooses Python 3.6+ only; Python 3.5 is named as end-of-life and explicitly rejected"
+      }
+    ]
+  },
+  {
+    "adr_id": "ADR-0003",
+    "adr_path": "docs/adr/0003-where-to-develop-TUF-1-0-0.md",
+    "constraints": [],
+    "note": "Process/location ADR: 'develop TUF 1.0.0 in a subdirectory' is a development process decision, not an enforceable code-level architectural constraint. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0006",
+    "adr_path": "docs/adr/0006-where-to-implemenent-model-serialization.md",
+    "constraints": [
+      {
+        "subject": "tuf.api.metadata.*",
+        "predicate": "requires_dependency",
+        "object": "tuf.api.serialization.*",
+        "justification": "ADR-0006 separates serialization from the metadata class model; metadata classes depend on the serialization package (tuf.api.serialization), not the other way around"
+      }
+    ]
+  },
+  {
+    "adr_id": "ADR-0010",
+    "adr_path": "docs/adr/0010-repository-library-design.md",
+    "constraints": [
+      {
+        "subject": "tuf.repository.*",
+        "predicate": "requires_dependency",
+        "object": "tuf.api.metadata.*",
+        "justification": "ADR-0010 states the repository library is built on top of the Metadata API; this is a dependency, not an inheritance rule"
+      }
+    ],
+    "note": "Do NOT emit requires_implementation tuf.repository._repository.Repository: ADR describes Repository as an ABC that may be extended by choice, not a base that all repository classes must implement. 'Built on top of' = requires_dependency."
+  }
+]

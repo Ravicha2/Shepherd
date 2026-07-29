@@ -1,10 +1,10 @@
 {
-  "exact": 5,
-  "partial": 6,
-  "miss": 1,
+  "exact": 3,
+  "partial": 7,
+  "miss": 2,
   "total": 12,
-  "false_positives": 10,
-  "accuracy": 0.6667,
+  "false_positives": 9,
+  "accuracy": 0.5417,
   "per_constraint": [
     {
       "adr_id": "ADR-0002",
@@ -26,8 +26,8 @@
         "object": "graphene",
         "justification": "ADR-0004 mandates GraphQL as the API standard, implemented via Graphene library"
       },
-      "score": "exact_match",
-      "resolved_subject": "openlobby.core.api.*",
+      "score": "partial_match",
+      "resolved_subject": "openlobby.core.*",
       "resolved_object": "graphene"
     },
     {
@@ -38,8 +38,8 @@
         "object": "rest_framework",
         "justification": "ADR-0004 mandates GraphQL over REST; REST API frameworks should not be used"
       },
-      "score": "exact_match",
-      "resolved_subject": "openlobby.core.api.*",
+      "score": "partial_match",
+      "resolved_subject": "openlobby.core.*",
       "resolved_object": "rest_framework"
     },
     {
@@ -74,8 +74,8 @@
         "object": "oic",
         "justification": "ADR-0009 mandates OpenID Connect for user authentication; openlobby/core/openid.py imports the oic package"
       },
-      "score": "partial_match",
-      "resolved_subject": "openlobby.core.*",
+      "score": "miss",
+      "resolved_subject": "openlobby.core.api.mutations.*",
       "resolved_object": "oic"
     },
     {
