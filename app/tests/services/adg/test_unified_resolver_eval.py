@@ -1,0 +1,209 @@
+"""Unified resolver eval: score resolve_adr_constraints against openlobby ground truth.
+
+Deterministic FQN pattern scoring (no LLM-as-judge). Runs the real unified resolver
+against all 13 openlobby ADRs and scores resolved ConstraintEdges against human-curated
+ground truth at tests/ground_truth/openlobby_ground_truth.json.
+
+CLI: uv run --extra dev python -m tests.services.adg.test_unified_resolver_eval  (from app/)
+"""
+from __future__ import annotations
+
+import json
+import os
+from dataclasses import dataclass, field
+from pathlib import Path
+
+import pytest
+import yaml
+
+from services.adg.treesitter import parse_repo
+from services.adg.unified_resolver import resolve_adr_constraints
+from services.extract.config import LangExtractConfig
+from services.models import ConstraintEdge, PredicateType
+
+
+REPO_ROOT = Path(__file__).resolve().parents[4]
+GROUND_TRUTH_PATH = REPO_ROOT / "tests" / "ground_truth" / "openlobby_ground_truth.json"
+REPOS_YAML_PATH = REPO_ROOT / "repos" / "repos.yaml"
+REPORT_PATH = REPO_ROOT / "tests" / "ground_truth" / "openlobby_eval_report.json"
+
+HAS_API_KEY = bool(os.environ.get("OPENROUTER_API_KEY"))
+
+pytestmark = [
+    pytest.mark.resolver_eval,
+    pytest.mark.skipif(not HAS_API_KEY, reason="OPENROUTER_API_KEY not set"),
+]
+
+
+# -- FQN pattern scoring ----------------------------------------------------
+
+def _is_ancestor(expected: str, resolved: str) -> bool:
+    """True if resolved is a correct ancestor wildcard of expected.
+
+    expected=app.api.users, resolved=app.api.* → True
+    expected=app.api.*, resolved=app.*       → True
+    expected=app.api, resolved=app.services.* → False
+    """
+    expected_base = expected.rstrip(".*")
+    resolved_base = resolved.rstrip(".*")
+    return expected_base.startswith(resolved_base + ".")
+
+
+def _score_fqn(resolved: str, expected: str) -> str:
+    if resolved == expected:
+        return "exact_match"
+    if _is_ancestor(expected, resolved) or _is_ancestor(resolved, expected):
+        return "partial_match"
+    return "miss"
+
+
+_SCORE_RANK = {"exact_match": 2, "partial_match": 1, "miss": 0}
+
+
+def _score_constraint(
+    expected: dict, resolved_edges: list[ConstraintEdge]
+) -> tuple[str, ConstraintEdge | None]:
+    """Best score for one expected constraint against all resolved edges.
+
+    Predicate must match. overall = min(subject_score, object_score).
+    """
+    try:
+        expected_pred = PredicateType(expected["predicate"])
+    except ValueError:
+        return "miss", None
+
+    best = "miss"
+    best_edge: ConstraintEdge | None = None
+    for edge in resolved_edges:
+        if edge.predicate != expected_pred:
+            continue
+        subject_score = _score_fqn(edge.subject, expected["subject"])
+        object_score = _score_fqn(edge.object, expected["object"])
+        overall = min(subject_score, object_score, key=lambda s: _SCORE_RANK[s])
+        if _SCORE_RANK[overall] > _SCORE_RANK[best]:
+            best = overall
+            best_edge = edge
+    return best, best_edge
+
+
+# -- Eval result aggregation ------------------------------------------------
+
+@dataclass
+class EvalResult:
+    results: list[dict] = field(default_factory=list)
+    exact: int = 0
+    partial: int = 0
+    miss: int = 0
+    total: int = 0
+    false_positives: int = 0
+
+    @property
+    def accuracy(self) -> float:
+        return (self.exact + 0.5 * self.partial) / self.total if self.total else 0.0
+
+    def to_report(self) -> dict:
+        return {
+            "exact": self.exact,
+            "partial": self.partial,
+            "miss": self.miss,
+            "total": self.total,
+            "false_positives": self.false_positives,
+            "accuracy": round(self.accuracy, 4),
+            "per_constraint": self.results,
+        }
+
+
+# -- Fixtures ---------------------------------------------------------------
+
+def _openlobby_repo_root() -> Path:
+    with open(REPOS_YAML_PATH) as f:
+        repos = yaml.safe_load(f)
+    openlobby = next(r for r in repos["repos"] if r["id"] == "openlobby")
+    repo_path = Path(openlobby["url"])
+    if not repo_path.is_absolute():
+        repo_path = REPO_ROOT / repo_path
+    return repo_path
+
+
+@pytest.fixture(scope="module")
+def openlobby_adg() -> "object":
+    return parse_repo(_openlobby_repo_root())
+
+
+@pytest.fixture(scope="module")
+def ground_truth() -> list[dict]:
+    with open(GROUND_TRUTH_PATH) as f:
+        return json.load(f)
+
+
+# -- Eval runner ------------------------------------------------------------
+
+def run_eval(
+    ground_truth: list[dict],
+    adg,
+    write_report: bool = False,
+) -> EvalResult:
+    """Run the unified resolver on every ADR fixture and score against ground truth."""
+    repo_root = _openlobby_repo_root()
+    result = EvalResult()
+
+    for fixture in ground_truth:
+        adr_text = (repo_root / fixture["adr_path"]).read_text()
+
+        resolved_edges = resolve_adr_constraints(
+            adr_text=adr_text,
+            adr_id=fixture["adr_id"],
+            adr_path=fixture["adr_path"],
+            adg=adg,
+            config=LangExtractConfig(),
+        )
+
+        expected_constraints = fixture.get("constraints", [])
+        matched_edge_ids: set[int] = set()
+
+        for expected in expected_constraints:
+            score, matched = _score_constraint(expected, resolved_edges)
+            if matched is not None:
+                matched_edge_ids.add(id(matched))
+            result.results.append({
+                "adr_id": fixture["adr_id"],
+                "expected": expected,
+                "score": score,
+                "resolved_subject": matched.subject if matched else None,
+                "resolved_object": matched.object if matched else None,
+            })
+            result.total += 1
+            if score == "exact_match":
+                result.exact += 1
+            elif score == "partial_match":
+                result.partial += 1
+            else:
+                result.miss += 1
+
+        result.false_positives += len(resolved_edges) - len(matched_edge_ids)
+
+    if write_report:
+        REPORT_PATH.write_text(json.dumps(result.to_report(), indent=2))
+    return result
+
+
+# -- Test -------------------------------------------------------------------
+
+def test_unified_resolver_eval(openlobby_adg, ground_truth) -> None:
+    """End-to-end eval. Accuracy threshold kept low since LLM output is non-deterministic."""
+    result = run_eval(ground_truth, openlobby_adg, write_report=True)
+    print(f"\n[resolver_eval] exact={result.exact} partial={result.partial} miss={result.miss} "
+          f"total={result.total} false_positives={result.false_positives} "
+          f"accuracy={result.accuracy:.3f}")
+    assert result.total > 0
+    assert result.accuracy > 0.0
+
+
+# -- CLI --------------------------------------------------------------------
+
+if __name__ == "__main__":
+    with open(GROUND_TRUTH_PATH) as f:
+        gt = json.load(f)
+    adg = parse_repo(_openlobby_repo_root())
+    result = run_eval(gt, adg, write_report=True)
+    print(json.dumps(result.to_report(), indent=2))
