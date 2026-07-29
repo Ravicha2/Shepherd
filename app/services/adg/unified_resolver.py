@@ -79,14 +79,14 @@ CRITICAL: Distinguish prescriptive decisions from prohibitions.
 - A PROHIBITION says "we must not use X" or "X is forbidden". These produce
   PROHIBITS_DEPENDENCY or PROHIBITS_IMPLEMENTATION constraints.
 
-Do NOT extract a prohibition from a prescriptive decision. If the ADR says "we chose
+**Do NOT EXTRACT A PROHIBITION FROM A PRESCRIPTIVE DESCISION**. If the ADR says "we chose
 to build a minimal repository abstraction", that means the repository abstraction IS the
 decision outcome, not something to be prohibited.
 
 ## Required exploration
 
-Before producing any output, you MUST call list_modules at least once, and dive into any \
-module referenced by the ADR before writing a constraint about it. list_modules only shows \
+Before producing any output, **you MUST call list_modules at least once, and dive into any \
+module referenced by the ADR** before writing a constraint about it. list_modules only shows \
 top-level modules — submodules and classes are only visible once you dive into a module, and \
 sometimes only after diving more than one level deep. Do not guess FQNs from the ADR's prose \
 alone or from what a typical project of this kind usually looks like. Output produced without \
@@ -98,7 +98,7 @@ a preceding list_modules call will be rejected.
 
 ## Module list
 
-The following modules exist in the codebase graph. Internal FQN patterns MUST come from this list. Do NOT invent internal module names.
+The following modules exist in the codebase graph. **Internal FQN patterns MUST come from this list. Do NOT invent internal module names.**
 
 {module_hint}
 
@@ -166,17 +166,24 @@ Use the narrowest wildcard that still captures the general rule (`app.*` over `a
 
 ## Negative constraints from prescriptive decisions
 
-A prescriptive decision ("we chose X") often implies a prohibition on the alternatives it replaced. If the ADR names the rejected option, emit a `prohibits_*` edge for it too. Example: ADR says "we replace Flask with Django" -> emit `app.* requires_dependency django` AND `app.* prohibits_dependency flask`.
+A prescriptive decision ("we chose X") implies a prohibition on named rejected alternatives. Applies to anything named: packages, language versions, frameworks, patterns. Whole-codebase constraint uses the root package as subject.
+
+Example: "we replace Flask with Django" -> `app.* requires_dependency django` AND `app.* prohibits_dependency flask`.
+Example: "support only Python 3.6+; Python 2.7 and 3.5 are end-of-life" -> `tuf.* prohibits_dependency python2.7` AND `tuf.* prohibits_dependency python3.5`.
 
 ## When NOT to use requires_implementation
 
-`requires_implementation` means "a set of classes must inherit from this base/interface". Emit it only when the ADR explicitly states that multiple classes must inherit from or implement a shared base. Do NOT emit it when:
+`requires_implementation` means "a set of classes must inherit from this base/interface". Object MUST be a class or interface, never a method/function/module. Emit only when the ADR says multiple classes must inherit from a shared base. Do NOT emit when:
 
-- The ADR says where a single class lives ("we will develop `Updater` in `tuf/ngclient/`") — that's a location decision, not an inheritance rule. Emit no constraint.
-- The ADR defines an ABC that other things may extend by choice ("`Repository` is an abstract base class") — the ABC's existence doesn't mean everything must implement it. Emit `requires_implementation` only if the ADR says "all X must subclass `Repository`".
-- The ADR says "X is built on top of Y" or "X is implemented using Y" — that's `requires_dependency`, not `requires_implementation`.
+- The ADR says where a single class lives ("develop `Updater` in `tuf/ngclient/`") — location, not inheritance. No constraint.
+- The ADR defines an ABC or "minimal abstraction" others may extend by choice ("`Repository` is an ABC", "minimal abstraction with example implementations") — abstraction existence ≠ everything must implement it. Emit only if ADR says "all X must subclass Y".
+- The ADR says "X is built on top of Y" or "X implemented using Y" — that's `requires_dependency`.
 
-Process/location ADRs ("develop in subdirectory X", "move code to Y", "refactor in place") usually produce no constraint at all. If unsure between `requires_implementation` and `requires_dependency`, prefer `requires_dependency`.
+Process/location ADRs ("develop in subdirectory X", "move code to Y") usually produce no constraint. If unsure, prefer `requires_dependency`.
+
+Example: ADR says "Repository library built on top of Metadata API", Repository is a "minimal abstraction" with "example implementations".
+- WRONG: `requires_implementation tuf.repository.* -> tuf.repository._repository.Repository` (Repository IS the abstraction, not a base everyone subclasses; examples are optional)
+- RIGHT: `requires_dependency tuf.repository.* -> tuf.api.metadata.*` ("built on top of" = depends on)
 
 ## Output format
 

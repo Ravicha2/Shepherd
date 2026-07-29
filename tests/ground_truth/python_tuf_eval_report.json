@@ -1,10 +1,10 @@
 {
-  "exact": 0,
+  "exact": 3,
   "partial": 1,
-  "miss": 3,
+  "miss": 0,
   "total": 4,
-  "false_positives": 2,
-  "accuracy": 0.125,
+  "false_positives": 1,
+  "accuracy": 0.875,
   "per_constraint": [
     {
       "adr_id": "ADR-0001",
@@ -14,9 +14,9 @@
         "object": "python2.7",
         "justification": "ADR-0001 chooses Python 3.6+ only; Python 2.7 is named as end-of-life and explicitly rejected"
       },
-      "score": "miss",
-      "resolved_subject": null,
-      "resolved_object": null
+      "score": "exact_match",
+      "resolved_subject": "tuf.*",
+      "resolved_object": "python2.7"
     },
     {
       "adr_id": "ADR-0001",
@@ -26,9 +26,9 @@
         "object": "python3.5",
         "justification": "ADR-0001 chooses Python 3.6+ only; Python 3.5 is named as end-of-life and explicitly rejected"
       },
-      "score": "miss",
-      "resolved_subject": null,
-      "resolved_object": null
+      "score": "exact_match",
+      "resolved_subject": "tuf.*",
+      "resolved_object": "python3.5"
     },
     {
       "adr_id": "ADR-0006",
@@ -50,9 +50,9 @@
         "object": "tuf.api.metadata.*",
         "justification": "ADR-0010 states the repository library is built on top of the Metadata API; this is a dependency, not an inheritance rule"
       },
-      "score": "miss",
-      "resolved_subject": null,
-      "resolved_object": null
+      "score": "exact_match",
+      "resolved_subject": "tuf.repository.*",
+      "resolved_object": "tuf.api.metadata.*"
     }
   ]
 }

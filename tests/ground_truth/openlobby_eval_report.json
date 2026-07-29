@@ -1,10 +1,10 @@
 {
-  "exact": 3,
-  "partial": 7,
+  "exact": 5,
+  "partial": 5,
   "miss": 2,
   "total": 12,
   "false_positives": 9,
-  "accuracy": 0.5417,
+  "accuracy": 0.625,
   "per_constraint": [
     {
       "adr_id": "ADR-0002",
@@ -38,9 +38,9 @@
         "object": "rest_framework",
         "justification": "ADR-0004 mandates GraphQL over REST; REST API frameworks should not be used"
       },
-      "score": "partial_match",
-      "resolved_subject": "openlobby.core.*",
-      "resolved_object": "rest_framework"
+      "score": "miss",
+      "resolved_subject": null,
+      "resolved_object": null
     },
     {
       "adr_id": "ADR-0006",
@@ -74,8 +74,8 @@
         "object": "oic",
         "justification": "ADR-0009 mandates OpenID Connect for user authentication; openlobby/core/openid.py imports the oic package"
       },
-      "score": "miss",
-      "resolved_subject": "openlobby.core.api.mutations.*",
+      "score": "partial_match",
+      "resolved_subject": "openlobby.core.*",
       "resolved_object": "oic"
     },
     {
@@ -134,8 +134,8 @@
         "object": "django.db",
         "justification": "ADR-0012 mandates PostgreSQL as the relational database; access goes through the Django ORM (django.db). The codebase does not import postgresql directly (transitive via django.db)."
       },
-      "score": "partial_match",
-      "resolved_subject": "openlobby.core.*",
+      "score": "exact_match",
+      "resolved_subject": "openlobby.*",
       "resolved_object": "django.db"
     },
     {
@@ -146,8 +146,8 @@
         "object": "mysql",
         "justification": "ADR-0012 prohibits MySQL/MariaDB due to ACID-breaking bug in schema changes"
       },
-      "score": "partial_match",
-      "resolved_subject": "openlobby.core.*",
+      "score": "exact_match",
+      "resolved_subject": "openlobby.*",
       "resolved_object": "mysql"
     }
   ]
