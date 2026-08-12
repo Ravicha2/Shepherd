@@ -1,6 +1,6 @@
 # Shepherd
 
-Shepherd detects Architectural Decision Record (ADR) violations in Python repositories. It ingests source code and ADR documents into an Architectural Decision Graph (ADG), then uses CPT (Contradiction Path Traversal) detection to find conflicts between architectural constraints and actual code. Violations are resolved through a tiered system (explicit supersession, specificity, recency, or human review) and reported back via GitHub commit status.
+Shepherd detects Architectural Decision Record (ADR) violations in Python repositories. It ingests source code and ADR documents into an Architectural Decision Graph (ADG), then uses CPT (Constraint Path Traversal) detection to find conflicts between architectural constraints and actual code. Violations are resolved through a tiered system (explicit supersession, specificity, recency, or human review).
 
 Part of a research project at UNSW (University of New South Wales).
 
@@ -16,7 +16,7 @@ Architectural decisions decay. Teams write ADRs to record constraints like "no d
 
 1. **Seed**: Parse a repository's Python source and ADR documents, extract structural constraints via LLM, and persist an Architectural Decision Graph (ADG) in Neo4j.
 2. **Detect**: Given a commit or PR diff, traverse the ADG to find constraint violations introduced by the changes.
-3. **Resolve**: Violations are resolved by tier: explicit supersension, specificity, recency, then human review via dismissal.
+3. **Resolve**: Violations are resolved by tier: explicit supersession, specificity, recency, then human review via dismissal.
 
 ## Prerequisites
 
@@ -83,8 +83,8 @@ cpt detect --repo flask --json
 # List active violations (dismissed ones are filtered out)
 cpt violation list --repo flask
 
-# Dismiss a false positive
-cpt violation dismiss --repo flask --id VIO-abc
+# Dismiss a false positive (short_id is the 5-hex-char ID shown by `violation list`)
+cpt violation dismiss <short_id> --repo flask
 ```
 
 ### 4. Update the ADG
