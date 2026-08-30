@@ -130,4 +130,3 @@ repos:
 - **Python 3.12** with FastAPI
 - **Neo4j 5** for graph storage
 - **Typer** CLI framework
-- **LangExtract** for LLM-based constraint extraction via OpenRouter

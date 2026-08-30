@@ -181,10 +181,10 @@ class TestE2EDetect:
         assert result.orphans == []
 
     def test_specificity_resolution_suppresses_prohibits(self, layered_adg: ADG) -> None:
-        """Higher-specificity REQUIRES overrides lower-specificity PROHIBITS on same object."""
+        """Higher-specificity REQUIRES overrides lower-specificity PROHIBITS on same object when the require's subject covers the prohibit's matched_fqn."""
         constraints = [
             _constraint("app.*", PredicateType.PROHIBITS_IMPLEMENTATION, "app.auth.middleware", "ADR-005", specificity=1.0),
-            _constraint("app.service", PredicateType.REQUIRES_IMPLEMENTATION, "app.auth.middleware", "ADR-006", specificity=3.0),
+            _constraint("app.auth.*", PredicateType.REQUIRES_IMPLEMENTATION, "app.auth.middleware", "ADR-006", specificity=3.0),
         ]
         adg = ADG(nodes=layered_adg.nodes, edges=layered_adg.edges, constraint_edges=constraints)
         diff = DiffResult(to_sha="abc", changed_fqns=[_changed("app.service.user")])

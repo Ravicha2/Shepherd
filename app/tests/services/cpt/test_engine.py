@@ -221,16 +221,21 @@ class TestMatchConstraints:
 class TestCheckStructuralPredicates:
     """PROHIBITS_* constraints evaluated without changed_fqn."""
 
-    def test_reachable_nodes(self) -> None:
-        from services.cpt.engine import _reachable_nodes, _build_adjacency
+    def test_reachable_paths(self) -> None:
+        from services.cpt.engine import _reachable_paths, _build_adjacency
         from services.models import Edge
 
         adjacency = _build_adjacency({
             Edge(source="app.api.users", target="app.auth.middleware", kind="IMPORTS"),
             Edge(source="app.auth.middleware", target="app.models.user", kind="IMPORTS"),
         })
-        reachable = _reachable_nodes("app.api.users", adjacency, {"IMPORTS"})
-        assert reachable == {"app.auth.middleware", "app.models.user"}
+        paths = _reachable_paths("app.api.users", adjacency, {"IMPORTS"})
+        assert set(paths) == {"app.auth.middleware", "app.models.user"}
+        assert paths["app.auth.middleware"] == [Edge(source="app.api.users", target="app.auth.middleware", kind="IMPORTS")]
+        assert paths["app.models.user"] == [
+            Edge(source="app.api.users", target="app.auth.middleware", kind="IMPORTS"),
+            Edge(source="app.auth.middleware", target="app.models.user", kind="IMPORTS"),
+        ]
 
     def test_prohibits_dependency_violated(self) -> None:
         from services.cpt.engine import MatchedConstraint, check_structural_predicates, _build_adjacency
@@ -537,8 +542,8 @@ class TestResolve:
             specificity=1.0, matched_fqn="app.api.users", adr_id="ADR-005",
         )
         v_require = self._make_violation(
-            "app.middleware", PredicateType.REQUIRES_IMPLEMENTATION, "app.auth.middleware",
-            specificity=3.0, matched_fqn="app.middleware", adr_id="ADR-005",
+            "app.api.*", PredicateType.REQUIRES_IMPLEMENTATION, "app.auth.middleware",
+            specificity=3.0, matched_fqn="app.api.users", adr_id="ADR-005",
         )
         result = resolve([v_prohibit, v_require])
         result_predicates = {v.constraint.predicate for v in result}
@@ -916,8 +921,8 @@ class TestSelfLoopConstraint:
 class TestDevToolFiltering:
     """DEV_TOOL nodes are excluded from reachability traversal."""
 
-    def test_reachable_nodes_skips_dev_tool(self) -> None:
-        from services.cpt.engine import _reachable_nodes, _build_adjacency
+    def test_reachable_paths_skips_dev_tool(self) -> None:
+        from services.cpt.engine import _reachable_paths, _build_adjacency
 
         adjacency = _build_adjacency({
             Edge(source="app.api", target="pytest", kind="IMPORTS"),
@@ -928,15 +933,15 @@ class TestDevToolFiltering:
             "pytest": DependencyRole.DEV_TOOL,
             "pytest.fixture": DependencyRole.DEV_TOOL,
         }
-        reachable = _reachable_nodes(
+        paths = _reachable_paths(
             "app.api", adjacency, {"IMPORTS", "CONTAINS"},
             node_roles=node_roles, skip_roles={DependencyRole.DEV_TOOL},
         )
-        assert "pytest" not in reachable
-        assert "pytest.fixture" not in reachable
+        assert "pytest" not in paths
+        assert "pytest.fixture" not in paths
 
-    def test_reachable_nodes_includes_unknown_external(self) -> None:
-        from services.cpt.engine import _reachable_nodes, _build_adjacency
+    def test_reachable_paths_includes_unknown_external(self) -> None:
+        from services.cpt.engine import _reachable_paths, _build_adjacency
 
         adjacency = _build_adjacency({
             Edge(source="app.api", target="flask", kind="IMPORTS"),
@@ -945,11 +950,11 @@ class TestDevToolFiltering:
             "app.api": DependencyRole.INTERNAL,
             "flask": DependencyRole.UNKNOWN,
         }
-        reachable = _reachable_nodes(
+        paths = _reachable_paths(
             "app.api", adjacency, {"IMPORTS"},
             node_roles=node_roles, skip_roles={DependencyRole.DEV_TOOL},
         )
-        assert "flask" in reachable
+        assert "flask" in paths
 
     def test_prohibits_dependency_ignores_dev_tool_path(self) -> None:
         """A module importing pytest should NOT trigger PROHIBITS_DEPENDENCY."""
@@ -1113,4 +1118,175 @@ class TestDevToolFiltering:
             enclosing_module=FQN.from_dotted("app.api"),
         )]
         violations = check_change_triggered_predicates(matched, adjacency, changed, node_roles=node_roles)
+        assert len(violations) == 1
+
+# ===========================================================================
+# 9. Issue 105: path-based reasoning + requires_implementation INHERITS
+# ===========================================================================
+
+
+class TestPathBasedProhibits:
+    """prohibits_dependency distinguishes direct edges from paths through
+    intermediaries that are themselves required to depend on the object."""
+
+    @staticmethod
+    def _prohibit_and_require_matched() -> dict:
+        from services.cpt.engine import MatchedConstraint
+        from services.resolver import MatchStatus
+
+        prohibit = ConstraintEdge(
+            subject="app.services.*",
+            predicate=PredicateType.PROHIBITS_DEPENDENCY,
+            object="src.db",
+            justification="Services must not reach the database directly.",
+            adr_id="ADR-DB1",
+            adr_path="docs/adr/db1.md",
+        )
+        require = ConstraintEdge(
+            subject="app.db_connector.*",
+            predicate=PredicateType.REQUIRES_DEPENDENCY,
+            object="src.db",
+            justification="The db connector is the only allowed gateway to the database.",
+            adr_id="ADR-DB2",
+            adr_path="docs/adr/db2.md",
+        )
+        return {
+            id(prohibit): MatchedConstraint(
+                constraint=prohibit,
+                subject_matches=[(FQN.from_dotted("app.services.OrderService"), MatchStatus.WILDCARD)],
+                object_matches=[(FQN.from_dotted("src.db"), MatchStatus.EXACT)],
+            ),
+            id(require): MatchedConstraint(
+                constraint=require,
+                subject_matches=[(FQN.from_dotted("app.db_connector.Conn"), MatchStatus.WILDCARD)],
+                object_matches=[(FQN.from_dotted("src.db"), MatchStatus.EXACT)],
+            ),
+        }
+
+    def test_via_connector_only_not_violating(self) -> None:
+        from services.cpt.engine import check_structural_predicates, _build_adjacency
+
+        adjacency = _build_adjacency({
+            Edge(source="app.services.OrderService", target="app.db_connector.Conn", kind="CALLS"),
+            Edge(source="app.db_connector.Conn", target="src.db", kind="CALLS"),
+        })
+        violations = check_structural_predicates(self._prohibit_and_require_matched(), adjacency)
+        assert len(violations) == 0
+
+    def test_direct_path_violates_and_evidence_names_path(self) -> None:
+        from services.cpt.engine import check_structural_predicates, _build_adjacency
+
+        adjacency = _build_adjacency({
+            Edge(source="app.services.OrderService", target="src.db", kind="CALLS"),
+        })
+        violations = check_structural_predicates(self._prohibit_and_require_matched(), adjacency)
+        assert len(violations) == 1
+        assert violations[0].evidence == (
+            "app.services.OrderService has dependency path to src.db via CALLS src.db"
+        )
+
+    def test_mixed_paths_violate_and_evidence_names_direct_path(self) -> None:
+        from services.cpt.engine import check_structural_predicates, _build_adjacency
+
+        adjacency = _build_adjacency({
+            Edge(source="app.services.OrderService", target="src.db", kind="CALLS"),
+            Edge(source="app.services.OrderService", target="app.db_connector.Conn", kind="CALLS"),
+            Edge(source="app.db_connector.Conn", target="src.db", kind="CALLS"),
+        })
+        violations = check_structural_predicates(self._prohibit_and_require_matched(), adjacency)
+        assert len(violations) == 1
+        assert violations[0].evidence == (
+            "app.services.OrderService has dependency path to src.db via CALLS src.db"
+        )
+
+    def test_via_non_allowed_intermediary_still_violates(self) -> None:
+        from services.cpt.engine import check_structural_predicates, _build_adjacency
+
+        adjacency = _build_adjacency({
+            Edge(source="app.services.OrderService", target="app.random.Thing", kind="CALLS"),
+            Edge(source="app.random.Thing", target="src.db", kind="CALLS"),
+        })
+        violations = check_structural_predicates(self._prohibit_and_require_matched(), adjacency)
+        assert len(violations) == 1
+        assert violations[0].evidence == (
+            "app.services.OrderService has dependency path to src.db "
+            "via CALLS app.random.Thing -> CALLS src.db"
+        )
+
+
+class TestRequiresImplementationInherits:
+    """requires_implementation is satisfied by INHERITS edges (issue 105 part 3)."""
+
+    @staticmethod
+    def _matched() -> dict:
+        from services.cpt.engine import MatchedConstraint
+        from services.resolver import MatchStatus
+
+        constraint = ConstraintEdge(
+            subject="app.*",
+            predicate=PredicateType.REQUIRES_IMPLEMENTATION,
+            object="app.auth.AuthMiddleware",
+            justification="All app modules must implement the auth middleware contract.",
+            adr_id="ADR-AUTH1",
+            adr_path="docs/adr/auth1.md",
+        )
+        return {
+            id(constraint): MatchedConstraint(
+                constraint=constraint,
+                subject_matches=[(FQN.from_dotted("app.api.orders"), MatchStatus.WILDCARD)],
+                object_matches=[(FQN.from_dotted("app.auth.AuthMiddleware"), MatchStatus.EXACT)],
+            ),
+        }
+
+    def test_inherits_satisfies(self) -> None:
+        from services.cpt.engine import check_change_triggered_predicates, _build_adjacency
+
+        adjacency = _build_adjacency({
+            Edge(source="app.api.orders", target="app.auth.AuthMiddleware", kind="INHERITS"),
+        })
+        changed = [_changed_fqn("app.api.orders")]
+        violations = check_change_triggered_predicates(self._matched(), adjacency, changed)
+        assert len(violations) == 0
+
+    def test_calls_still_satisfies(self) -> None:
+        from services.cpt.engine import check_change_triggered_predicates, _build_adjacency
+
+        adjacency = _build_adjacency({
+            Edge(source="app.api.orders", target="app.auth.AuthMiddleware", kind="CALLS"),
+        })
+        changed = [_changed_fqn("app.api.orders")]
+        violations = check_change_triggered_predicates(self._matched(), adjacency, changed)
+        assert len(violations) == 0
+
+    def test_no_edge_still_violates(self) -> None:
+        from services.cpt.engine import check_change_triggered_predicates, _build_adjacency
+
+        adjacency = _build_adjacency({})
+        changed = [_changed_fqn("app.api.orders")]
+        violations = check_change_triggered_predicates(self._matched(), adjacency, changed)
+        assert len(violations) == 1
+
+    def test_prohibits_implementation_flags_inherits(self) -> None:
+        from services.cpt.engine import MatchedConstraint, check_structural_predicates, _build_adjacency
+        from services.resolver import MatchStatus
+
+        constraint = ConstraintEdge(
+            subject="app.*",
+            predicate=PredicateType.PROHIBITS_IMPLEMENTATION,
+            object="app.auth.middleware",
+            justification="test",
+            adr_id="ADR-005",
+            adr_path="docs/adr/005.md",
+        )
+        adjacency = _build_adjacency({
+            Edge(source="app.api", target="app.auth.middleware", kind="INHERITS"),
+        })
+        matched = {
+            id(constraint): MatchedConstraint(
+                constraint=constraint,
+                subject_matches=[(FQN.from_dotted("app.api"), MatchStatus.WILDCARD)],
+                object_matches=[(FQN.from_dotted("app.auth.middleware"), MatchStatus.EXACT)],
+            ),
+        }
+        violations = check_structural_predicates(matched, adjacency)
         assert len(violations) == 1

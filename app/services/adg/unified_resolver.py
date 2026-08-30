@@ -138,8 +138,8 @@ External packages imported by the codebase. Use these as the `requires_*` object
 
 - prohibits_dependency: subject must not depend on (import) object
 - requires_dependency: subject must depend on (import) object
-- prohibits_implementation: subject must not implement (inherit from, subclass) object
-- requires_implementation: subject must implement (inherit from, subclass) object
+- prohibits_implementation: subject must not implement (inherit from, subclass) or call object
+- requires_implementation: subject must implement (inherit from, subclass) or call object
 
 ## Wildcard
 

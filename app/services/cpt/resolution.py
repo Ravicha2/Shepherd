@@ -3,8 +3,19 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from services.fqn import FQN
-from services.resolver import MatchStatus
+from services.resolver import MatchStatus, fqn_matches_pattern
 from services.models import ConstraintEdge
+
+
+def _subject_covers(subject_pattern: str, fqn: FQN) -> bool:
+    # ponytail: subject-keyed suppression, see issue #105
+    if fqn_matches_pattern(fqn, subject_pattern) != MatchStatus.NO_MATCH:
+        return True
+    # wildcard pattern X.* also covers X itself (the containing module),
+    # since a prohibit can fire on X via transitive reach through X's children
+    if subject_pattern.endswith(".*") and str(fqn) == subject_pattern[:-2]:
+        return True
+    return False
 
 
 @dataclass
@@ -67,16 +78,20 @@ def resolve(violations: list[Violation]) -> list[Violation]:
             violation_j_require = violation_j.constraint.predicate.value.startswith("requires_")
 
             if violation_i_prohibit and violation_j_require:
-                if violation_j.constraint.specificity > violation_i.constraint.specificity:
-                    suppress.add(i)
-                elif violation_i.constraint.specificity > violation_j.constraint.specificity:
-                    suppress.add(j)
+                if _subject_covers(violation_j.constraint.subject, violation_i.matched_fqn):
+                    if violation_j.constraint.specificity > violation_i.constraint.specificity:
+                        suppress.add(i)
+                if _subject_covers(violation_i.constraint.subject, violation_j.matched_fqn):
+                    if violation_i.constraint.specificity > violation_j.constraint.specificity:
+                        suppress.add(j)
 
             elif violation_i_require and violation_j_prohibit:
-                if violation_i.constraint.specificity > violation_j.constraint.specificity:
-                    suppress.add(j)
-                elif violation_j.constraint.specificity > violation_i.constraint.specificity:
-                    suppress.add(i)
+                if _subject_covers(violation_i.constraint.subject, violation_j.matched_fqn):
+                    if violation_i.constraint.specificity > violation_j.constraint.specificity:
+                        suppress.add(j)
+                if _subject_covers(violation_j.constraint.subject, violation_i.matched_fqn):
+                    if violation_j.constraint.specificity > violation_i.constraint.specificity:
+                        suppress.add(i)
 
     return [violation for i, violation in enumerate(deduped_violation) if i not in suppress]
 
@@ -85,7 +100,7 @@ def suppress_outweighed_prohibits(
     violations: list[Violation],
     active_requires: list[ConstraintEdge],
 ) -> list[Violation]:
-    """Remove prohibits violations outweighed by a higher-specificity requires on the same object."""
+    """Remove prohibits violations outweighed by a higher-specificity requires on the same object AND whose matched_fqn falls under the require's subject."""
     return [
         violation for violation in violations
         if not (
@@ -93,6 +108,7 @@ def suppress_outweighed_prohibits(
             and any(
                 requires.object == violation.constraint.object
                 and requires.specificity > violation.constraint.specificity
+                and _subject_covers(requires.subject, violation.matched_fqn)
                 for requires in active_requires
             )
         )
@@ -103,7 +119,7 @@ def suppress_outweighed_requires(
     violations: list[Violation],
     active_prohibits: list[ConstraintEdge],
 ) -> list[Violation]:
-    """Remove requires violations outweighed by a higher-specificity or newer prohibits on the same object."""
+    """Remove requires violations outweighed by a higher-specificity or newer prohibits on the same object AND whose matched_fqn falls under the prohibit's subject."""
     return [
         violation for violation in violations
         if not (
@@ -111,6 +127,7 @@ def suppress_outweighed_requires(
             and any(
                 prohibits.object == violation.constraint.object
                 and (prohibits.specificity > violation.constraint.specificity or (prohibits.specificity == violation.constraint.specificity and prohibits.adr_id > violation.constraint.adr_id))
+                and _subject_covers(prohibits.subject, violation.matched_fqn)
                 for prohibits in active_prohibits
             )
         )

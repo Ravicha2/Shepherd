@@ -36,15 +36,17 @@ def _build_adjacency(edges: Iterable[Edge]) -> dict[str, list[Edge]]:
     return adjacency
 
 
-def _reachable_nodes(
+def _reachable_paths(
     start: str,
     adjacency: dict[str, list[Edge]],
     kinds: set[str],
     node_roles: dict[str, DependencyRole] | None = None,
     skip_roles: set[DependencyRole] | None = None,
-) -> set[str]:
-    """BFS: O(V+E). Skips edges whose target has a role in skip_roles."""
-    visited: set[str] = set()
+) -> dict[str, list[Edge]]:
+    """BFS: O(V+E) per node. Value is the shortest edge-path from start to that node.
+    Skips edges whose target has a role in skip_roles.
+    # ponytail: only the shortest path per target is kept; a longer alternate path is never reported."""
+    paths: dict[str, list[Edge]] = {}
     queue: deque[str] = deque([start])
 
     while queue:
@@ -56,11 +58,30 @@ def _reachable_nodes(
                 target_role = node_roles.get(edge.target)
                 if target_role and target_role in skip_roles:
                     continue
-            if edge.target not in visited:
-                visited.add(edge.target)
-                queue.append(edge.target)
+            if edge.target in paths:
+                continue
+            paths[edge.target] = paths.get(current, []) + [edge]
+            queue.append(edge.target)
 
-    return visited
+    return paths
+
+
+def _path_excused(path: list[Edge], object_str: str, requires: list[ConstraintEdge]) -> bool:
+    """True when every intermediary on the path is itself required to depend on the
+    object ('via connector' pattern): services -> connector -> db is allowed when a
+    requires constraint covers the connector for db."""
+    if len(path) <= 1:
+        return False
+    object_fqn = FQN.from_dotted_safe(object_str)
+    for intermediary in [edge.source for edge in path[1:]]:
+        intermediary_fqn = FQN.from_dotted_safe(intermediary)
+        if not any(
+            fqn_matches_pattern(intermediary_fqn, require.subject) != MatchStatus.NO_MATCH
+            and fqn_matches_pattern(object_fqn, require.object) != MatchStatus.NO_MATCH
+            for require in requires
+        ):
+            return False
+    return True
 
 
 def match_constraints(adg: ADG) -> dict[int, MatchedConstraint]:
@@ -100,14 +121,22 @@ def check_structural_predicates(
     TODO: cache BFS result, all prohibit can reuse same full graph reachability
     """
     violations: list[Violation] = []
+    requires_by_predicate: dict[str, list[ConstraintEdge]] = {}
+    for matched_constraint in matched_constraints.values():
+        constraint_pred = matched_constraint.constraint.predicate
+        if constraint_pred in (PredicateType.REQUIRES_DEPENDENCY, PredicateType.REQUIRES_IMPLEMENTATION):
+            requires_by_predicate.setdefault(constraint_pred.value, []).append(matched_constraint.constraint)
+
     for matched_constraint in matched_constraints.values():
         pred = matched_constraint.constraint.predicate
 
         if pred not in (PredicateType.PROHIBITS_DEPENDENCY, PredicateType.PROHIBITS_IMPLEMENTATION):
             continue
 
-        kinds = {"CONTAINS", "IMPORTS", "CALLS", "INHERITS"} if pred == PredicateType.PROHIBITS_DEPENDENCY else {"CONTAINS", "CALLS"}
+        kinds = {"CONTAINS", "IMPORTS", "CALLS", "INHERITS"} if pred == PredicateType.PROHIBITS_DEPENDENCY else {"CONTAINS", "CALLS", "INHERITS"}
         label = "has dependency path to" if pred == PredicateType.PROHIBITS_DEPENDENCY else "implements"
+        counterpart = PredicateType.REQUIRES_DEPENDENCY.value if pred == PredicateType.PROHIBITS_DEPENDENCY else PredicateType.REQUIRES_IMPLEMENTATION.value
+        excusing_requires = requires_by_predicate.get(counterpart, [])
 
         # ponytail: DEV_TOOL objects are not architecturally meaningful for prohibits
         non_dev_object_matches = [
@@ -119,19 +148,25 @@ def check_structural_predicates(
 
         for subject_fqn, subject_status in matched_constraint.subject_matches:
             subject_str = str(subject_fqn)
-            reachable = _reachable_nodes(subject_str, adjacency, kinds, node_roles=node_roles, skip_roles={DependencyRole.DEV_TOOL})
+            paths = _reachable_paths(subject_str, adjacency, kinds, node_roles=node_roles, skip_roles={DependencyRole.DEV_TOOL})
             for object_fqn, object_status in non_dev_object_matches:
                 higher = subject_status if _PRIORITY[subject_status] >= _PRIORITY[object_status] else object_status
                 object_str = str(object_fqn)
-                if any(reachable_node == object_str or reachable_node.startswith(object_str + ".") for reachable_node in reachable):
+                for target, path in paths.items():
+                    if not (target == object_str or target.startswith(object_str + ".")):
+                        continue
+                    if _path_excused(path, object_str, excusing_requires):
+                        continue
+                    path_summary = " -> ".join(f"{edge.kind} {edge.target}" for edge in path)
                     violations.append(Violation(
                         constraint=matched_constraint.constraint,
-                        changed_fqn=subject_fqn, 
+                        changed_fqn=subject_fqn,
                         matched_fqn=subject_fqn,
                         match_status=higher,
-                        evidence=f"{subject_str} {label} {object_str}",
+                        evidence=f"{subject_str} {label} {object_str} via {path_summary}",
                         change_type="structural",
                     ))
+                    break
     return violations
 
 
@@ -171,7 +206,7 @@ def check_change_triggered_predicates(
             if not relevant_subjects:
                 continue
 
-            kinds = {"CONTAINS", "IMPORTS", "CALLS", "INHERITS"} if pred == PredicateType.REQUIRES_DEPENDENCY else {"CONTAINS", "CALLS"}
+            kinds = {"CONTAINS", "IMPORTS", "CALLS", "INHERITS"} if pred == PredicateType.REQUIRES_DEPENDENCY else {"CONTAINS", "CALLS", "INHERITS"}
             label = "has no dependency on any module matching" if pred == PredicateType.REQUIRES_DEPENDENCY else "does not implement any module matching"
             # ponytail: DEV_TOOL objects are not architecturally meaningful for requires
             non_dev_object_matches = [
@@ -182,7 +217,7 @@ def check_change_triggered_predicates(
                 continue
             for subject_fqn, subject_status in relevant_subjects:
                 subject_str = str(subject_fqn)
-                reachable = _reachable_nodes(subject_str, adjacency, kinds, node_roles=node_roles, skip_roles={DependencyRole.DEV_TOOL})
+                reachable = _reachable_paths(subject_str, adjacency, kinds, node_roles=node_roles, skip_roles={DependencyRole.DEV_TOOL})
                 object_reachable = False
                 for object_fqn, _ in matched_constraint.object_matches:
                     object_str = str(object_fqn)

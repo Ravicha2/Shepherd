@@ -9,7 +9,6 @@ using in-memory Diff fixtures (no git dependency).
 
 from __future__ import annotations
 
-import pytest
 
 from services.fqn import FQN
 from services.models import ChangedFQN, Diff, DiffResult, FileChange, FQNKind
@@ -551,15 +550,16 @@ class TestRenamedFile:
 
 
 # ===========================================================================
-# 10. Fail fast on syntax errors
+# 10. Skip files with syntax errors
 # ===========================================================================
 
 
 class TestSyntaxErrorsInDiff:
-    """process_diff fails fast when a changed file has syntax errors."""
+    """process_diff skips changed files with syntax errors instead of crashing
+    (commit 6c147b6: one vendored/Py2 file must not kill detection)."""
 
-    def test_syntax_error_in_new_file(self) -> None:
-        """A syntax error in a new file causes process_diff to raise."""
+    def test_syntax_error_in_new_file_skipped(self) -> None:
+        """A syntax error in a new file is skipped: no raise, no FQNs."""
         diff = Diff(
             to_sha="abc123",
             from_sha="abc122",
@@ -567,11 +567,11 @@ class TestSyntaxErrorsInDiff:
             file_contents={"app/broken.py": b"def foo(:\n    pass\n"},
             from_contents={},
         )
-        with pytest.raises(Exception):
-            process_diff(diff)
+        result = process_diff(diff)
+        assert all("broken" not in str(c.fqn) for c in result.changed_fqns)
 
-    def test_syntax_error_in_modified_file(self) -> None:
-        """A syntax error in a modified file causes process_diff to raise."""
+    def test_syntax_error_in_modified_file_skipped(self) -> None:
+        """A syntax error in a modified file is skipped: no raise, no FQNs."""
         diff = Diff(
             to_sha="abc123",
             from_sha="abc122",
@@ -579,8 +579,26 @@ class TestSyntaxErrorsInDiff:
             file_contents={"app/broken.py": b"class User\n    pass\n"},
             from_contents={"app/broken.py": USER_MODEL_OLD},
         )
-        with pytest.raises(Exception):
-            process_diff(diff)
+        result = process_diff(diff)
+        assert all("broken" not in str(c.fqn) for c in result.changed_fqns)
+
+    def test_syntax_error_does_not_block_other_files(self) -> None:
+        """A broken file is skipped but other files still yield their FQNs."""
+        diff = Diff(
+            to_sha="abc123",
+            from_sha="abc122",
+            changed_files=[
+                FileChange(path="app/broken.py", status="added"),
+                FileChange(path="app/services/user_service.py", status="added"),
+            ],
+            file_contents={
+                "app/broken.py": b"def foo(:\n    pass\n",
+                "app/services/user_service.py": USER_SERVICE_OLD,
+            },
+            from_contents={},
+        )
+        result = process_diff(diff)
+        assert any("user_service" in str(c.fqn) for c in result.changed_fqns)
 
 
 # ===========================================================================
