@@ -26,6 +26,10 @@ class Violation:
     match_status: MatchStatus
     evidence: str
     change_type: str
+    # Informational provenance for reviewer context; never part of identity/dismissal
+    location: dict | None = None           # {"file_path", "line_start", "line_end"} of changed_fqn's node
+    path_hops: list[dict] | None = None    # prohibits: traversal from subject to object, [{"kind", "target", "file_path"?}]
+    scope_snapshots: list[dict] | None = None  # requires: [{"scope", "fqn", "outgoing": [{"kind", "target"}]}]
 
 
 def resolve(violations: list[Violation]) -> list[Violation]:

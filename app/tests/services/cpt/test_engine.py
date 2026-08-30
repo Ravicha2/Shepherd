@@ -638,6 +638,64 @@ class TestResolve:
 # ===========================================================================
 
 
+class TestViolationProvenance:
+    """detect() attaches informational provenance to violations.
+
+    Provenance (location, path_hops, scope_snapshots) is informational: it
+    feeds the reviewer-agent context and never affects identity/dismissal.
+    """
+
+    def test_requires_violation_carries_location_and_scope_snapshots(
+        self, sample_adg: ADG, sample_constraints: list[ConstraintEdge]
+    ) -> None:
+        from services.cpt.engine import detect
+
+        adg = ADG(nodes=sample_adg.nodes, edges=sample_adg.edges, constraint_edges=[sample_constraints[1]])
+        diff = DiffResult(
+            to_sha="abc123",
+            from_sha="def456",
+            changed_files=[FileChange(path="app/api/orders.py", status="modified")],
+            changed_fqns=[_changed_fqn("app.api.orders")],
+        )
+        result = detect(diff, adg)
+        requires = [v for v in result.violations if v.constraint.adr_id == "ADR-004"]
+        assert len(requires) == 1
+        violation = requires[0]
+
+        assert violation.location == {"file_path": "app/api/orders.py", "line_start": 0, "line_end": 40}
+
+        changed_scope = next(s for s in violation.scope_snapshots if s["scope"] == "changed")
+        assert changed_scope["fqn"] == "app.api.orders"
+        assert changed_scope["outgoing"] == [{"kind": "CALLS", "target": "app.models.user"}]
+
+        module_scope = next(s for s in violation.scope_snapshots if s["scope"] == "enclosing_module")
+        assert module_scope["fqn"] == "app.api"
+        # CONTAINS edges are structure, not dependencies: excluded from the snapshot
+        assert module_scope["outgoing"] == []
+
+    def test_prohibits_violation_carries_path_hops_with_files(
+        self, sample_adg: ADG, sample_constraints: list[ConstraintEdge]
+    ) -> None:
+        from services.cpt.engine import detect
+
+        adg = ADG(nodes=sample_adg.nodes, edges=sample_adg.edges, constraint_edges=[sample_constraints[0]])
+        diff = DiffResult(
+            to_sha="abc123",
+            from_sha="def456",
+            changed_files=[FileChange(path="app/api/orders.py", status="modified")],
+            changed_fqns=[_changed_fqn("app.api.orders")],
+        )
+        result = detect(diff, adg)
+        prohibits = [v for v in result.violations if v.constraint.adr_id == "ADR-003"]
+        assert len(prohibits) == 1
+        violation = prohibits[0]
+
+        assert str(violation.matched_fqn) == "app.api.orders"
+        assert violation.path_hops == [
+            {"kind": "CALLS", "target": "app.models.user", "file_path": "app/models/user.py"},
+        ]
+
+
 class TestDetect:
     """Integration: detect(diff_result, adg) -> CPTResult."""
 

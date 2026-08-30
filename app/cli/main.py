@@ -40,6 +40,9 @@ def _violation_to_dict(v: Violation) -> dict:
         "change_type": v.change_type,
         "match_status": v.match_status.value,
         "evidence": v.evidence,
+        "location": v.location,
+        "path_hops": v.path_hops,
+        "scope_snapshots": v.scope_snapshots,
     }
 
 

@@ -14,6 +14,17 @@ log = logging.getLogger(__name__)
 
 _PRIORITY = {MatchStatus.EXACT: 3, MatchStatus.WILDCARD: 2}
 
+_DEPENDENCY_EDGE_KINDS = frozenset({"IMPORTS", "CALLS", "INHERITS"})
+
+
+def _outgoing_dependency_edges(fqn_str: str, adjacency: dict[str, list[Edge]]) -> list[dict]:
+    # ponytail: uncapped; cap if large modules flood the reviewer context
+    return [
+        {"kind": edge.kind, "target": edge.target}
+        for edge in adjacency.get(fqn_str, ())
+        if edge.kind in _DEPENDENCY_EDGE_KINDS
+    ]
+
 
 @dataclass
 class CPTResult:
@@ -165,6 +176,7 @@ def check_structural_predicates(
                         match_status=higher,
                         evidence=f"{subject_str} {label} {object_str} via {path_summary}",
                         change_type="structural",
+                        path_hops=[{"kind": edge.kind, "target": edge.target} for edge in path],
                     ))
                     break
     return violations
@@ -233,6 +245,14 @@ def check_change_triggered_predicates(
                         if _PRIORITY[object_status] > _PRIORITY[highest_status]:
                             highest_status = object_status
 
+                    changed_module_str = str(changed.enclosing_module)
+                    scope_snapshots = [
+                        {"scope": "changed", "fqn": changed_str, "outgoing": _outgoing_dependency_edges(changed_str, adjacency)}
+                    ]
+                    if changed_module_str != changed_str:
+                        scope_snapshots.append(
+                            {"scope": "enclosing_module", "fqn": changed_module_str, "outgoing": _outgoing_dependency_edges(changed_module_str, adjacency)}
+                        )
                     violations.append(Violation(
                         constraint=matched_constraint.constraint,
                         changed_fqn=changed.fqn,
@@ -240,6 +260,7 @@ def check_change_triggered_predicates(
                         match_status=highest_status,
                         evidence=f"{subject_str} {label} {matched_constraint.constraint.object}",
                         change_type=changed.change_type,
+                        scope_snapshots=scope_snapshots,
                     ))
     return violations
 
@@ -281,6 +302,16 @@ def detect(diff_result: DiffResult, adg: ADG) -> CPTResult:
         if match_constraint.constraint.predicate.value.startswith("prohibits_"):
             active_prohibits.append(match_constraint.constraint)
     violations = suppress_outweighed_requires(violations, active_prohibits)
+
+    node_by_fqn = {str(node.fqn): node for node in adg.nodes}
+    for violation in violations:
+        node = node_by_fqn.get(str(violation.changed_fqn))
+        if node:
+            violation.location = {"file_path": node.file_path, "line_start": node.line_start, "line_end": node.line_end}
+        for hop in violation.path_hops or ():
+            hop_node = node_by_fqn.get(hop["target"])
+            if hop_node:
+                hop["file_path"] = hop_node.file_path
 
     orphans: list[ConstraintEdge] = []
     for constraint in adg.constraint_edges:
