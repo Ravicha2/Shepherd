@@ -1,0 +1,264 @@
+{
+  "flask": {
+    "cases": [
+      {
+        "case_id": "flask-violating-route",
+        "description": "New route calls the model directly, bypassing the service layer",
+        "diff": [
+          {
+            "path": "app/routes/users.py",
+            "append": "\n\ndef create_user_route(data):\n    user = User.create(data)\n    return jsonify(user)\n"
+          }
+        ],
+        "expected_violations": [
+          {
+            "adr_id": "ADR-001",
+            "predicate": "prohibits_dependency",
+            "subject": "app.routes.*",
+            "object": "app.models.*",
+            "matched_fqn": "app.routes.users",
+            "justification": "HEAD code in routes/users.py already imports the model directly, and the new route continues the pattern. Structural predicate, reported at module level after module-level dedup."
+          },
+          {
+            "adr_id": "ADR-001",
+            "predicate": "requires_dependency",
+            "subject": "app.routes.*",
+            "object": "app.services.*",
+            "matched_fqn": "app.routes.users.create_user_route",
+            "justification": "The new route writes user data without going through any service function."
+          },
+          {
+            "adr_id": "ADR-002",
+            "predicate": "requires_dependency",
+            "subject": "app.routes.*",
+            "object": "app.middleware.auth.*",
+            "matched_fqn": "app.routes.users.create_user_route",
+            "justification": "New API endpoint without any dependency on the centralized auth middleware."
+          }
+        ]
+      },
+      {
+        "case_id": "flask-compliant-service",
+        "description": "New service function uses the model: the sanctioned path",
+        "diff": [
+          {
+            "path": "app/services/user_service.py",
+            "append": "\n\ndef create_user(data):\n    return User.find(3)\n"
+          }
+        ],
+        "expected_violations": [
+          {
+            "adr_id": "ADR-001",
+            "predicate": "prohibits_dependency",
+            "subject": "app.routes.*",
+            "object": "app.models.*",
+            "matched_fqn": "app.routes.users",
+            "justification": "Baseline only: pre-existing routes/users.py imports the model directly (marked '# violation' in the fixture). The new service function itself is compliant: services are the sanctioned path and requires app.models.* is satisfied via the call to User.find."
+          }
+        ],
+        "grading_note": "Any violation beyond the baseline prohibits would be a false positive: the service change itself must not trigger anything."
+      },
+      {
+        "case_id": "flask-unauthenticated-route",
+        "description": "New status endpoint with no auth middleware usage and no service dependency",
+        "diff": [
+          {
+            "path": "app/routes/auth.py",
+            "append": "\n\ndef status_route():\n    return jsonify({'status': 'ok'})\n"
+          }
+        ],
+        "expected_violations": [
+          {
+            "adr_id": "ADR-001",
+            "predicate": "prohibits_dependency",
+            "subject": "app.routes.*",
+            "object": "app.models.*",
+            "matched_fqn": "app.routes.users",
+            "justification": "Baseline: pre-existing routes/users.py imports the model directly. The new status route touches no model."
+          },
+          {
+            "adr_id": "ADR-002",
+            "predicate": "requires_dependency",
+            "subject": "app.routes.*",
+            "object": "app.middleware.auth.*",
+            "matched_fqn": "app.routes.auth.status_route",
+            "justification": "Per ADR-002 every API endpoint is authenticated unless under the /auth exemption, which covers login and token-refresh only. A status endpoint with no middleware dependency is a genuine violation."
+          }
+        ],
+        "grading_note": "requires app.services.* firing on status_route counts as a false positive: the ADR-001 rule is 'if a route needs data, it calls the service', and a data-less status endpoint needs no service."
+      },
+      {
+        "case_id": "flask-auth-exempt-route",
+        "description": "New endpoint in auth.py uses the service layer (layering compliant) but forgets the auth middleware: layering clean, auth violation",
+        "diff": [
+          {
+            "path": "app/routes/auth.py",
+            "append": "\n\ndef whoami_route():\n    from app.services.user_service import get_user\n    user = get_user(1)\n    return jsonify(user)\n"
+          }
+        ],
+        "expected_violations": [
+          {
+            "adr_id": "ADR-001",
+            "predicate": "prohibits_dependency",
+            "subject": "app.routes.*",
+            "object": "app.models.*",
+            "matched_fqn": "app.routes.users",
+            "justification": "Baseline only: pre-existing routes/users.py imports the model directly. The new route goes through the service layer and stays out of the model layer."
+          },
+          {
+            "adr_id": "ADR-002",
+            "predicate": "requires_dependency",
+            "subject": "app.routes.*",
+            "object": "app.middleware.auth.*",
+            "matched_fqn": "app.routes.auth.whoami_route",
+            "justification": "whoami is an authenticated endpoint (the /auth exemption covers login and token-refresh only), and the new route has no dependency on the auth middleware."
+          }
+        ],
+        "grading_note": "The layering rules must stay quiet on this case: requires app.services.* must NOT fire because whoami_route calls get_user through the service layer."
+      }
+    ]
+  },
+  "django": {
+    "cases": [
+      {
+        "case_id": "django-violating-view",
+        "description": "New view calls the model directly, bypassing the service layer",
+        "diff": [
+          {
+            "path": "users/views.py",
+            "append": "\n\ndef create_user_view(request):\n    user = User.objects.create(name='test')\n    return JsonResponse({'id': user.id})\n"
+          }
+        ],
+        "expected_violations": [
+          {
+            "adr_id": "ADR-001",
+            "predicate": "requires_dependency",
+            "subject": "users.views.*",
+            "object": "users.services.*",
+            "matched_fqn": "users.views.create_user_view",
+            "justification": "The new view writes user data directly via User.objects.create without going through the service layer."
+          },
+          {
+            "adr_id": "ADR-001",
+            "predicate": "prohibits_dependency",
+            "subject": "users.views.*",
+            "object": "users.models.*",
+            "matched_fqn": "users.views",
+            "justification": "IDEAL, currently MISSED: view handlers must not access data models directly, yet both the new create_user_view (User.objects.create) and the HEAD views (user_list, user_detail) use the model. Expected matched_fqn is the pattern base so any child-level hit scores partial. Detection currently misses this because the subject pattern does not match the module itself (users.views), function-level subjects cannot see module-level imports, and attribute-chained calls like User.objects.create do not resolve to CALLS edges."
+          }
+        ],
+        "grading_note": "The prohibits expectation is scored as a miss until detection closes the gap described in its justification. This is a deliberate record of a known detection blind spot, not a scoring artifact."
+      },
+      {
+        "case_id": "django-compliant-view-via-connector",
+        "description": "New view calls the service function, which itself uses the model: exercises the via-connector exemption",
+        "diff": [
+          {
+            "path": "users/views.py",
+            "append": "\n\ndef delete_user_view(request, user_id):\n    from users.services import get_user\n    user = get_user(user_id)\n    return JsonResponse(user)\n"
+          }
+        ],
+        "expected_violations": [
+          {
+            "adr_id": "ADR-001",
+            "predicate": "prohibits_dependency",
+            "subject": "users.views.*",
+            "object": "users.models.*",
+            "matched_fqn": "users.views",
+            "justification": "IDEAL baseline, currently MISSED for the same reasons as django-violating-view: HEAD user_list/user_detail access the model directly. The new delete_user_view itself must NOT be reported: its only path to the model goes through users.services.get_user, the sanctioned connector covered by users.services.* requires users.models.*."
+          }
+        ],
+        "grading_note": "A violation whose matched_fqn is users.views.delete_user_view would be a false positive: the via-connector exemption must keep the compliant view clean."
+      },
+      {
+        "case_id": "django-settings-assignment",
+        "description": "Module-level assignment change in project/settings.py: no architectural impact",
+        "diff": [
+          {
+            "path": "project/settings.py",
+            "append": "\n\nEXTRA_SETTING = 1\n"
+          }
+        ],
+        "expected_violations": [],
+        "grading_note": "Zero violations expected. project/urls.py transitively reaching users.models through users.views is not an ADR-002 violation: the ADR governs direct imports from the data model, and urls.py imports views only."
+      }
+    ]
+  },
+  "python-tuf": {
+    "cases": [
+      {
+        "case_id": "tuf-serialization-helper",
+        "description": "New function in the serialization package: outside all constraint subjects, expect nothing",
+        "diff": [
+          {
+            "path": "tuf/api/serialization/__init__.py",
+            "append": "\n\ndef _canonical_helper(data):\n    return data\n"
+          }
+        ],
+        "expected_violations": [],
+        "grading_note": "Zero violations expected: tuf.api.serialization is outside the tuf.api.metadata.* and tuf.repository.* subjects, and nothing in tuf depends on python2.7 or python3.5."
+      },
+      {
+        "case_id": "tuf-repository-helper",
+        "description": "New function in tuf/repository: module imports tuf.api.metadata, function-level reachability cannot see module imports",
+        "diff": [
+          {
+            "path": "tuf/repository/_repository.py",
+            "append": "\n\ndef _helper():\n    pass\n"
+          }
+        ],
+        "expected_violations": [],
+        "grading_note": "Zero violations expected: _repository.py already imports tuf.api.metadata at module level, so ADR-0010's requires is satisfied. Any violation firing here (currently: requires tuf.api.metadata.* on tuf.repository._repository._helper) is an over-trigger false positive caused by function-level BFS being unable to see module-level imports."
+      },
+      {
+        "case_id": "tuf-ngclient-helper",
+        "description": "New function in tuf/ngclient: under tuf.* but outside the constrained subpackages, expect nothing",
+        "diff": [
+          {
+            "path": "tuf/ngclient/fetcher.py",
+            "append": "\n\ndef _helper():\n    pass\n"
+          }
+        ],
+        "expected_violations": [],
+        "grading_note": "Zero violations expected: tuf.ngclient is under tuf.* (which only prohibits the dead Python versions) but outside tuf.api.metadata.* and tuf.repository.*."
+      }
+    ]
+  },
+  "openlobby": {
+    "cases": [
+      {
+        "case_id": "openlobby-reimport-flask",
+        "description": "New code imports flask, violating ADR-0010 (flask replaced by django)",
+        "diff": [
+          {
+            "path": "openlobby/core/views.py",
+            "append": "\n\nimport flask\n\ndef legacy_view():\n    return flask.jsonify({})\n"
+          }
+        ],
+        "expected_violations": [
+          {
+            "adr_id": "ADR-0010",
+            "predicate": "prohibits_dependency",
+            "subject": "openlobby.*",
+            "object": "flask",
+            "matched_fqn": "openlobby.core.views",
+            "justification": "New code imports flask after ADR-0010 replaced Flask with Django. Structural predicate, reported at the module that owns the new import."
+          }
+        ],
+        "grading_note": "requires violations on legacy_view (elasticsearch, django, django.db) count as false positives: openlobby/core/views.py already imports django at module level and the module satisfies ADR-0010/0012; ADR-0002's subject openlobby.core.* is over-broad for non-search functions. Only the flask prohibition is a true finding."
+      },
+      {
+        "case_id": "openlobby-models-assignment",
+        "description": "Module-level assignment change in core/models.py: compliant, module-level imports keep django.db reachable",
+        "diff": [
+          {
+            "path": "openlobby/core/models.py",
+            "append": "\n\nMODEL_NOTE = 'x'\n"
+          }
+        ],
+        "expected_violations": [],
+        "grading_note": "Zero violations expected: models.py imports django.db at module level (satisfying ADR-0010/0012 for openlobby.core.models.* and openlobby.*), and a module-level assignment is architecturally inert. ADR-0002 requires elasticsearch for openlobby.core.* firing here is a false positive: ADR-0002 is about fulltext search, not the data model."
+      }
+    ]
+  }
+}

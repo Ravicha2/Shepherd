@@ -41,4 +41,5 @@ markers = [
     "integration: marks tests as integration tests",
     "llm_eval: marks tests that call the real LLM (costly, non-deterministic)",
     "resolver_eval: marks agent resolver eval tests (real LLM calls)",
+    "cpt_eval: marks CPT detection (retrieval) eval tests",
 ]

@@ -1,0 +1,58 @@
+{
+  "exact": 3,
+  "partial": 0,
+  "miss": 1,
+  "total": 4,
+  "false_positives": 2,
+  "accuracy": 0.75,
+  "per_constraint": [
+    {
+      "adr_id": "ADR-001",
+      "expected": {
+        "subject": "users.views.*",
+        "predicate": "prohibits_dependency",
+        "object": "users.models.*",
+        "justification": "View handlers must not access data models directly"
+      },
+      "score": "exact_match",
+      "resolved_subject": "users.views.*",
+      "resolved_object": "users.models.*"
+    },
+    {
+      "adr_id": "ADR-001",
+      "expected": {
+        "subject": "users.views.*",
+        "predicate": "requires_dependency",
+        "object": "users.services.*",
+        "justification": "All data access must go through service functions; the service layer (users.services) is the sole gateway to the data layer"
+      },
+      "score": "exact_match",
+      "resolved_subject": "users.views.*",
+      "resolved_object": "users.services.*"
+    },
+    {
+      "adr_id": "ADR-001",
+      "expected": {
+        "subject": "users.services.*",
+        "predicate": "requires_dependency",
+        "object": "users.models.*",
+        "justification": "Only the service layer may import from the data model module"
+      },
+      "score": "miss",
+      "resolved_subject": "users.views.*",
+      "resolved_object": "users.services.*"
+    },
+    {
+      "adr_id": "ADR-002",
+      "expected": {
+        "subject": "project.*",
+        "predicate": "prohibits_dependency",
+        "object": "users.models.*",
+        "justification": "No module outside the service layer may import from the data model module; in this codebase the non-service top-level code lives in the project package (settings/urls/wiring)"
+      },
+      "score": "exact_match",
+      "resolved_subject": "project.*",
+      "resolved_object": "users.models.*"
+    }
+  ]
+}

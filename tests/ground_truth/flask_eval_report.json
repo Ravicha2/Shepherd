@@ -1,0 +1,58 @@
+{
+  "exact": 2,
+  "partial": 1,
+  "miss": 1,
+  "total": 4,
+  "false_positives": 1,
+  "accuracy": 0.625,
+  "per_constraint": [
+    {
+      "adr_id": "ADR-001",
+      "expected": {
+        "subject": "app.routes.*",
+        "predicate": "prohibits_dependency",
+        "object": "app.models.*",
+        "justification": "Route handlers must not access data models directly; the HTTP layer must not couple to the persistence layer"
+      },
+      "score": "exact_match",
+      "resolved_subject": "app.routes.*",
+      "resolved_object": "app.models.*"
+    },
+    {
+      "adr_id": "ADR-001",
+      "expected": {
+        "subject": "app.routes.*",
+        "predicate": "requires_dependency",
+        "object": "app.services.*",
+        "justification": "If a route needs data, it calls the corresponding service function; routes depend on services for data access"
+      },
+      "score": "exact_match",
+      "resolved_subject": "app.routes.*",
+      "resolved_object": "app.services.*"
+    },
+    {
+      "adr_id": "ADR-001",
+      "expected": {
+        "subject": "app.services.*",
+        "predicate": "requires_dependency",
+        "object": "app.models.*",
+        "justification": "Only the service layer may import from the data model module"
+      },
+      "score": "miss",
+      "resolved_subject": "app.routes.*",
+      "resolved_object": "app.services.*"
+    },
+    {
+      "adr_id": "ADR-002",
+      "expected": {
+        "subject": "app.routes.*",
+        "predicate": "requires_dependency",
+        "object": "app.middleware.auth.*",
+        "justification": "Every API endpoint requires authentication enforced through the centralized auth middleware"
+      },
+      "score": "partial_match",
+      "resolved_subject": "app.routes.*",
+      "resolved_object": "app.middleware.auth.require_auth"
+    }
+  ]
+}

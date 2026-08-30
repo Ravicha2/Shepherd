@@ -1,0 +1,40 @@
+[
+  {
+    "adr_id": "ADR-001",
+    "adr_path": "docs/adr/001-service-layer-mandatory.md",
+    "constraints": [
+      {
+        "subject": "users.views.*",
+        "predicate": "prohibits_dependency",
+        "object": "users.models.*",
+        "justification": "View handlers must not access data models directly"
+      },
+      {
+        "subject": "users.views.*",
+        "predicate": "requires_dependency",
+        "object": "users.services.*",
+        "justification": "All data access must go through service functions; the service layer (users.services) is the sole gateway to the data layer"
+      },
+      {
+        "subject": "users.services.*",
+        "predicate": "requires_dependency",
+        "object": "users.models.*",
+        "justification": "Only the service layer may import from the data model module"
+      }
+    ],
+    "note": "Do NOT emit prohibits_dependency users.services.* -> users.models.*: services are the sanctioned path to models."
+  },
+  {
+    "adr_id": "ADR-002",
+    "adr_path": "docs/adr/002-no-direct-model-imports.md",
+    "constraints": [
+      {
+        "subject": "project.*",
+        "predicate": "prohibits_dependency",
+        "object": "users.models.*",
+        "justification": "No module outside the service layer may import from the data model module; in this codebase the non-service top-level code lives in the project package (settings/urls/wiring)"
+      }
+    ],
+    "note": "The ADR states a codebase-wide rule, but a bare '*' subject is not expressible (constraint patterns are exact FQNs or 'prefix.*'). The users-side cases are covered by ADR-001 (views prohibited, services the sanctioned exception). Emit the edge for the remaining root namespace, project.*, not users.*."
+  }
+]

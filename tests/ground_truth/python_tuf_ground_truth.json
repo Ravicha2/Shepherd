@@ -1,5 +1,11 @@
 [
   {
+    "adr_id": "ADR-0000",
+    "adr_path": "docs/adr/0000-use-markdown-architectural-decision-records.md",
+    "constraints": [],
+    "note": "Documentation-process ADR: choosing MADR as the record format governs how decisions are written down, not how code is structured. Emit no edges."
+  },
+  {
     "adr_id": "ADR-0001",
     "adr_path": "docs/adr/0001-python-version-3-6-plus.md",
     "constraints": [
@@ -18,10 +24,28 @@
     ]
   },
   {
+    "adr_id": "ADR-0002",
+    "adr_path": "docs/adr/0002-pre-1-0-deprecation-strategy.md",
+    "constraints": [],
+    "note": "Release/support-process ADR: how bugs in pre-1.0.0 releases are handled is a governance commitment, not a code-level architectural constraint. Emit no edges."
+  },
+  {
     "adr_id": "ADR-0003",
     "adr_path": "docs/adr/0003-where-to-develop-TUF-1-0-0.md",
     "constraints": [],
     "note": "Process/location ADR: 'develop TUF 1.0.0 in a subdirectory' is a development process decision, not an enforceable code-level architectural constraint. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0004",
+    "adr_path": "docs/adr/0004-extent-of-OOP-in-metadata-model.md",
+    "constraints": [],
+    "note": "Data-representation choice: 'complex metadata attributes are custom classes, not dicts' is about how attributes are represented inside tuf.api.metadata, not a dependency or implementation relation between FQNs. The mentioned self-validation behavior is 'may be extended' (optional), so no requires_implementation either. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0005",
+    "adr_path": "docs/adr/0005-use-google-python-style-guide.md",
+    "constraints": [],
+    "note": "Code-style ADR: naming/formatting conventions are not expressible as dependency or implementation edges between FQNs; tooling suggestions ('consider providing linter config') are explicitly optional. Emit no edges."
   },
   {
     "adr_id": "ADR-0006",
@@ -34,6 +58,18 @@
         "justification": "ADR-0006 separates serialization from the metadata class model; metadata classes depend on the serialization package (tuf.api.serialization), not the other way around"
       }
     ]
+  },
+  {
+    "adr_id": "ADR-0008",
+    "adr_path": "docs/adr/0008-accept-unrecognised-fields.md",
+    "constraints": [],
+    "note": "Runtime-behavior ADR: 'preserve unrecognized fields on load' specifies deserialization behavior inside the metadata API, not a dependency or implementation relation between FQNs. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0009",
+    "adr_path": "docs/adr/0009-what-is-a-reference-implementation.md",
+    "constraints": [],
+    "note": "Vision ADR: 'the primary purpose is an exemplary reference' states a design philosophy with no operationally checkable code-level constraint. Emit no edges."
   },
   {
     "adr_id": "ADR-0010",

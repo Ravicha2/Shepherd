@@ -25,7 +25,7 @@ from services.models import ConstraintEdge, PredicateType
 REPO_ROOT = Path(__file__).resolve().parents[4]
 REPOS_YAML_PATH = REPO_ROOT / "repos" / "repos.yaml"
 GROUND_TRUTH_DIR = REPO_ROOT / "tests" / "ground_truth"
-EVAL_REPOS = ["openlobby", "python-tuf"]
+EVAL_REPOS = ["openlobby", "python-tuf", "flask", "django"]
 
 HAS_API_KEY = bool(os.environ.get("OPENROUTER_API_KEY"))
 
@@ -125,7 +125,7 @@ def _repo_root(repo_id: str) -> Path:
     repo = next(r for r in repos["repos"] if r["id"] == repo_id)
     repo_path = Path(repo["url"])
     if not repo_path.is_absolute():
-        repo_path = REPO_ROOT / repo_path
+        repo_path = REPO_ROOT / "repos" / repo_path
     return repo_path
 
 

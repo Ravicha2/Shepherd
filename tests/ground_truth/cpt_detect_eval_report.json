@@ -1,0 +1,375 @@
+{
+  "flask": {
+    "repo_id": "flask",
+    "cases": [
+      {
+        "case_id": "flask-violating-route",
+        "exact": 3,
+        "partial": 0,
+        "miss": 0,
+        "total": 3,
+        "false_positives": 0,
+        "unexpected": [],
+        "per_constraint": [
+          {
+            "expected": {
+              "adr_id": "ADR-001",
+              "predicate": "prohibits_dependency",
+              "subject": "app.routes.*",
+              "object": "app.models.*",
+              "matched_fqn": "app.routes.users",
+              "justification": "HEAD code in routes/users.py already imports the model directly, and the new route continues the pattern. Structural predicate, reported at module level after module-level dedup."
+            },
+            "score": "exact_match",
+            "justification": "HEAD code in routes/users.py already imports the model directly, and the new route continues the pattern. Structural predicate, reported at module level after module-level dedup."
+          },
+          {
+            "expected": {
+              "adr_id": "ADR-001",
+              "predicate": "requires_dependency",
+              "subject": "app.routes.*",
+              "object": "app.services.*",
+              "matched_fqn": "app.routes.users.create_user_route",
+              "justification": "The new route writes user data without going through any service function."
+            },
+            "score": "exact_match",
+            "justification": "The new route writes user data without going through any service function."
+          },
+          {
+            "expected": {
+              "adr_id": "ADR-002",
+              "predicate": "requires_dependency",
+              "subject": "app.routes.*",
+              "object": "app.middleware.auth.*",
+              "matched_fqn": "app.routes.users.create_user_route",
+              "justification": "New API endpoint without any dependency on the centralized auth middleware."
+            },
+            "score": "exact_match",
+            "justification": "New API endpoint without any dependency on the centralized auth middleware."
+          }
+        ]
+      },
+      {
+        "case_id": "flask-compliant-service",
+        "exact": 1,
+        "partial": 0,
+        "miss": 0,
+        "total": 1,
+        "false_positives": 0,
+        "unexpected": [],
+        "per_constraint": [
+          {
+            "expected": {
+              "adr_id": "ADR-001",
+              "predicate": "prohibits_dependency",
+              "subject": "app.routes.*",
+              "object": "app.models.*",
+              "matched_fqn": "app.routes.users",
+              "justification": "Baseline only: pre-existing routes/users.py imports the model directly (marked '# violation' in the fixture). The new service function itself is compliant: services are the sanctioned path and requires app.models.* is satisfied via the call to User.find."
+            },
+            "score": "exact_match",
+            "justification": "Baseline only: pre-existing routes/users.py imports the model directly (marked '# violation' in the fixture). The new service function itself is compliant: services are the sanctioned path and requires app.models.* is satisfied via the call to User.find."
+          }
+        ]
+      },
+      {
+        "case_id": "flask-unauthenticated-route",
+        "exact": 2,
+        "partial": 0,
+        "miss": 0,
+        "total": 2,
+        "false_positives": 1,
+        "unexpected": [
+          {
+            "adr_id": "ADR-001",
+            "predicate": "requires_dependency",
+            "subject": "app.routes.*",
+            "object": "app.services.*",
+            "matched_fqn": "app.routes.auth.status_route",
+            "changed_fqn": "app.routes.auth.status_route",
+            "evidence": "app.routes.auth.status_route has no dependency on any module matching app.services.*"
+          }
+        ],
+        "per_constraint": [
+          {
+            "expected": {
+              "adr_id": "ADR-001",
+              "predicate": "prohibits_dependency",
+              "subject": "app.routes.*",
+              "object": "app.models.*",
+              "matched_fqn": "app.routes.users",
+              "justification": "Baseline: pre-existing routes/users.py imports the model directly. The new status route touches no model."
+            },
+            "score": "exact_match",
+            "justification": "Baseline: pre-existing routes/users.py imports the model directly. The new status route touches no model."
+          },
+          {
+            "expected": {
+              "adr_id": "ADR-002",
+              "predicate": "requires_dependency",
+              "subject": "app.routes.*",
+              "object": "app.middleware.auth.*",
+              "matched_fqn": "app.routes.auth.status_route",
+              "justification": "Per ADR-002 every API endpoint is authenticated unless under the /auth exemption, which covers login and token-refresh only. A status endpoint with no middleware dependency is a genuine violation."
+            },
+            "score": "exact_match",
+            "justification": "Per ADR-002 every API endpoint is authenticated unless under the /auth exemption, which covers login and token-refresh only. A status endpoint with no middleware dependency is a genuine violation."
+          }
+        ]
+      },
+      {
+        "case_id": "flask-auth-exempt-route",
+        "exact": 2,
+        "partial": 0,
+        "miss": 0,
+        "total": 2,
+        "false_positives": 0,
+        "unexpected": [],
+        "per_constraint": [
+          {
+            "expected": {
+              "adr_id": "ADR-001",
+              "predicate": "prohibits_dependency",
+              "subject": "app.routes.*",
+              "object": "app.models.*",
+              "matched_fqn": "app.routes.users",
+              "justification": "Baseline only: pre-existing routes/users.py imports the model directly. The new route goes through the service layer and stays out of the model layer."
+            },
+            "score": "exact_match",
+            "justification": "Baseline only: pre-existing routes/users.py imports the model directly. The new route goes through the service layer and stays out of the model layer."
+          },
+          {
+            "expected": {
+              "adr_id": "ADR-002",
+              "predicate": "requires_dependency",
+              "subject": "app.routes.*",
+              "object": "app.middleware.auth.*",
+              "matched_fqn": "app.routes.auth.whoami_route",
+              "justification": "whoami is an authenticated endpoint (the /auth exemption covers login and token-refresh only), and the new route has no dependency on the auth middleware."
+            },
+            "score": "exact_match",
+            "justification": "whoami is an authenticated endpoint (the /auth exemption covers login and token-refresh only), and the new route has no dependency on the auth middleware."
+          }
+        ]
+      }
+    ],
+    "exact": 8,
+    "partial": 0,
+    "miss": 0,
+    "false_positives": 1,
+    "total": 8,
+    "accuracy": 1.0
+  },
+  "django": {
+    "repo_id": "django",
+    "cases": [
+      {
+        "case_id": "django-violating-view",
+        "exact": 1,
+        "partial": 0,
+        "miss": 1,
+        "total": 2,
+        "false_positives": 0,
+        "unexpected": [],
+        "per_constraint": [
+          {
+            "expected": {
+              "adr_id": "ADR-001",
+              "predicate": "requires_dependency",
+              "subject": "users.views.*",
+              "object": "users.services.*",
+              "matched_fqn": "users.views.create_user_view",
+              "justification": "The new view writes user data directly via User.objects.create without going through the service layer."
+            },
+            "score": "exact_match",
+            "justification": "The new view writes user data directly via User.objects.create without going through the service layer."
+          },
+          {
+            "expected": {
+              "adr_id": "ADR-001",
+              "predicate": "prohibits_dependency",
+              "subject": "users.views.*",
+              "object": "users.models.*",
+              "matched_fqn": "users.views",
+              "justification": "IDEAL, currently MISSED: view handlers must not access data models directly, yet both the new create_user_view (User.objects.create) and the HEAD views (user_list, user_detail) use the model. Expected matched_fqn is the pattern base so any child-level hit scores partial. Detection currently misses this because the subject pattern does not match the module itself (users.views), function-level subjects cannot see module-level imports, and attribute-chained calls like User.objects.create do not resolve to CALLS edges."
+            },
+            "score": "miss",
+            "justification": "IDEAL, currently MISSED: view handlers must not access data models directly, yet both the new create_user_view (User.objects.create) and the HEAD views (user_list, user_detail) use the model. Expected matched_fqn is the pattern base so any child-level hit scores partial. Detection currently misses this because the subject pattern does not match the module itself (users.views), function-level subjects cannot see module-level imports, and attribute-chained calls like User.objects.create do not resolve to CALLS edges."
+          }
+        ]
+      },
+      {
+        "case_id": "django-compliant-view-via-connector",
+        "exact": 0,
+        "partial": 0,
+        "miss": 1,
+        "total": 1,
+        "false_positives": 0,
+        "unexpected": [],
+        "per_constraint": [
+          {
+            "expected": {
+              "adr_id": "ADR-001",
+              "predicate": "prohibits_dependency",
+              "subject": "users.views.*",
+              "object": "users.models.*",
+              "matched_fqn": "users.views",
+              "justification": "IDEAL baseline, currently MISSED for the same reasons as django-violating-view: HEAD user_list/user_detail access the model directly. The new delete_user_view itself must NOT be reported: its only path to the model goes through users.services.get_user, the sanctioned connector covered by users.services.* requires users.models.*."
+            },
+            "score": "miss",
+            "justification": "IDEAL baseline, currently MISSED for the same reasons as django-violating-view: HEAD user_list/user_detail access the model directly. The new delete_user_view itself must NOT be reported: its only path to the model goes through users.services.get_user, the sanctioned connector covered by users.services.* requires users.models.*."
+          }
+        ]
+      },
+      {
+        "case_id": "django-settings-assignment",
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "total": 0,
+        "false_positives": 0,
+        "unexpected": [],
+        "per_constraint": []
+      }
+    ],
+    "exact": 1,
+    "partial": 0,
+    "miss": 2,
+    "false_positives": 0,
+    "total": 3,
+    "accuracy": 0.3333
+  },
+  "python-tuf": {
+    "repo_id": "python-tuf",
+    "cases": [
+      {
+        "case_id": "tuf-serialization-helper",
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "total": 0,
+        "false_positives": 0,
+        "unexpected": [],
+        "per_constraint": []
+      },
+      {
+        "case_id": "tuf-repository-helper",
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "total": 0,
+        "false_positives": 1,
+        "unexpected": [
+          {
+            "adr_id": "ADR-0010",
+            "predicate": "requires_dependency",
+            "subject": "tuf.repository.*",
+            "object": "tuf.api.metadata.*",
+            "matched_fqn": "tuf.repository._repository._helper",
+            "changed_fqn": "tuf.repository._repository._helper",
+            "evidence": "tuf.repository._repository._helper has no dependency on any module matching tuf.api.metadata.*"
+          }
+        ],
+        "per_constraint": []
+      },
+      {
+        "case_id": "tuf-ngclient-helper",
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "total": 0,
+        "false_positives": 0,
+        "unexpected": [],
+        "per_constraint": []
+      }
+    ],
+    "exact": 0,
+    "partial": 0,
+    "miss": 0,
+    "false_positives": 1,
+    "total": 0,
+    "accuracy": 0.0
+  },
+  "openlobby": {
+    "repo_id": "openlobby",
+    "cases": [
+      {
+        "case_id": "openlobby-reimport-flask",
+        "exact": 1,
+        "partial": 0,
+        "miss": 0,
+        "total": 1,
+        "false_positives": 3,
+        "unexpected": [
+          {
+            "adr_id": "ADR-0002",
+            "predicate": "requires_dependency",
+            "subject": "openlobby.core.*",
+            "object": "elasticsearch",
+            "matched_fqn": "openlobby.core.views.legacy_view",
+            "changed_fqn": "openlobby.core.views.legacy_view",
+            "evidence": "openlobby.core.views.legacy_view has no dependency on any module matching elasticsearch"
+          },
+          {
+            "adr_id": "ADR-0010",
+            "predicate": "requires_dependency",
+            "subject": "openlobby.*",
+            "object": "django",
+            "matched_fqn": "openlobby.core.views.legacy_view",
+            "changed_fqn": "openlobby.core.views.legacy_view",
+            "evidence": "openlobby.core.views.legacy_view has no dependency on any module matching django"
+          },
+          {
+            "adr_id": "ADR-0012",
+            "predicate": "requires_dependency",
+            "subject": "openlobby.*",
+            "object": "django.db",
+            "matched_fqn": "openlobby.core.views.legacy_view",
+            "changed_fqn": "openlobby.core.views.legacy_view",
+            "evidence": "openlobby.core.views.legacy_view has no dependency on any module matching django.db"
+          }
+        ],
+        "per_constraint": [
+          {
+            "expected": {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "openlobby.*",
+              "object": "flask",
+              "matched_fqn": "openlobby.core.views",
+              "justification": "New code imports flask after ADR-0010 replaced Flask with Django. Structural predicate, reported at the module that owns the new import."
+            },
+            "score": "exact_match",
+            "justification": "New code imports flask after ADR-0010 replaced Flask with Django. Structural predicate, reported at the module that owns the new import."
+          }
+        ]
+      },
+      {
+        "case_id": "openlobby-models-assignment",
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "total": 0,
+        "false_positives": 1,
+        "unexpected": [
+          {
+            "adr_id": "ADR-0002",
+            "predicate": "requires_dependency",
+            "subject": "openlobby.core.*",
+            "object": "elasticsearch",
+            "matched_fqn": "openlobby.core.models",
+            "changed_fqn": "openlobby.core.models",
+            "evidence": "openlobby.core.models has no dependency on any module matching elasticsearch"
+          }
+        ],
+        "per_constraint": []
+      }
+    ],
+    "exact": 1,
+    "partial": 0,
+    "miss": 0,
+    "false_positives": 4,
+    "total": 1,
+    "accuracy": 1.0
+  }
+}

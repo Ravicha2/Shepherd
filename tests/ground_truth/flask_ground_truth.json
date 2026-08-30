@@ -1,0 +1,40 @@
+[
+  {
+    "adr_id": "ADR-001",
+    "adr_path": "docs/adr/001-layered-architecture.md",
+    "constraints": [
+      {
+        "subject": "app.routes.*",
+        "predicate": "prohibits_dependency",
+        "object": "app.models.*",
+        "justification": "Route handlers must not access data models directly; the HTTP layer must not couple to the persistence layer"
+      },
+      {
+        "subject": "app.routes.*",
+        "predicate": "requires_dependency",
+        "object": "app.services.*",
+        "justification": "If a route needs data, it calls the corresponding service function; routes depend on services for data access"
+      },
+      {
+        "subject": "app.services.*",
+        "predicate": "requires_dependency",
+        "object": "app.models.*",
+        "justification": "Only the service layer may import from the data model module"
+      }
+    ],
+    "note": "Do NOT emit prohibits_dependency app.services.* -> app.models.*: services are the sanctioned path to models. The ADR constrains routes only; app.middleware and config.py are not named."
+  },
+  {
+    "adr_id": "ADR-002",
+    "adr_path": "docs/adr/002-auth-middleware-required.md",
+    "constraints": [
+      {
+        "subject": "app.routes.*",
+        "predicate": "requires_dependency",
+        "object": "app.middleware.auth.*",
+        "justification": "Every API endpoint requires authentication enforced through the centralized auth middleware"
+      }
+    ],
+    "note": "Login and token-refresh endpoints under /auth are explicitly exempt; they are handled by the middleware itself, so no exception edge against app.middleware.auth should be emitted. app/routes/auth.py legitimately uses require_auth."
+  }
+]
