@@ -315,6 +315,32 @@ class TestCallsEdges:
             )
 
 
+class TestChainedCallRootResolution:
+    """Attribute-chained calls (User.objects.create) resolve to the leftmost
+    imported name's FQN, with guardrails for shadowing and self/cls/super roots.
+    """
+
+    def test_chained_call_resolves_to_class_root(self, sample_repo: Path) -> None:
+        """User.objects.create() in create_user -> CALLS edge from create_user to User."""
+        adg = parse_repo(sample_repo)
+        edge = _find_edge(adg, "app.services.user_service.create_user", "app.models.user.User", "CALLS")
+        assert edge is not None
+
+    def test_shadowed_root_no_edge(self, sample_repo: Path) -> None:
+        """Rebinding User inside the function kills root resolution."""
+        adg = parse_repo(sample_repo)
+        edges = [e for e in _find_edges(adg, "CALLS") if e.source == "app.services.user_service.shadowed_create"]
+        assert edges == []
+
+    def test_self_and_super_roots_no_edge(self, sample_repo: Path) -> None:
+        """self.backend.save() and super().find() produce no CALLS edges."""
+        adg = parse_repo(sample_repo)
+        save_edges = [e for e in _find_edges(adg, "CALLS") if e.source == "app.services.user_service.UserService.save"]
+        restore_edges = [e for e in _find_edges(adg, "CALLS") if e.source == "app.services.user_service.UserService.restore"]
+        assert save_edges == []
+        assert restore_edges == []
+
+
 # ===========================================================================
 # 6. INHERITS edges
 # ===========================================================================

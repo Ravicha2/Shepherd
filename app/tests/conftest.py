@@ -77,12 +77,26 @@ def sample_repo(tmp_path: Path) -> Path:
     # app/services/__init__.py - empty
     (services_dir / "__init__.py").write_text("")
 
-    # app/services/user_service.py - top-level function that calls User.find
+    # app/services/user_service.py - functions that call User in various shapes
     (services_dir / "user_service.py").write_text(
         "from app.models.user import User\n"
         "\n"
         "def get_user(user_id: int) -> dict:\n"
         "    return User.find(user_id)\n"
+        "\n"
+        "def create_user(name: str) -> dict:\n"
+        "    return User.objects.create(name=name)\n"
+        "\n"
+        "def shadowed_create(name: str) -> dict:\n"
+        "    User = dict\n"
+        "    return User.objects.create(name=name)\n"
+        "\n"
+        "class UserService:\n"
+        "    def save(self, user: dict) -> dict:\n"
+        "        return self.backend.save(user)\n"
+        "\n"
+        "    def restore(self, user_id: int) -> dict:\n"
+        "        return super().find(user_id)\n"
     )
 
     return tmp_path

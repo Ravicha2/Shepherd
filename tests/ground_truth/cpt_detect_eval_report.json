@@ -4,8 +4,8 @@
     "cases": [
       {
         "case_id": "flask-violating-route",
-        "exact": 3,
-        "partial": 0,
+        "exact": 2,
+        "partial": 1,
         "miss": 0,
         "total": 3,
         "false_positives": 0,
@@ -20,7 +20,7 @@
               "matched_fqn": "app.routes.users",
               "justification": "HEAD code in routes/users.py already imports the model directly, and the new route continues the pattern. Structural predicate, reported at module level after module-level dedup."
             },
-            "score": "exact_match",
+            "score": "partial_match",
             "justification": "HEAD code in routes/users.py already imports the model directly, and the new route continues the pattern. Structural predicate, reported at module level after module-level dedup."
           },
           {
@@ -51,8 +51,8 @@
       },
       {
         "case_id": "flask-compliant-service",
-        "exact": 1,
-        "partial": 0,
+        "exact": 0,
+        "partial": 1,
         "miss": 0,
         "total": 1,
         "false_positives": 0,
@@ -67,15 +67,15 @@
               "matched_fqn": "app.routes.users",
               "justification": "Baseline only: pre-existing routes/users.py imports the model directly (marked '# violation' in the fixture). The new service function itself is compliant: services are the sanctioned path and requires app.models.* is satisfied via the call to User.find."
             },
-            "score": "exact_match",
+            "score": "partial_match",
             "justification": "Baseline only: pre-existing routes/users.py imports the model directly (marked '# violation' in the fixture). The new service function itself is compliant: services are the sanctioned path and requires app.models.* is satisfied via the call to User.find."
           }
         ]
       },
       {
         "case_id": "flask-unauthenticated-route",
-        "exact": 1,
-        "partial": 0,
+        "exact": 0,
+        "partial": 1,
         "miss": 1,
         "total": 2,
         "false_positives": 1,
@@ -100,7 +100,7 @@
               "matched_fqn": "app.routes.users",
               "justification": "Baseline: pre-existing routes/users.py imports the model directly. The new status route touches no model."
             },
-            "score": "exact_match",
+            "score": "partial_match",
             "justification": "Baseline: pre-existing routes/users.py imports the model directly. The new status route touches no model."
           },
           {
@@ -119,8 +119,8 @@
       },
       {
         "case_id": "flask-auth-exempt-route",
-        "exact": 1,
-        "partial": 0,
+        "exact": 0,
+        "partial": 1,
         "miss": 1,
         "total": 2,
         "false_positives": 0,
@@ -135,7 +135,7 @@
               "matched_fqn": "app.routes.users",
               "justification": "Baseline only: pre-existing routes/users.py imports the model directly. The new route goes through the service layer and stays out of the model layer."
             },
-            "score": "exact_match",
+            "score": "partial_match",
             "justification": "Baseline only: pre-existing routes/users.py imports the model directly. The new route goes through the service layer and stays out of the model layer."
           },
           {
@@ -153,8 +153,8 @@
         ]
       }
     ],
-    "exact": 6,
-    "partial": 0,
+    "exact": 2,
+    "partial": 4,
     "miss": 2,
     "false_positives": 1,
     "total": 8,
@@ -162,7 +162,7 @@
       "adg_nodes": 28,
       "external_nodes": 2
     },
-    "accuracy": 0.75
+    "accuracy": 0.5
   },
   "django": {
     "repo_id": "django",
@@ -173,8 +173,18 @@
         "partial": 0,
         "miss": 0,
         "total": 2,
-        "false_positives": 0,
-        "unexpected": [],
+        "false_positives": 1,
+        "unexpected": [
+          {
+            "adr_id": "ADR-002",
+            "predicate": "prohibits_dependency",
+            "subject": "project.*",
+            "object": "users.models.*",
+            "matched_fqn": "project.urls",
+            "changed_fqn": "project.urls",
+            "evidence": "project.urls has dependency path to users.models.User.to_dict via IMPORTS users.views.user_list -> CALLS users.models.User -> CONTAINS users.models.User.to_dict"
+          }
+        ],
         "per_constraint": [
           {
             "expected": {
@@ -208,8 +218,18 @@
         "partial": 0,
         "miss": 0,
         "total": 1,
-        "false_positives": 0,
-        "unexpected": [],
+        "false_positives": 1,
+        "unexpected": [
+          {
+            "adr_id": "ADR-002",
+            "predicate": "prohibits_dependency",
+            "subject": "project.*",
+            "object": "users.models.*",
+            "matched_fqn": "project.urls",
+            "changed_fqn": "project.urls",
+            "evidence": "project.urls has dependency path to users.models.User.to_dict via IMPORTS users.views.user_list -> CALLS users.models.User -> CONTAINS users.models.User.to_dict"
+          }
+        ],
         "per_constraint": [
           {
             "expected": {
@@ -231,8 +251,18 @@
         "partial": 0,
         "miss": 0,
         "total": 1,
-        "false_positives": 0,
-        "unexpected": [],
+        "false_positives": 1,
+        "unexpected": [
+          {
+            "adr_id": "ADR-002",
+            "predicate": "prohibits_dependency",
+            "subject": "project.*",
+            "object": "users.models.*",
+            "matched_fqn": "project.urls",
+            "changed_fqn": "project.urls",
+            "evidence": "project.urls has dependency path to users.models.User.to_dict via IMPORTS users.views.user_list -> CALLS users.models.User -> CONTAINS users.models.User.to_dict"
+          }
+        ],
         "per_constraint": [
           {
             "expected": {
@@ -252,7 +282,7 @@
     "exact": 4,
     "partial": 0,
     "miss": 0,
-    "false_positives": 0,
+    "false_positives": 3,
     "total": 4,
     "node_counts": {
       "adg_nodes": 20,

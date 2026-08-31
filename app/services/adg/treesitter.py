@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 import tree_sitter_python as tspython
 from tree_sitter import Language, Parser
@@ -153,13 +154,34 @@ def walk_imports(node, module_fqn: FQN, known_fqns: set[FQN], edges: list[Edge])
     for child in node.children:
         walk_imports(child, module_fqn, known_fqns, edges)
 
-def walk_calls(node, caller_fqn: FQN, resolver: NameResolver, edges: list[Edge]):
+_SHADOW_ROOTS = {"self", "cls"}
+
+
+def _leftmost_name(node) -> str | None:
+    """Leftmost identifier of an attribute chain, or None if the chain is
+    rooted in a non-name expression (call, subscript, literal...)."""
+    while node is not None and node.type == "attribute":
+        node = node.child(0)
+    if node is not None and node.type == "identifier":
+        return node.text.decode("utf-8")
+    return None
+
+
+def walk_calls(node, caller_fqn: FQN, resolver: NameResolver, edges: list[Edge], scope_text: str = ""):
     """Recursively walk AST to extract CALLS edges from function call expressions."""
     if node.type == "call":
         callee_node = node.child(0)
         if callee_node is not None:
             callee_text = callee_node.text.decode("utf-8")
             resolved = resolver.resolve(callee_text)
+            if resolved is None and callee_node.type == "attribute":
+                # ponytail: root approximation — User.objects.create and User.objects.filter
+                # produce identical edges; method-level precision needs type inference.
+                root = _leftmost_name(callee_node)
+                if (root is not None
+                        and root not in _SHADOW_ROOTS
+                        and not re.search(rf"\b{root}\s*=(?!=)", scope_text)):
+                    resolved = resolver.resolve(root)
             if resolved is not None:
                 edges.append(Edge(source=str(caller_fqn), target=str(resolved), kind="CALLS"))
 
@@ -170,9 +192,10 @@ def walk_calls(node, caller_fqn: FQN, resolver: NameResolver, edges: list[Edge])
             inner_fqn = caller_fqn.child(func_name)
             if inner_fqn in resolver:
                 caller_fqn = inner_fqn
+        scope_text = node.text.decode("utf-8")
 
     for child in node.children:
-        walk_calls(child, caller_fqn, resolver, edges)
+        walk_calls(child, caller_fqn, resolver, edges, scope_text)
 
 
 

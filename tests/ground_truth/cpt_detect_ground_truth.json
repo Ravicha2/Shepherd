@@ -147,7 +147,7 @@
             "justification": "view handlers must not access data models directly: both the new create_user_view (User.objects.create) and the HEAD views (user_list, user_detail) use the model. Function-level subjects see the enclosing module's imports (B1 fix, #115), so the violation reports once at users.views."
           }
         ],
-        "grading_note": "The requires expectation must stay matched at create_user_view: views.py does not import users.services, so module-import seeding must not satisfy it."
+        "grading_note": "The requires expectation must stay matched at create_user_view: views.py does not import users.services, so module-import seeding must not satisfy it. Documented over-trigger (2026-08-31, post-#116 root resolution): ADR-002 prohibits project.* -> users.models.* fires at project.urls because the imported view functions gained CALLS edges to users.models.User (User.objects.all/filter are chained calls resolved to their root, #116). The edge is real, but ADR-002 governs direct imports and urls.py imports views only, so this firing counts as a false positive."
       },
       {
         "case_id": "django-compliant-view-via-connector",
@@ -168,7 +168,7 @@
             "justification": "Baseline: HEAD user_list/user_detail access the model directly via the module-level import of users.models, reported once at users.views. The new delete_user_view itself must NOT be reported: its only path to the model goes through users.services.get_user, the sanctioned connector covered by users.services.* requires users.models.*."
           }
         ],
-        "grading_note": "A violation whose matched_fqn is users.views.delete_user_view would be a false positive: the via-connector exemption must keep the compliant view clean."
+        "grading_note": "A violation whose matched_fqn is users.views.delete_user_view would be a false positive: the via-connector exemption must keep the compliant view clean. Documented over-trigger (2026-08-31, post-#116 root resolution): ADR-002 prohibits project.* -> users.models.* fires at project.urls because the imported view functions gained CALLS edges to users.models.User (User.objects.all/filter are chained calls resolved to their root, #116). The edge is real, but ADR-002 governs direct imports and urls.py imports views only, so this firing counts as a false positive."
       },
       {
         "case_id": "django-settings-assignment",
@@ -189,7 +189,7 @@
             "justification": "Baseline: HEAD users/views.py imports the model directly (user_list, user_detail use User), a diff-independent structural violation, consistent with the baseline expectations in the other django cases. The settings.py change itself is architecturally inert."
           }
         ],
-        "grading_note": "The settings.py change itself must produce no violation. project/urls.py transitively reaching users.models through users.views is not an ADR-002 violation: the ADR governs direct imports from the data model, and urls.py imports views only."
+        "grading_note": "The settings.py change itself must produce no violation. project/urls.py transitively reaching users.models through users.views is not an ADR-002 violation: the ADR governs direct imports from the data model, and urls.py imports views only. Documented over-trigger (2026-08-31, post-#116 root resolution): ADR-002 fires at project.urls exactly because of that transitive reach — the imported view functions gained CALLS edges to users.models.User (User.objects.all/filter are chained calls resolved to their root, #116) — so this firing counts as a false positive and the path closure is pre-documented here."
       }
     ]
   },

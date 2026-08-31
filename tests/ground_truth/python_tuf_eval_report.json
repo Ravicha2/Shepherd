@@ -1,10 +1,10 @@
 {
-  "exact": 4,
-  "partial": 0,
+  "exact": 3,
+  "partial": 1,
   "miss": 0,
   "total": 4,
   "false_positives": 3,
-  "accuracy": 1.0,
+  "accuracy": 0.875,
   "per_constraint": [
     {
       "adr_id": "ADR-0001",
@@ -38,9 +38,9 @@
         "object": "tuf.api.serialization.*",
         "justification": "ADR-0006 separates serialization from the metadata class model; metadata classes depend on the serialization package (tuf.api.serialization), not the other way around"
       },
-      "score": "exact_match",
-      "resolved_subject": "tuf.api.metadata.*",
-      "resolved_object": "tuf.api.serialization.*"
+      "score": "partial_match",
+      "resolved_subject": "tuf.api.metadata.Metadata",
+      "resolved_object": "tuf.api.serialization.MetadataSerializer"
     },
     {
       "adr_id": "ADR-0010",
