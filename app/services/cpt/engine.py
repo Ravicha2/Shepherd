@@ -84,6 +84,10 @@ def _reachable_paths(
         for edge in adjacency.get(seed_module, ()):
             if edge.kind not in kinds or edge.kind == "CONTAINS":
                 continue
+            # a module importing its own subtree (package __init__ importing a
+            # child) is internal structure: the child module reports for itself
+            if edge.target == seed_module or edge.target.startswith(seed_module + "."):
+                continue
             if node_roles and skip_roles and node_roles.get(edge.target) in skip_roles:
                 continue
             if edge.target not in paths:
@@ -191,10 +195,16 @@ def check_structural_predicates(
         for subject_fqn, subject_status in matched_constraint.subject_matches:
             subject_str = str(subject_fqn)
             # function/method subjects cannot see module-level edges from their own
-            # frontier; re-anchor to the enclosing module so its imports count and
-            # the violation reports once at module level (issue 115, B1)
-            scope_str = (module_scope or {}).get(subject_str, subject_str)
-            paths = _reachable_paths(scope_str, adjacency, kinds, node_roles=node_roles, skip_roles={DependencyRole.DEV_TOOL})
+            # frontier: seed it with the enclosing module's edges (issue 115, B1)
+            scope_str = (module_scope or {}).get(subject_str)
+            paths = _reachable_paths(
+                subject_str, adjacency, kinds,
+                node_roles=node_roles, skip_roles={DependencyRole.DEV_TOOL},
+                seed_module=scope_str,
+            )
+            # report at the enclosing module so sibling functions collapse into
+            # one violation per module (module-level dedup)
+            report_str = scope_str or subject_str
             for object_fqn, object_status in non_dev_object_matches:
                 higher = subject_status if _PRIORITY[subject_status] >= _PRIORITY[object_status] else object_status
                 object_str = str(object_fqn)
@@ -207,9 +217,9 @@ def check_structural_predicates(
                     violations.append(Violation(
                         constraint=matched_constraint.constraint,
                         changed_fqn=subject_fqn,
-                        matched_fqn=FQN.from_dotted_safe(scope_str),
+                        matched_fqn=FQN.from_dotted_safe(report_str),
                         match_status=higher,
-                        evidence=f"{scope_str} {label} {object_str} via {path_summary}",
+                        evidence=f"{report_str} {label} {object_str} via {path_summary}",
                         change_type="structural",
                         path_hops=[{"kind": edge.kind, "target": edge.target} for edge in path],
                     ))
@@ -311,6 +321,7 @@ def check_change_triggered_predicates(
 def detect(diff_result: DiffResult, adg: ADG) -> CPTResult:
     adjacency = _build_adjacency(adg.edges)
     node_roles = {str(node.fqn): node.role for node in adg.nodes}
+    module_scope = _enclosing_module_map(adg)
 
     # filter self-loop constraints (subject == object), surface as informational
     self_loop_constraints: list[ConstraintEdge] = [
@@ -329,8 +340,8 @@ def detect(diff_result: DiffResult, adg: ADG) -> CPTResult:
     matched = match_constraints(safe_adg)
 
     all_violations: list[Violation] = []
-    all_violations.extend(check_structural_predicates(matched, adjacency, node_roles=node_roles))
-    all_violations.extend(check_change_triggered_predicates(matched, adjacency, diff_result.changed_fqns, node_roles=node_roles))
+    all_violations.extend(check_structural_predicates(matched, adjacency, node_roles=node_roles, module_scope=module_scope))
+    all_violations.extend(check_change_triggered_predicates(matched, adjacency, diff_result.changed_fqns, node_roles=node_roles, module_scope=module_scope))
 
     violations = resolve(all_violations)
 

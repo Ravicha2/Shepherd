@@ -33,14 +33,18 @@ Scores CPT detect against `tests/ground_truth/cpt_detect_ground_truth.json`: per
 
 - Constraints come from the ingestion ground truth (gold constraints), so extraction variance never leaks into retrieval scores. No LLM, no Neo4j.
 - Each case's `expected_violations` record the correct outcome per the ADRs, not current system behavior:
-  - `django-violating-view` / `django-compliant-view-via-connector` expect a prohibits violation the engine currently misses (function-level subjects cannot see module-level imports; attribute-chained calls like `User.objects.create` do not resolve to CALLS edges). These score as misses until detection improves.
-  - Over-triggers (requires firing on functions whose module already satisfies the dependency) are deliberately listed in `grading_note` as false positives rather than expected.
+  - Function/method subjects inherit their enclosing module's module-level edges (#115), so module-import-only dependencies count at module scope. Known remaining misses are recorded in `grading_note` with their cause, e.g. the two flask middleware expectations (auth.py's module-level `require_auth` import satisfies the function-scope requires even though the decorator is not applied, so the endpoints stay unauthenticated per ADR-002).
+  - Over-triggers (requires firing on over-broad subjects, e.g. ADR-0002's `openlobby.core.*` -> elasticsearch) are deliberately listed in `grading_note` as false positives rather than expected.
 - Scoring matches on (adr_id, predicate, subject, object); matched_fqn is scored exact / partial with the same ancestor tolerance, since module-level dedup can shift which namespace level a violation is reported at.
 - Aggregate report: `tests/ground_truth/cpt_detect_eval_report.json`.
 
-## Reference baseline (2026-08-30)
+## Reference baselines
 
-Retrieval group: flask 8/8 exact with 1 false positive; django 1 exact, 2 miss, 0 false positives; python-tuf 0 expected, 1 false positive; openlobby 1 exact, 4 false positives. Note: flask and django rows are synthetic-fixture results (smoke signal, not gold). On real repos alone the retrieval gold holds only 1 expected violation (openlobby) — real-repo retrieval gold needs authoring before any threshold is meaningful. Both groups are report-only: accuracy is printed and written, never gated. Thresholds can be added later by gating on the aggregate tallies in the report JSONs.
+2026-08-30 (pre-#115): retrieval group flask 8/8 exact, 1 false positive; django 1 exact, 2 miss, 0 false positives; python-tuf 0 expected, 1 false positive; openlobby 1 exact, 4 false positives. The django misses (function-level subjects cannot see module-level imports) and the tuf/openlobby B2 over-triggers motivated #115.
+
+2026-08-31 (post-#115, function scopes see enclosing module's module-level edges): flask 6 exact, 2 miss, 1 false positive (the two misses are the auth.py middleware tradeoff, recorded in grading notes); django 4/4 exact, 0 false positives (settings-assignment gained the same baseline prohibits as the other django cases); python-tuf 0 expected, 0 false positives; openlobby 1 exact, 3 false positives (django satisfied via module import; elasticsearch/django.db over-triggers remain, over-broad subjects).
+
+Note: flask and django rows are synthetic-fixture results (smoke signal, not gold). On real repos alone the retrieval gold holds only 1 expected violation (openlobby) — real-repo retrieval gold needs authoring before any threshold is meaningful. Both groups are report-only: accuracy is printed and written, never gated. Thresholds can be added later by gating on the aggregate tallies in the report JSONs.
 
 ## Curation mode
 

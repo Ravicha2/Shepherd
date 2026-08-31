@@ -85,7 +85,7 @@
             "justification": "Per ADR-002 every API endpoint is authenticated unless under the /auth exemption, which covers login and token-refresh only. A status endpoint with no middleware dependency is a genuine violation."
           }
         ],
-        "grading_note": "requires app.services.* firing on status_route counts as a false positive: the ADR-001 rule is 'if a route needs data, it calls the service', and a data-less status endpoint needs no service."
+        "grading_note": "requires app.services.* firing on status_route counts as a false positive: the ADR-001 rule is 'if a route needs data, it calls the service', and a data-less status endpoint needs no service. The middleware expectation currently scores as a miss: auth.py imports require_auth at module level and function-scope requires is satisfied by the enclosing module's imports (B2 fix tradeoff, #115). Per ADR-002 the endpoint is still unauthenticated (the decorator is not applied to status_route), so the expectation stays in the gold as a known miss."
       },
       {
         "case_id": "flask-auth-exempt-route",
@@ -114,7 +114,7 @@
             "justification": "whoami is an authenticated endpoint (the /auth exemption covers login and token-refresh only), and the new route has no dependency on the auth middleware."
           }
         ],
-        "grading_note": "The layering rules must stay quiet on this case: requires app.services.* must NOT fire because whoami_route calls get_user through the service layer."
+        "grading_note": "The layering rules must stay quiet on this case: requires app.services.* must NOT fire because whoami_route calls get_user through the service layer. The middleware expectation currently scores as a miss: auth.py imports require_auth at module level and function-scope requires is satisfied by the enclosing module's imports (B2 fix tradeoff, #115). Per ADR-002 whoami is authenticated and the decorator is not applied, so the expectation stays in the gold as a known miss."
       }
     ]
   },
@@ -144,10 +144,10 @@
             "subject": "users.views.*",
             "object": "users.models.*",
             "matched_fqn": "users.views",
-            "justification": "IDEAL, currently MISSED: view handlers must not access data models directly, yet both the new create_user_view (User.objects.create) and the HEAD views (user_list, user_detail) use the model. Expected matched_fqn is the pattern base so any child-level hit scores partial. Detection currently misses this because the subject pattern does not match the module itself (users.views), function-level subjects cannot see module-level imports, and attribute-chained calls like User.objects.create do not resolve to CALLS edges."
+            "justification": "view handlers must not access data models directly: both the new create_user_view (User.objects.create) and the HEAD views (user_list, user_detail) use the model. Function-level subjects see the enclosing module's imports (B1 fix, #115), so the violation reports once at users.views."
           }
         ],
-        "grading_note": "The prohibits expectation is scored as a miss until detection closes the gap described in its justification. This is a deliberate record of a known detection blind spot, not a scoring artifact."
+        "grading_note": "The requires expectation must stay matched at create_user_view: views.py does not import users.services, so module-import seeding must not satisfy it."
       },
       {
         "case_id": "django-compliant-view-via-connector",
@@ -165,7 +165,7 @@
             "subject": "users.views.*",
             "object": "users.models.*",
             "matched_fqn": "users.views",
-            "justification": "IDEAL baseline, currently MISSED for the same reasons as django-violating-view: HEAD user_list/user_detail access the model directly. The new delete_user_view itself must NOT be reported: its only path to the model goes through users.services.get_user, the sanctioned connector covered by users.services.* requires users.models.*."
+            "justification": "Baseline: HEAD user_list/user_detail access the model directly via the module-level import of users.models, reported once at users.views. The new delete_user_view itself must NOT be reported: its only path to the model goes through users.services.get_user, the sanctioned connector covered by users.services.* requires users.models.*."
           }
         ],
         "grading_note": "A violation whose matched_fqn is users.views.delete_user_view would be a false positive: the via-connector exemption must keep the compliant view clean."
@@ -179,8 +179,17 @@
             "append": "\n\nEXTRA_SETTING = 1\n"
           }
         ],
-        "expected_violations": [],
-        "grading_note": "Zero violations expected. project/urls.py transitively reaching users.models through users.views is not an ADR-002 violation: the ADR governs direct imports from the data model, and urls.py imports views only."
+        "expected_violations": [
+          {
+            "adr_id": "ADR-001",
+            "predicate": "prohibits_dependency",
+            "subject": "users.views.*",
+            "object": "users.models.*",
+            "matched_fqn": "users.views",
+            "justification": "Baseline: HEAD users/views.py imports the model directly (user_list, user_detail use User), a diff-independent structural violation, consistent with the baseline expectations in the other django cases. The settings.py change itself is architecturally inert."
+          }
+        ],
+        "grading_note": "The settings.py change itself must produce no violation. project/urls.py transitively reaching users.models through users.views is not an ADR-002 violation: the ADR governs direct imports from the data model, and urls.py imports views only."
       }
     ]
   },
@@ -208,7 +217,7 @@
           }
         ],
         "expected_violations": [],
-        "grading_note": "Zero violations expected: _repository.py already imports tuf.api.metadata at module level, so ADR-0010's requires is satisfied. Any violation firing here (currently: requires tuf.api.metadata.* on tuf.repository._repository._helper) is an over-trigger false positive caused by function-level BFS being unable to see module-level imports."
+        "grading_note": "Zero violations expected: _repository.py already imports tuf.api.metadata at module level, so ADR-0010's requires is satisfied for function scope (enclosing-module seeding, #115). Any violation firing here is an over-trigger false positive."
       },
       {
         "case_id": "tuf-ngclient-helper",
@@ -245,7 +254,7 @@
             "justification": "New code imports flask after ADR-0010 replaced Flask with Django. Structural predicate, reported at the module that owns the new import."
           }
         ],
-        "grading_note": "requires violations on legacy_view (elasticsearch, django, django.db) count as false positives: openlobby/core/views.py already imports django at module level and the module satisfies ADR-0010/0012; ADR-0002's subject openlobby.core.* is over-broad for non-search functions. Only the flask prohibition is a true finding."
+        "grading_note": "requires violations on legacy_view (elasticsearch, django, django.db) count as false positives: openlobby/core/views.py already imports django at module level and satisfies ADR-0010's requires for function scope (enclosing-module seeding, #115). elasticsearch (ADR-0002's openlobby.core.* is over-broad for non-search functions) and django.db (views.py never imports django.db; ADR-0012's openlobby.* subject is over-broad) still over-trigger and remain recorded FPs. Only the flask prohibition is a true finding."
       },
       {
         "case_id": "openlobby-models-assignment",

@@ -74,9 +74,9 @@
       },
       {
         "case_id": "flask-unauthenticated-route",
-        "exact": 2,
+        "exact": 1,
         "partial": 0,
-        "miss": 0,
+        "miss": 1,
         "total": 2,
         "false_positives": 1,
         "unexpected": [
@@ -112,16 +112,16 @@
               "matched_fqn": "app.routes.auth.status_route",
               "justification": "Per ADR-002 every API endpoint is authenticated unless under the /auth exemption, which covers login and token-refresh only. A status endpoint with no middleware dependency is a genuine violation."
             },
-            "score": "exact_match",
+            "score": "miss",
             "justification": "Per ADR-002 every API endpoint is authenticated unless under the /auth exemption, which covers login and token-refresh only. A status endpoint with no middleware dependency is a genuine violation."
           }
         ]
       },
       {
         "case_id": "flask-auth-exempt-route",
-        "exact": 2,
+        "exact": 1,
         "partial": 0,
-        "miss": 0,
+        "miss": 1,
         "total": 2,
         "false_positives": 0,
         "unexpected": [],
@@ -147,31 +147,31 @@
               "matched_fqn": "app.routes.auth.whoami_route",
               "justification": "whoami is an authenticated endpoint (the /auth exemption covers login and token-refresh only), and the new route has no dependency on the auth middleware."
             },
-            "score": "exact_match",
+            "score": "miss",
             "justification": "whoami is an authenticated endpoint (the /auth exemption covers login and token-refresh only), and the new route has no dependency on the auth middleware."
           }
         ]
       }
     ],
-    "exact": 8,
+    "exact": 6,
     "partial": 0,
-    "miss": 0,
+    "miss": 2,
     "false_positives": 1,
     "total": 8,
     "node_counts": {
       "adg_nodes": 28,
       "external_nodes": 2
     },
-    "accuracy": 1.0
+    "accuracy": 0.75
   },
   "django": {
     "repo_id": "django",
     "cases": [
       {
         "case_id": "django-violating-view",
-        "exact": 1,
+        "exact": 2,
         "partial": 0,
-        "miss": 1,
+        "miss": 0,
         "total": 2,
         "false_positives": 0,
         "unexpected": [],
@@ -195,18 +195,18 @@
               "subject": "users.views.*",
               "object": "users.models.*",
               "matched_fqn": "users.views",
-              "justification": "IDEAL, currently MISSED: view handlers must not access data models directly, yet both the new create_user_view (User.objects.create) and the HEAD views (user_list, user_detail) use the model. Expected matched_fqn is the pattern base so any child-level hit scores partial. Detection currently misses this because the subject pattern does not match the module itself (users.views), function-level subjects cannot see module-level imports, and attribute-chained calls like User.objects.create do not resolve to CALLS edges."
+              "justification": "view handlers must not access data models directly: both the new create_user_view (User.objects.create) and the HEAD views (user_list, user_detail) use the model. Function-level subjects see the enclosing module's imports (B1 fix, #115), so the violation reports once at users.views."
             },
-            "score": "miss",
-            "justification": "IDEAL, currently MISSED: view handlers must not access data models directly, yet both the new create_user_view (User.objects.create) and the HEAD views (user_list, user_detail) use the model. Expected matched_fqn is the pattern base so any child-level hit scores partial. Detection currently misses this because the subject pattern does not match the module itself (users.views), function-level subjects cannot see module-level imports, and attribute-chained calls like User.objects.create do not resolve to CALLS edges."
+            "score": "exact_match",
+            "justification": "view handlers must not access data models directly: both the new create_user_view (User.objects.create) and the HEAD views (user_list, user_detail) use the model. Function-level subjects see the enclosing module's imports (B1 fix, #115), so the violation reports once at users.views."
           }
         ]
       },
       {
         "case_id": "django-compliant-view-via-connector",
-        "exact": 0,
+        "exact": 1,
         "partial": 0,
-        "miss": 1,
+        "miss": 0,
         "total": 1,
         "false_positives": 0,
         "unexpected": [],
@@ -218,34 +218,47 @@
               "subject": "users.views.*",
               "object": "users.models.*",
               "matched_fqn": "users.views",
-              "justification": "IDEAL baseline, currently MISSED for the same reasons as django-violating-view: HEAD user_list/user_detail access the model directly. The new delete_user_view itself must NOT be reported: its only path to the model goes through users.services.get_user, the sanctioned connector covered by users.services.* requires users.models.*."
+              "justification": "Baseline: HEAD user_list/user_detail access the model directly via the module-level import of users.models, reported once at users.views. The new delete_user_view itself must NOT be reported: its only path to the model goes through users.services.get_user, the sanctioned connector covered by users.services.* requires users.models.*."
             },
-            "score": "miss",
-            "justification": "IDEAL baseline, currently MISSED for the same reasons as django-violating-view: HEAD user_list/user_detail access the model directly. The new delete_user_view itself must NOT be reported: its only path to the model goes through users.services.get_user, the sanctioned connector covered by users.services.* requires users.models.*."
+            "score": "exact_match",
+            "justification": "Baseline: HEAD user_list/user_detail access the model directly via the module-level import of users.models, reported once at users.views. The new delete_user_view itself must NOT be reported: its only path to the model goes through users.services.get_user, the sanctioned connector covered by users.services.* requires users.models.*."
           }
         ]
       },
       {
         "case_id": "django-settings-assignment",
-        "exact": 0,
+        "exact": 1,
         "partial": 0,
         "miss": 0,
-        "total": 0,
+        "total": 1,
         "false_positives": 0,
         "unexpected": [],
-        "per_constraint": []
+        "per_constraint": [
+          {
+            "expected": {
+              "adr_id": "ADR-001",
+              "predicate": "prohibits_dependency",
+              "subject": "users.views.*",
+              "object": "users.models.*",
+              "matched_fqn": "users.views",
+              "justification": "Baseline: HEAD users/views.py imports the model directly (user_list, user_detail use User), a diff-independent structural violation, consistent with the baseline expectations in the other django cases. The settings.py change itself is architecturally inert."
+            },
+            "score": "exact_match",
+            "justification": "Baseline: HEAD users/views.py imports the model directly (user_list, user_detail use User), a diff-independent structural violation, consistent with the baseline expectations in the other django cases. The settings.py change itself is architecturally inert."
+          }
+        ]
       }
     ],
-    "exact": 1,
+    "exact": 4,
     "partial": 0,
-    "miss": 2,
+    "miss": 0,
     "false_positives": 0,
-    "total": 3,
+    "total": 4,
     "node_counts": {
       "adg_nodes": 20,
       "external_nodes": 6
     },
-    "accuracy": 0.3333
+    "accuracy": 1.0
   },
   "python-tuf": {
     "repo_id": "python-tuf",
@@ -266,18 +279,8 @@
         "partial": 0,
         "miss": 0,
         "total": 0,
-        "false_positives": 1,
-        "unexpected": [
-          {
-            "adr_id": "ADR-0010",
-            "predicate": "requires_dependency",
-            "subject": "tuf.repository.*",
-            "object": "tuf.api.metadata.*",
-            "matched_fqn": "tuf.repository._repository._helper",
-            "changed_fqn": "tuf.repository._repository._helper",
-            "evidence": "tuf.repository._repository._helper has no dependency on any module matching tuf.api.metadata.*"
-          }
-        ],
+        "false_positives": 0,
+        "unexpected": [],
         "per_constraint": []
       },
       {
@@ -294,7 +297,7 @@
     "exact": 0,
     "partial": 0,
     "miss": 0,
-    "false_positives": 1,
+    "false_positives": 0,
     "total": 0,
     "node_counts": {
       "adg_nodes": 321,
@@ -311,7 +314,7 @@
         "partial": 0,
         "miss": 0,
         "total": 1,
-        "false_positives": 3,
+        "false_positives": 2,
         "unexpected": [
           {
             "adr_id": "ADR-0002",
@@ -321,15 +324,6 @@
             "matched_fqn": "openlobby.core.views.legacy_view",
             "changed_fqn": "openlobby.core.views.legacy_view",
             "evidence": "openlobby.core.views.legacy_view has no dependency on any module matching elasticsearch"
-          },
-          {
-            "adr_id": "ADR-0010",
-            "predicate": "requires_dependency",
-            "subject": "openlobby.*",
-            "object": "django",
-            "matched_fqn": "openlobby.core.views.legacy_view",
-            "changed_fqn": "openlobby.core.views.legacy_view",
-            "evidence": "openlobby.core.views.legacy_view has no dependency on any module matching django"
           },
           {
             "adr_id": "ADR-0012",
@@ -380,7 +374,7 @@
     "exact": 1,
     "partial": 0,
     "miss": 0,
-    "false_positives": 4,
+    "false_positives": 3,
     "total": 1,
     "node_counts": {
       "adg_nodes": 196,
