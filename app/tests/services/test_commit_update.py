@@ -88,18 +88,16 @@ class TestMergePreservedConstraints:
         assert merged.constraint_edges[0].subject == "app.api.users"
 
     def test_with_orphans(self) -> None:
-        """Missing endpoints create EXTERNAL nodes."""
+        """Missing endpoints create EXTERNAL nodes; wildcard base present does not."""
         adg = _structural_adg()
         ce = _make_constraint_edge("app.api.*", "logging")
 
         merged = merge_preserved_constraints(adg, [ce])
 
-        # Two EXTERNAL nodes added: app.api.* and logging
+        # Only logging is missing: one EXTERNAL node
         external_nodes = [n for n in merged.nodes if n.kind == FQNKind.EXTERNAL]
-        assert len(external_nodes) == 2
-        external_fqns = {str(n.fqn) for n in external_nodes}
-        assert "app.api.*" in external_fqns
-        assert "logging" in external_fqns
+        assert len(external_nodes) == 1
+        assert str(external_nodes[0].fqn) == "logging"
         # Original structural nodes unchanged
         structural_fqns = {str(n.fqn) for n in merged.nodes if n.kind != FQNKind.EXTERNAL}
         assert "app.auth.middleware" in structural_fqns
@@ -118,28 +116,42 @@ class TestMergePreservedConstraints:
         # Original edges still present
         assert len(merged.edges) == len(adg.edges)
 
-    def test_wildcard_subject_creates_external(self) -> None:
-        """Wildcard pattern (app.api.*) creates an EXTERNAL node."""
+    def test_wildcard_subject_no_external_for_pattern(self) -> None:
+        """Wildcard subject (app.api.*) must not become an EXTERNAL node.
+
+        The base (app.api) exists in the ADG, so no node is created at all.
+        """
         adg = _structural_adg()
         ce = _make_constraint_edge("app.api.*", "app.auth.middleware")
 
         merged = merge_preserved_constraints(adg, [ce])
 
-        wildcard_nodes = [n for n in merged.nodes if str(n.fqn) == "app.api.*"]
-        assert len(wildcard_nodes) == 1
-        assert wildcard_nodes[0].kind == FQNKind.EXTERNAL
+        external_fqns = {str(n.fqn) for n in merged.nodes if n.kind == FQNKind.EXTERNAL}
+        assert "app.api.*" not in external_fqns
+        assert len(merged.nodes) == len(adg.nodes)
+
+    def test_wildcard_base_missing_creates_external_for_base(self) -> None:
+        """Wildcard base absent from ADG: EXTERNAL node created for the base, not the pattern."""
+        adg = _structural_adg()
+        ce = _make_constraint_edge("app.missing.*", "app.auth.middleware")
+
+        merged = merge_preserved_constraints(adg, [ce])
+
+        external_nodes = [n for n in merged.nodes if n.kind == FQNKind.EXTERNAL]
+        assert len(external_nodes) == 1
+        assert str(external_nodes[0].fqn) == "app.missing"
 
     def test_no_duplicate_external_nodes(self) -> None:
         """Two constraints sharing an orphan endpoint create only one EXTERNAL node."""
         adg = _structural_adg()
-        ce1 = _make_constraint_edge("app.api.*", "app.auth.middleware", adr_id="ADR-001")
-        ce2 = _make_constraint_edge("app.api.*", "logging", adr_id="ADR-002")
+        ce1 = _make_constraint_edge("app.missing.*", "app.auth.middleware", adr_id="ADR-001")
+        ce2 = _make_constraint_edge("app.missing.*", "logging", adr_id="ADR-002")
 
         merged = merge_preserved_constraints(adg, [ce1, ce2])
 
         external_fqns = [str(n.fqn) for n in merged.nodes if n.kind == FQNKind.EXTERNAL]
-        # app.api.* appears once, logging appears once
-        assert external_fqns.count("app.api.*") == 1
+        # app.missing appears once, logging appears once
+        assert external_fqns.count("app.missing") == 1
         assert external_fqns.count("logging") == 1
 
     def test_empty_constraints(self) -> None:

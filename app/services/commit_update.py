@@ -51,18 +51,22 @@ def merge_preserved_constraints(adg: ADG, constraint_edges: list[ConstraintEdge]
     seen: set[str] = set()
 
     for ce in constraint_edges:
-        for fqn_str in (ce.subject, ce.object):
-            if fqn_str not in existing_fqns and fqn_str not in seen:
-                new_nodes.append(FQNNode(
-                    fqn=FQN.from_dotted(fqn_str),
-                    kind=FQNKind.EXTERNAL,
-                    file_path="",
-                    line_start=-1,
-                    line_end=-1,
-                    start_byte=0,
-                    end_byte=0,
-                ))
-                seen.add(fqn_str)
+        for raw_fqn in (ce.subject, ce.object):
+            # Wildcard patterns (users.views.*) are not concrete FQNs;
+            # resolve to the base namespace and check that instead.
+            fqn_str = raw_fqn.removesuffix(".*")
+            if not fqn_str or fqn_str in existing_fqns or fqn_str in seen:
+                continue
+            new_nodes.append(FQNNode(
+                fqn=FQN.from_dotted(fqn_str),
+                kind=FQNKind.EXTERNAL,
+                file_path="",
+                line_start=-1,
+                line_end=-1,
+                start_byte=0,
+                end_byte=0,
+            ))
+            seen.add(fqn_str)
 
     return ADG(
         nodes=adg.nodes + new_nodes,

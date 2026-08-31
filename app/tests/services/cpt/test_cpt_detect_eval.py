@@ -19,7 +19,7 @@ from services.adg.merge import add_external_nodes, merge_constraint_edges
 from services.adg.treesitter import parse_repo
 from services.cpt.diff_processor import process_diff
 from services.cpt.engine import detect
-from services.models import ConstraintEdge, Diff, FileChange, PredicateType
+from services.models import ConstraintEdge, Diff, FileChange, FQNKind, PredicateType
 from services.pipeline import adg_with_specificity, augment_immutable
 from tests.services.adg.test_unified_resolver_eval import _score_fqn
 
@@ -164,6 +164,16 @@ def score_case(case: dict, violations) -> dict:
     }
 
 
+def _merged_node_counts(repo_id: str) -> dict:
+    """Node counts after the merge path, to track wildcard-EXTERNAL pollution (issue #114)."""
+    repo_root = _repo_root(repo_id)
+    adg = parse_repo(repo_root)
+    merged = add_external_nodes(adg, project_root=repo_root)
+    merged = merge_constraint_edges(merged, _gold_constraints(repo_id), project_root=repo_root)
+    external = sum(1 for n in merged.nodes if n.kind == FQNKind.EXTERNAL)
+    return {"adg_nodes": len(merged.nodes), "external_nodes": external}
+
+
 def run_repo_eval(repo_id: str) -> dict:
     cases = _load_cases()[repo_id]["cases"]
     case_results = []
@@ -178,6 +188,7 @@ def run_repo_eval(repo_id: str) -> dict:
         "miss": sum(c["miss"] for c in case_results),
         "false_positives": sum(c["false_positives"] for c in case_results),
         "total": sum(c["total"] for c in case_results),
+        "node_counts": _merged_node_counts(repo_id),
     }
     report["accuracy"] = round(
         (report["exact"] + 0.5 * report["partial"]) / report["total"], 4
@@ -203,7 +214,8 @@ def test_cpt_detect_eval(repo_id, repo_report) -> None:
     """Report-only: tallies must be internally consistent, accuracy is printed not gated."""
     print(f"\n[cpt_eval:{repo_id}] exact={repo_report['exact']} partial={repo_report['partial']} "
           f"miss={repo_report['miss']} total={repo_report['total']} "
-          f"false_positives={repo_report['false_positives']} accuracy={repo_report['accuracy']:.3f}")
+          f"false_positives={repo_report['false_positives']} accuracy={repo_report['accuracy']:.3f} "
+          f"adg_nodes={repo_report['node_counts']['adg_nodes']} external_nodes={repo_report['node_counts']['external_nodes']}")
     for case_result in repo_report["cases"]:
         print(f"  {case_result['case_id']}: exact={case_result['exact']} partial={case_result['partial']} "
               f"miss={case_result['miss']} unexpected={case_result['false_positives']}")

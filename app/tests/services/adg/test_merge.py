@@ -163,6 +163,23 @@ class TestMergeConstraintEdges:
         external_nodes = [n for n in result.nodes if n.kind == FQNKind.EXTERNAL]
         assert any(n.fqn == FQN.from_dotted("logging") for n in external_nodes)
 
+    def test_merge_no_external_for_wildcard_pattern(self, sample_adg: ADG) -> None:
+        """Wildcard pattern strings (app.services.*) must not become EXTERNAL nodes."""
+        edges = [
+            ConstraintEdge(
+                subject="app.services.*",
+                predicate=PredicateType.PROHIBITS_DEPENDENCY,
+                object="app.api.*",
+                justification="No cross-layer deps.",
+                adr_id="ADR-006",
+                adr_path="docs/adr/006.md",
+            ),
+        ]
+        result = merge_constraint_edges(sample_adg, edges)
+        external_fqns = [str(n.fqn) for n in result.nodes if n.kind == FQNKind.EXTERNAL]
+        assert "app.services.*" not in external_fqns
+        assert "app.api.*" not in external_fqns
+
     def test_merge_empty_edges(self, sample_adg: ADG) -> None:
         result = merge_constraint_edges(sample_adg, [])
         assert len(result.constraint_edges) == 0

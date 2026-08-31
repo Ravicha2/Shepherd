@@ -173,7 +173,13 @@ def merge_constraint_edges(adg: ADG, constraint_edges: list[ConstraintEdge], pro
 
     known_fqns = {str(n.fqn) for n in adg.nodes}
 
-    orphan_fqns = sorted(all_edge_fqns - known_fqns)
+    # Wildcard patterns (app.api.*) are not concrete FQNs;
+    # resolve to the base namespace and check that instead.
+    orphan_fqns = sorted(
+        base
+        for base in (fqn.removesuffix(".*") for fqn in all_edge_fqns)
+        if base and base not in known_fqns
+    )
     external_nodes = [
         FQNNode(
             fqn=FQN.from_dotted(fqn),

@@ -158,6 +158,10 @@
     "miss": 0,
     "false_positives": 1,
     "total": 8,
+    "node_counts": {
+      "adg_nodes": 28,
+      "external_nodes": 2
+    },
     "accuracy": 1.0
   },
   "django": {
@@ -237,6 +241,10 @@
     "miss": 2,
     "false_positives": 0,
     "total": 3,
+    "node_counts": {
+      "adg_nodes": 20,
+      "external_nodes": 6
+    },
     "accuracy": 0.3333
   },
   "python-tuf": {
@@ -288,6 +296,10 @@
     "miss": 0,
     "false_positives": 1,
     "total": 0,
+    "node_counts": {
+      "adg_nodes": 321,
+      "external_nodes": 31
+    },
     "accuracy": 0.0
   },
   "openlobby": {
@@ -370,6 +382,10 @@
     "miss": 0,
     "false_positives": 4,
     "total": 1,
+    "node_counts": {
+      "adg_nodes": 196,
+      "external_nodes": 51
+    },
     "accuracy": 1.0
   }
 }
