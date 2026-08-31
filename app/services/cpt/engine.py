@@ -4,7 +4,7 @@ import logging
 from dataclasses import dataclass, field
 
 from services.fqn import FQN
-from services.models import ADG, ChangedFQN, ConstraintEdge, DependencyRole, DiffResult, Edge, PredicateType
+from services.models import ADG, ChangedFQN, ConstraintEdge, DependencyRole, DiffResult, Edge, FQNKind, PredicateType
 from services.cpt.resolution import Violation, resolve, suppress_outweighed_prohibits, suppress_outweighed_requires
 from services.resolver import MatchStatus, fqn_matches_pattern
 from collections.abc import Iterable
@@ -47,18 +47,48 @@ def _build_adjacency(edges: Iterable[Edge]) -> dict[str, list[Edge]]:
     return adjacency
 
 
+def _enclosing_module_map(adg: ADG) -> dict[str, str]:
+    """function/method FQN -> enclosing module FQN (nearest MODULE ancestor)."""
+    module_kinds = {str(node.fqn) for node in adg.nodes if node.kind == FQNKind.MODULE}
+    scope: dict[str, str] = {}
+    for node in adg.nodes:
+        if node.kind not in (FQNKind.FUNCTION, FQNKind.METHOD):
+            continue
+        parts = str(node.fqn).split(".")
+        for i in range(len(parts) - 1, 0, -1):
+            candidate = ".".join(parts[:i])
+            if candidate in module_kinds:
+                scope[str(node.fqn)] = candidate
+                break
+    return scope
+
+
 def _reachable_paths(
     start: str,
     adjacency: dict[str, list[Edge]],
     kinds: set[str],
     node_roles: dict[str, DependencyRole] | None = None,
     skip_roles: set[DependencyRole] | None = None,
+    seed_module: str | None = None,
 ) -> dict[str, list[Edge]]:
     """BFS: O(V+E) per node. Value is the shortest edge-path from start to that node.
     Skips edges whose target has a role in skip_roles.
+    seed_module: module whose module-level edges (all kinds except CONTAINS) are
+    visible from start's function scope: a function inherits its module's imports,
+    not its siblings' bodies.
     # ponytail: only the shortest path per target is kept; a longer alternate path is never reported."""
     paths: dict[str, list[Edge]] = {}
     queue: deque[str] = deque([start])
+
+    if seed_module:
+        for edge in adjacency.get(seed_module, ()):
+            if edge.kind not in kinds or edge.kind == "CONTAINS":
+                continue
+            if node_roles and skip_roles and node_roles.get(edge.target) in skip_roles:
+                continue
+            if edge.target not in paths:
+                paths[edge.target] = [edge]
+                queue.append(edge.target)
 
     while queue:
         current = queue.popleft()
@@ -126,6 +156,7 @@ def check_structural_predicates(
     matched_constraints: dict[int, MatchedConstraint],
     adjacency: dict[str, list[Edge]],
     node_roles: dict[str, DependencyRole] | None = None,
+    module_scope: dict[str, str] | None = None,
 ) -> list[Violation]:
     """
     PROHIBITS_*: evaluate once per constraint, no changed_fqn needed.
@@ -159,7 +190,11 @@ def check_structural_predicates(
 
         for subject_fqn, subject_status in matched_constraint.subject_matches:
             subject_str = str(subject_fqn)
-            paths = _reachable_paths(subject_str, adjacency, kinds, node_roles=node_roles, skip_roles={DependencyRole.DEV_TOOL})
+            # function/method subjects cannot see module-level edges from their own
+            # frontier; re-anchor to the enclosing module so its imports count and
+            # the violation reports once at module level (issue 115, B1)
+            scope_str = (module_scope or {}).get(subject_str, subject_str)
+            paths = _reachable_paths(scope_str, adjacency, kinds, node_roles=node_roles, skip_roles={DependencyRole.DEV_TOOL})
             for object_fqn, object_status in non_dev_object_matches:
                 higher = subject_status if _PRIORITY[subject_status] >= _PRIORITY[object_status] else object_status
                 object_str = str(object_fqn)
@@ -172,9 +207,9 @@ def check_structural_predicates(
                     violations.append(Violation(
                         constraint=matched_constraint.constraint,
                         changed_fqn=subject_fqn,
-                        matched_fqn=subject_fqn,
+                        matched_fqn=FQN.from_dotted_safe(scope_str),
                         match_status=higher,
-                        evidence=f"{subject_str} {label} {object_str} via {path_summary}",
+                        evidence=f"{scope_str} {label} {object_str} via {path_summary}",
                         change_type="structural",
                         path_hops=[{"kind": edge.kind, "target": edge.target} for edge in path],
                     ))
@@ -187,6 +222,7 @@ def check_change_triggered_predicates(
     adjacency: dict[str, list[Edge]],
     changed_fqns: list[ChangedFQN],
     node_roles: dict[str, DependencyRole] | None = None,
+    module_scope: dict[str, str] | None = None,
 ) -> list[Violation]:
     """
     REQUIRES_*: evaluate per changed_fqn, pre-filtered by subject_matches.
@@ -229,7 +265,14 @@ def check_change_triggered_predicates(
                 continue
             for subject_fqn, subject_status in relevant_subjects:
                 subject_str = str(subject_fqn)
-                reachable = _reachable_paths(subject_str, adjacency, kinds, node_roles=node_roles, skip_roles={DependencyRole.DEV_TOOL})
+                # function-scope frontier inherits the enclosing module's
+                # module-level edges, so a module that already satisfies the
+                # dependency does not over-trigger the function (issue 115, B2)
+                reachable = _reachable_paths(
+                    subject_str, adjacency, kinds,
+                    node_roles=node_roles, skip_roles={DependencyRole.DEV_TOOL},
+                    seed_module=(module_scope or {}).get(subject_str),
+                )
                 object_reachable = False
                 for object_fqn, _ in matched_constraint.object_matches:
                     object_str = str(object_fqn)

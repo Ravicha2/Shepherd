@@ -1348,3 +1348,130 @@ class TestRequiresImplementationInherits:
         }
         violations = check_structural_predicates(matched, adjacency)
         assert len(violations) == 1
+
+
+# ===========================================================================
+# 10. Issue 115: function-level scope sees the enclosing module's imports
+# ===========================================================================
+
+
+class TestModuleScopeSeeding:
+    """Function/method FQNs inherit the enclosing module's module-level edges.
+
+    B1: a prohibits on a wildcard subject that matches only functions (not the
+    enclosing module) must still fire, reported at the enclosing module after
+    re-anchoring (one violation per module, not per function).
+    B2: a requires must be satisfied when the enclosing module already imports
+    the object, instead of over-triggering on the function's empty frontier.
+    """
+
+    @staticmethod
+    def _module_scope_adg() -> ADG:
+        """app.routes.users imports the model and the service at module level;
+        create_user (function) and Gate.open (method) have no own edges."""
+        nodes = [
+            FQNNode(fqn=FQN.from_dotted("app"), kind=FQNKind.MODULE, file_path="app/__init__.py", line_start=0, line_end=0, start_byte=0, end_byte=0),
+            FQNNode(fqn=FQN.from_dotted("app.routes"), kind=FQNKind.MODULE, file_path="app/routes/__init__.py", line_start=0, line_end=0, start_byte=0, end_byte=0),
+            FQNNode(fqn=FQN.from_dotted("app.routes.users"), kind=FQNKind.MODULE, file_path="app/routes/users.py", line_start=0, line_end=30, start_byte=0, end_byte=0),
+            FQNNode(fqn=FQN.from_dotted("app.routes.users.create_user"), kind=FQNKind.FUNCTION, file_path="app/routes/users.py", line_start=5, line_end=10, start_byte=0, end_byte=0),
+            FQNNode(fqn=FQN.from_dotted("app.models"), kind=FQNKind.MODULE, file_path="app/models/__init__.py", line_start=0, line_end=0, start_byte=0, end_byte=0),
+            FQNNode(fqn=FQN.from_dotted("app.models.user"), kind=FQNKind.MODULE, file_path="app/models/user.py", line_start=0, line_end=20, start_byte=0, end_byte=0),
+            FQNNode(fqn=FQN.from_dotted("app.services"), kind=FQNKind.MODULE, file_path="app/services/__init__.py", line_start=0, line_end=0, start_byte=0, end_byte=0),
+            FQNNode(fqn=FQN.from_dotted("app.services.auth"), kind=FQNKind.MODULE, file_path="app/services/auth.py", line_start=0, line_end=20, start_byte=0, end_byte=0),
+        ]
+        edges = [
+            Edge(source="app", target="app.routes", kind="CONTAINS"),
+            Edge(source="app.routes", target="app.routes.users", kind="CONTAINS"),
+            Edge(source="app.routes.users", target="app.routes.users.create_user", kind="CONTAINS"),
+            Edge(source="app", target="app.models", kind="CONTAINS"),
+            Edge(source="app.models", target="app.models.user", kind="CONTAINS"),
+            Edge(source="app", target="app.services", kind="CONTAINS"),
+            Edge(source="app.services", target="app.services.auth", kind="CONTAINS"),
+            # module-level imports: visible from every function scope in the module
+            Edge(source="app.routes.users", target="app.models.user", kind="IMPORTS"),
+            Edge(source="app.routes.users", target="app.services.auth", kind="IMPORTS"),
+        ]
+        return ADG(nodes=nodes, edges=edges)
+
+    def test_prohibits_on_function_subject_fires_at_enclosing_module(self) -> None:
+        """B1: subject pattern matches only the function, the module import is
+        the evidence, reported once at the enclosing module."""
+        from services.cpt.engine import detect
+
+        constraints = [
+            ConstraintEdge(
+                subject="app.routes.users.*",
+                predicate=PredicateType.PROHIBITS_DEPENDENCY,
+                object="app.models.*",
+                justification="Routes must not touch models.",
+                adr_id="ADR-001",
+                adr_path="docs/adr/001.md",
+            ),
+        ]
+        adg = ADG(nodes=self._module_scope_adg().nodes, edges=self._module_scope_adg().edges, constraint_edges=constraints)
+        diff = DiffResult(
+            to_sha="abc123",
+            from_sha="def456",
+            changed_files=[FileChange(path="app/routes/users.py", status="modified")],
+            changed_fqns=[_changed_fqn("app.routes.users.create_user")],
+        )
+        result = detect(diff, adg)
+        assert len(result.violations) == 1
+        assert str(result.violations[0].matched_fqn) == "app.routes.users"
+        assert "app.routes.users has dependency path to app.models.user" in result.violations[0].evidence
+
+    def test_requires_satisfied_by_enclosing_module_import(self) -> None:
+        """B2: the module already imports the service, the function must not
+        over-trigger the requires."""
+        from services.cpt.engine import detect
+
+        constraints = [
+            ConstraintEdge(
+                subject="app.routes.users.*",
+                predicate=PredicateType.REQUIRES_DEPENDENCY,
+                object="app.services.*",
+                justification="Routes must go through services.",
+                adr_id="ADR-002",
+                adr_path="docs/adr/002.md",
+            ),
+        ]
+        adg = ADG(nodes=self._module_scope_adg().nodes, edges=self._module_scope_adg().edges, constraint_edges=constraints)
+        diff = DiffResult(
+            to_sha="abc123",
+            from_sha="def456",
+            changed_files=[FileChange(path="app/routes/users.py", status="modified")],
+            changed_fqns=[_changed_fqn("app.routes.users.create_user")],
+        )
+        result = detect(diff, adg)
+        assert len(result.violations) == 0
+
+    def test_method_scope_walks_up_through_class_to_module(self) -> None:
+        """A method re-anchors through its class ancestor to the enclosing module."""
+        from services.cpt.engine import detect
+
+        adg = self._module_scope_adg()
+        adg.nodes.append(FQNNode(fqn=FQN.from_dotted("app.routes.users.Gate"), kind=FQNKind.CLASS, file_path="app/routes/users.py", line_start=12, line_end=20, start_byte=0, end_byte=0))
+        adg.nodes.append(FQNNode(fqn=FQN.from_dotted("app.routes.users.Gate.open"), kind=FQNKind.METHOD, file_path="app/routes/users.py", line_start=14, line_end=18, start_byte=0, end_byte=0))
+        adg.edges.append(Edge(source="app.routes.users", target="app.routes.users.Gate", kind="CONTAINS"))
+        adg.edges.append(Edge(source="app.routes.users.Gate", target="app.routes.users.Gate.open", kind="CONTAINS"))
+        constraints = [
+            ConstraintEdge(
+                subject="app.routes.users.*",
+                predicate=PredicateType.PROHIBITS_DEPENDENCY,
+                object="app.models.*",
+                justification="Routes must not touch models.",
+                adr_id="ADR-001",
+                adr_path="docs/adr/001.md",
+            ),
+        ]
+        adg = ADG(nodes=adg.nodes, edges=adg.edges, constraint_edges=constraints)
+        diff = DiffResult(
+            to_sha="abc123",
+            from_sha="def456",
+            changed_files=[FileChange(path="app/routes/users.py", status="modified")],
+            changed_fqns=[_changed_fqn("app.routes.users.Gate.open")],
+        )
+        result = detect(diff, adg)
+        prohibits = [v for v in result.violations if v.constraint.predicate == PredicateType.PROHIBITS_DEPENDENCY]
+        assert len(prohibits) == 1
+        assert str(prohibits[0].matched_fqn) == "app.routes.users"
