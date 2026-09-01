@@ -280,6 +280,18 @@
           }
         ],
         "grading_note": "Both firings are exact and genuine (no seeding artifact: tuf/repository/__init__.py imports only tuf.repository._repository, and the transitive path __init__ -> _repository -> tuf.api.metadata does not satisfy the requires, which is exactly what makes __init__.py the discriminating counterpart to the masked tuf-repository-helper case in _repository.py). If a future change resolves transitive imports into requires satisfaction, both firings would flip to misses while remaining true findings per ADR-0010, so the expectations stay. The appended module-level 'import json' / 'import os' must stay quiet under ADR-0001: those prohibitions name only python2.7 and python3.5."
+      },
+      {
+        "case_id": "tuf-serialization-dotted-import",
+        "description": "New serializer helper in the serialization package gains a dependency on the Metadata API via the plain whole-module dotted import form: outside all requires subjects, zero-expectation probe of subject over-reach and import-form registration",
+        "diff": [
+          {
+            "path": "tuf/api/serialization/json.py",
+            "append": "\n\nimport tuf.api.metadata\n\n\ndef signed_metadata_from_bytes(data: bytes) -> \"tuf.api.metadata.Metadata\":\n    \"\"\"Deserialize signed metadata bytes via the dotted Metadata API (new helper).\"\"\"\n    return tuf.api.metadata.Metadata.from_bytes(data)\n"
+          }
+        ],
+        "expected_violations": [],
+        "grading_note": "Zero violations expected: tuf.api.serialization.json sits under the tuf.* subject only (whose ADR-0001 prohibitions name python2.7 and python3.5, never fired by a stdlib json import), outside both requires subjects (tuf.api.metadata.*, tuf.repository.*), and ADR-0006 explicitly sanctions the serialization package importing Metadata/Signed ('...to allow de/serializing Metadata and Signed objects here' — json.py's own HEAD from-import), so a serialization module gaining a metadata dependency violates nothing in the gold constraint set; any firing here would be a subject-overreach false positive. The system fired nothing. Import-form probe (verified in the post-augment graph): the plain whole-module form 'import tuf.api.metadata' registers IMPORTS tuf.api.serialization.json -> tuf.api.metadata verbatim, because import_statement records the full dotted target without the known-FQN fallback that from-imports use; the appended helper also keeps the existing from-import edge -> tuf.api.metadata.Metadata, so both import forms register the dependency today. Site note: this is the only as-yet-unused python-tuf module adjacent to the constrained packages — the repository package has no unused file (only __init__.py and _repository.py, both used by earlier cases) and metadata is a single module. The case pins the plain-import registration for any future requires whose subject covers tuf.api.serialization.*, and stays discriminating against subject widening or object-side regressions."
       }
     ]
   },
@@ -361,6 +373,39 @@
         ],
         "expected_violations": [],
         "grading_note": "Zero violations expected: ADR-0009 explicitly sanctions typing.TYPE_CHECKING forward references 'for the rare cases where cyclical dependencies for types are unavoidable', so a module whose only _types dependency is the guarded from-import still depends on tamr_client._types in the ADR's sense. The system agrees today only because module-level import extraction is guard-agnostic (walk_imports sees the from-import inside the if TYPE_CHECKING: block and satisfies the module-scope requires, #115); a parser that skipped guarded imports would turn this into a miss, which is why the case is in the gold."
+      },
+      {
+        "case_id": "tamr-operation-local-type",
+        "description": "New frozen dataclass defining a type in operation.py instead of tamr_client._types: probes whether the class-scope FQN also fires the module's already-satisfied requires",
+        "diff": [
+          {
+            "path": "tamr_client/operation.py",
+            "append": "\n\nfrom dataclasses import dataclass\n\n\n@dataclass(frozen=True)\nclass PollingPolicy:\n    \"\"\"Tunable operation polling policy (new type); per ADR-0009 this type belongs in tamr_client._types.\"\"\"\n\n    max_attempts: int\n    backoff_seconds: float\n"
+          }
+        ],
+        "expected_violations": [
+          {
+            "adr_id": "ADR-0009",
+            "predicate": "requires_dependency",
+            "subject": "tamr_client.*",
+            "object": "tamr_client._types",
+            "matched_fqn": "tamr_client.operation.PollingPolicy",
+            "justification": "ADR-0009: 'Put types (@dataclass(frozen=True)) into the _types module.' PollingPolicy is a frozen dataclass type declared in tamr_client/operation.py rather than tamr_client/_types, and the class-level FQN has no dependency on tamr_client._types at any scope (class FQNs do not inherit the enclosing module's imports), so the misplaced type fails the requires."
+          }
+        ],
+        "grading_note": "Exactly one firing and it is exact: ADR-0009 requires at tamr_client.operation.PollingPolicy. The firing is dual-caused. It is architecturally genuine: per ADR-0009 the type belongs in tamr_client._types and PollingPolicy is misplaced, so the expectation stays. It is also the class-scope-seeding probe: tamr_client.operation imports tamr_client._types at module level (the requires is satisfied at module scope), and the class fires only because class-level FQNs do not inherit enclosing-module imports (#115 seeds function/method scopes only) — after augment the PollingPolicy class has zero outgoing edges. A class-scope seeding fix would collapse this firing and flip the case to a miss while the misplaced type remains a violation per ADR-0009, the same fragility tradeoff recorded for tuf-metadata-handrolled-codec (whose note predicts the same flip in the opposite direction). Design note: the dataclass is field-only so the class is the only changed FQN (no method FQNs that would inherit the module seed and stay quiet), and the appended 'from dataclasses import dataclass' is inert because no constraint names dataclasses. No other firing is possible: tamr-client carries exactly one gold constraint."
+      },
+      {
+        "case_id": "tamr-submodule-types-import",
+        "description": "New helper in _types/restore.py whose _types dependency arrives only via runtime submodule from-imports: probes object-side ancestor matching",
+        "diff": [
+          {
+            "path": "tamr_client/_types/restore.py",
+            "append": "\n\nfrom tamr_client._types.dataset import Dataset\n\n\ndef dataset_restore_target(dataset: Dataset) -> str:\n    \"\"\"Derive the restore target path from a dataset (new helper).\"\"\"\n    return f\"restore{dataset.url.path}\"\n"
+          }
+        ],
+        "expected_violations": [],
+        "grading_note": "Zero violations expected: per ADR-0009 the helper's input type comes from the _types package, and a submodule import (from tamr_client._types.dataset import Dataset) is a dependency on the parent package tamr_client._types. The system fired nothing, and the case shows object-side ancestor matching WORKS: the module tamr_client._types.restore has no direct package-level _types import — both its HEAD import ('from tamr_client._types.url import URL') and the appended runtime import register submodule-form targets (tamr_client._types.url.URL, tamr_client._types.dataset.Dataset) — so the requires tamr_client.* -> tamr_client._types is satisfied only through the object-side ancestor tolerance in the engine (a reachable target matching object + '.' prefix counts as reachable). If that tolerance were dropped to exact object matching, the helper would flip to a fire and this case would catch it. Contrast with tamr-typechecking-import: there the guarded from-import names the package itself (tamr_client._types) and guard-agnostic extraction satisfies module scope; here the runtime import names a SUBMODULE and ancestor tolerance is what satisfies. Scope caveat, recorded for honesty: appending a helper into a _types module is outside ADR-0009's letter — no gold constraint encodes 'functions must not live in _types' — so zero expectations is the correct answer for the constraint set, and any future constraint in that direction would need re-curation of this case."
       }
     ]
   },
@@ -555,6 +600,30 @@
         ],
         "expected_violations": [],
         "grading_note": "Zero violations expected: the module-level assignment is architecturally inert, and openlobby/settings.py conventionally never imports django or django.db (it is Django's own configuration surface, referenced by name in INSTALLED_APPS strings), so the ADR-0010 requires django and ADR-0012 requires django.db firings at openlobby.settings are the recorded over-broad-subject FP classes (same class as ADR-0012 firing on modules that never touch data). This case is also the supersession probe: openlobby.settings has no flask import, so ADR-0006 requires flask would fire if supersession were not respected; ADR-0010 supersedes ADR-0006, so any ADR-0006 firing is a supersession false positive. Today it stays quiet."
+      },
+      {
+        "case_id": "openlobby-compliant-relay-from-import",
+        "description": "New API helper builds a Relay global ID through the 'from graphene import relay' import form: the sanctioned Relay usage, probing import-form registration",
+        "diff": [
+          {
+            "path": "openlobby/core/api/types.py",
+            "append": "\n\nfrom graphene import relay\n\n\ndef report_global_id(report_id):\n    \"\"\"Build a Relay global ID for a report node via Graphene Relay (new helper).\"\"\"\n    return relay.Node.to_global_id(\"Report\", report_id)\n"
+          }
+        ],
+        "expected_violations": [],
+        "grading_note": "Zero violations expected: report_global_id is the sanctioned Relay usage (relay.Node.to_global_id is exactly the Relay-spec API ADR-0007 adopted), and types.py already imports graphene and relay at module level. The system fired nothing, and the case is the import-form probe: 'from graphene import relay' does NOT register a dependency on graphene.relay in the initial parse_repo build (the from-import falls back to the module 'graphene' when the dotted target is unknown), but in this eval's augment path the import IS normalized — augment pass 2 re-walks the diff file against existing FQNs that include EXTERNAL nodes, and the graphene.relay external node exists (seeded by paginator.py's 'from graphene.relay import PageInfo' fallback edge), so openlobby.core.api.types gains IMPORTS graphene.relay and the function's enclosing-module seed satisfies ADR-0007's requires (#115). Verified in the post-augment graph. Verdict: import-form registration is missing only in the initial parse_repo build; the augment path resolves it today. The case discriminates the augment-path behavior: if a future change made the augment path resolve from-imports only against repo-internal FQNs, or dropped the external-node fallback edges, requires graphene.relay would fire here as a false positive and the case would flip. The other constraints stay quiet for the record: ADR-0004 graphene, ADR-0002 elasticsearch (module imports elasticsearch via the NotFoundError fallback edge), and ADR-0010 django / ADR-0012 django.db (reachable through 'from .. import models' registering the openlobby.core.models module, whose own imports reach django.db) are all satisfied through the function's module seed. This is the function-scope counterpart of openlobby-compliant-relay-mutation, where the same compliant module-level import form fails to protect the class-scope FQN."
+      },
+      {
+        "case_id": "openlobby-middleware-orm-access",
+        "description": "New middleware helper reads users through the Django ORM via the imported model: the sanctioned data access, without importing django.db",
+        "diff": [
+          {
+            "path": "openlobby/core/middleware.py",
+            "append": "\n\ndef get_author_usernames():\n    \"\"\"Return usernames of author users via the Django ORM (new helper).\"\"\"\n    return list(\n        User.objects.filter(is_author=True).values_list(\"username\", flat=True)\n    )\n"
+          }
+        ],
+        "expected_violations": [],
+        "grading_note": "Zero violations expected: get_author_usernames accesses data exactly the way ADR-0012 mandates (PostgreSQL through the Django ORM: User.objects.filter on the module-imported model), and the ORM is the django.db access path, so a direct 'from django.db import ...' is not required for compliance. The system fired three requires violations at openlobby.core.middleware.get_author_usernames, all false positives, each documenting a distinct gap. (1) ADR-0012 requires django.db — the ORM-resolution FP and the reason this case exists: chained-call root resolution (#116) resolves User.objects to the internal class openlobby.core.models.User, whose only outward edge INHERITS the external django AbstractUser dead-end, so sanctioned ORM usage never registers a django.db dependency (same limitation class as the ADR-0012 firing documented in openlobby-search-orm-bypass). An ORM-resolution fix (mapping <Model>.objects usage to django.db) would collapse this FP and score the case clean. (2) ADR-0010 requires django — the recorded over-broad openlobby.* subject FP: middleware.py legitimately never imports django (it receives request objects and delegates to get_response). (3) ADR-0002 requires elasticsearch — the recorded over-broad openlobby.core.* subject FP: authentication middleware is not search code. Supersession holds: ADR-0006 requires flask stays quiet (superseded by ADR-0010, and middleware.py has no flask import)."
       }
     ]
   }

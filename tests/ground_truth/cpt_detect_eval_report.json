@@ -380,6 +380,16 @@
             "justification": "ADR-0010 ('Repository library design built on top of Metadata API'): the repository library is built on top of the Metadata API, and the gold constraint reads 'ADR-0010 states the repository library is built on top of the Metadata API; this is a dependency.' The new write_role_file_with_stdlib_json helper in tuf/repository/__init__.py stores a role metadata file with the stdlib json module, bypassing the Metadata API; like its read-side sibling it has no dependency on tuf.api.metadata at any scope."
           }
         ]
+      },
+      {
+        "case_id": "tuf-serialization-dotted-import",
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "total": 0,
+        "false_positives": 0,
+        "unexpected": [],
+        "per_constraint": []
       }
     ],
     "exact": 3,
@@ -480,13 +490,46 @@
         "false_positives": 0,
         "unexpected": [],
         "per_constraint": []
+      },
+      {
+        "case_id": "tamr-operation-local-type",
+        "exact": 1,
+        "partial": 0,
+        "miss": 0,
+        "total": 1,
+        "false_positives": 0,
+        "unexpected": [],
+        "per_constraint": [
+          {
+            "expected": {
+              "adr_id": "ADR-0009",
+              "predicate": "requires_dependency",
+              "subject": "tamr_client.*",
+              "object": "tamr_client._types",
+              "matched_fqn": "tamr_client.operation.PollingPolicy",
+              "justification": "ADR-0009: 'Put types (@dataclass(frozen=True)) into the _types module.' PollingPolicy is a frozen dataclass type declared in tamr_client/operation.py rather than tamr_client/_types, and the class-level FQN has no dependency on tamr_client._types at any scope (class FQNs do not inherit the enclosing module's imports), so the misplaced type fails the requires."
+            },
+            "score": "exact_match",
+            "justification": "ADR-0009: 'Put types (@dataclass(frozen=True)) into the _types module.' PollingPolicy is a frozen dataclass type declared in tamr_client/operation.py rather than tamr_client/_types, and the class-level FQN has no dependency on tamr_client._types at any scope (class FQNs do not inherit the enclosing module's imports), so the misplaced type fails the requires."
+          }
+        ]
+      },
+      {
+        "case_id": "tamr-submodule-types-import",
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "total": 0,
+        "false_positives": 0,
+        "unexpected": [],
+        "per_constraint": []
       }
     ],
-    "exact": 2,
+    "exact": 3,
     "partial": 0,
     "miss": 0,
     "false_positives": 1,
-    "total": 2,
+    "total": 3,
     "node_counts": {
       "adg_nodes": 744,
       "external_nodes": 25
@@ -959,12 +1002,60 @@
           }
         ],
         "per_constraint": []
+      },
+      {
+        "case_id": "openlobby-compliant-relay-from-import",
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "total": 0,
+        "false_positives": 0,
+        "unexpected": [],
+        "per_constraint": []
+      },
+      {
+        "case_id": "openlobby-middleware-orm-access",
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "total": 0,
+        "false_positives": 3,
+        "unexpected": [
+          {
+            "adr_id": "ADR-0002",
+            "predicate": "requires_dependency",
+            "subject": "openlobby.core.*",
+            "object": "elasticsearch",
+            "matched_fqn": "openlobby.core.middleware.get_author_usernames",
+            "changed_fqn": "openlobby.core.middleware.get_author_usernames",
+            "evidence": "openlobby.core.middleware.get_author_usernames has no dependency on any module matching elasticsearch"
+          },
+          {
+            "adr_id": "ADR-0010",
+            "predicate": "requires_dependency",
+            "subject": "openlobby.*",
+            "object": "django",
+            "matched_fqn": "openlobby.core.middleware.get_author_usernames",
+            "changed_fqn": "openlobby.core.middleware.get_author_usernames",
+            "evidence": "openlobby.core.middleware.get_author_usernames has no dependency on any module matching django"
+          },
+          {
+            "adr_id": "ADR-0012",
+            "predicate": "requires_dependency",
+            "subject": "openlobby.*",
+            "object": "django.db",
+            "matched_fqn": "openlobby.core.middleware.get_author_usernames",
+            "changed_fqn": "openlobby.core.middleware.get_author_usernames",
+            "evidence": "openlobby.core.middleware.get_author_usernames has no dependency on any module matching django.db"
+          }
+        ],
+        "per_constraint": []
       }
     ],
     "exact": 7,
     "partial": 1,
     "miss": 0,
-    "false_positives": 28,
+    "false_positives": 31,
     "total": 8,
     "node_counts": {
       "adg_nodes": 196,
