@@ -103,6 +103,17 @@ def _resolve_repo_path(repo_cfg) -> Path:
     return path.resolve()
 
 
+def _resolve_adr_dir(repo_cfg, repo_path: Path) -> Path:
+    """Resolve the ADR directory, using the sibling adr_repo when configured."""
+    if repo_cfg.adr_repo is None:
+        return repo_path / repo_cfg.adr_dir
+    config_dir = Path(__file__).resolve().parents[2] / "repos"
+    adr_repo_path = Path(repo_cfg.adr_repo)
+    if not adr_repo_path.is_absolute():
+        adr_repo_path = config_dir / adr_repo_path
+    return adr_repo_path.resolve() / repo_cfg.adr_dir
+
+
 def _run_detection(repo: str, commit: str | None, base: str | None = None, head: str | None = None) -> DetectionResult:
     """Shared detection pipeline. Loads ADG from Neo4j (seeded via `seed build`)."""
     from services.cpt.engine import CPTResult
@@ -545,7 +556,8 @@ def seed_build(
     # resolve ADRs via unified agent
     console.print("[bold]Step 2:[/] Resolving ADR constraints (unified agent)...")
     pipeline = ADGPipeline()
-    merged = pipeline.build_seed(adg, repo_path / repo_cfg.adr_dir, project_root=repo_path, config=config.langextract)
+    adr_dir = _resolve_adr_dir(repo_cfg, repo_path)
+    merged = pipeline.build_seed(adg, adr_dir, project_root=repo_path, config=config.langextract)
     external_count = sum(1 for n in merged.nodes if n.kind == FQNKind.EXTERNAL)
     console.print(f"  {len(merged.constraint_edges)} constraint edges, {external_count} EXTERNAL nodes")
 

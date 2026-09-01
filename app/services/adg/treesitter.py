@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from pathlib import Path
 import tree_sitter_python as tspython
@@ -9,6 +10,8 @@ from tree_sitter import Language, Parser
 from services.fqn import FQN
 from services.models import ADG, Edge, FQNKind, FQNNode
 from services.resolver import NameResolver
+
+log = logging.getLogger(__name__)
 
 PY_LANGUAGE = Language(tspython.language())
 
@@ -295,7 +298,13 @@ def parse_repo(repo_path: Path) -> ADG:
     # Pass 2: extract class/function/method definitions + CONTAINS edges
     for fqn, source in file_sources.items():
         rel_path = next(n.file_path for n in nodes if n.fqn == fqn)
-        file_nodes, file_edges = parse_file(source, fqn, rel_path)
+        try:
+            file_nodes, file_edges = parse_file(source, fqn, rel_path)
+        except SyntaxError:
+            # ponytail: skip unparseable files (e.g. PEP 695 type-param defaults
+            # unsupported by tree-sitter-python) instead of failing the repo.
+            log.warning("Skipping unparseable file: %s", rel_path)
+            continue
         nodes.extend(file_nodes)
         edges.extend(file_edges)
 

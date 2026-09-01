@@ -498,37 +498,41 @@ class TestByteOffsets:
 
 
 class TestSyntaxErrors:
-    """parse_repo fails fast when Tree-sitter reports ERROR nodes."""
+    """parse_repo skips Tree-sitter ERROR nodes and keeps parsing the repo."""
 
-    def test_unclosed_parenthesis(self, tmp_path: Path) -> None:
-        """A file with an unclosed parenthesis causes parse_repo to raise."""
+    def test_unclosed_parenthesis_skipped(self, tmp_path: Path) -> None:
+        """A file with an unclosed parenthesis is skipped, rest of repo still parsed."""
         repo = tmp_path / "broken_repo"
         repo.mkdir()
         (repo / "app").mkdir()
-        (repo / "app" / "__init__.py").write_text("")
+        (repo / "app" / "__init__.py").write_text("x = 1\n")
         (repo / "app" / "broken.py").write_text("def foo(:\n    pass\n")
-        with pytest.raises(Exception):
-            parse_repo(repo)
+        adg = parse_repo(repo)
+        # module node exists; no definitions extracted from the broken file
+        assert any(n.kind == FQNKind.MODULE and str(n.fqn) == "app.broken" for n in adg.nodes)
+        assert not any(n.kind in (FQNKind.CLASS, FQNKind.FUNCTION, FQNKind.METHOD) and n.file_path == "app/broken.py" for n in adg.nodes)
 
-    def test_missing_colon(self, tmp_path: Path) -> None:
-        """A class definition missing a colon causes parse_repo to raise."""
+    def test_missing_colon_skipped(self, tmp_path: Path) -> None:
+        """A class definition missing a colon is skipped, rest of repo still parsed."""
         repo = tmp_path / "broken_repo"
         repo.mkdir()
         (repo / "app").mkdir()
-        (repo / "app" / "__init__.py").write_text("")
+        (repo / "app" / "__init__.py").write_text("x = 1\n")
         (repo / "app" / "broken.py").write_text("class User\n    pass\n")
-        with pytest.raises(Exception):
-            parse_repo(repo)
+        adg = parse_repo(repo)
+        assert any(n.kind == FQNKind.MODULE and str(n.fqn) == "app.broken" for n in adg.nodes)
+        assert not any(n.kind in (FQNKind.CLASS, FQNKind.FUNCTION, FQNKind.METHOD) and n.file_path == "app/broken.py" for n in adg.nodes)
 
-    def test_missing_parenthesis_in_params(self, tmp_path: Path) -> None:
-        """Mismatched parentheses in a function definition cause parse_repo to raise."""
+    def test_missing_parenthesis_in_params_skipped(self, tmp_path: Path) -> None:
+        """Mismatched parentheses in a function definition are skipped, rest still parsed."""
         repo = tmp_path / "broken_repo"
         repo.mkdir()
         (repo / "app").mkdir()
-        (repo / "app" / "__init__.py").write_text("")
+        (repo / "app" / "__init__.py").write_text("x = 1\n")
         (repo / "app" / "broken.py").write_text("def foo(a, b:\n    pass\n")
-        with pytest.raises(Exception):
-            parse_repo(repo)
+        adg = parse_repo(repo)
+        assert any(n.kind == FQNKind.MODULE and str(n.fqn) == "app.broken" for n in adg.nodes)
+        assert not any(n.kind in (FQNKind.CLASS, FQNKind.FUNCTION, FQNKind.METHOD) and n.file_path == "app/broken.py" for n in adg.nodes)
 
     def test_valid_repo_still_passes(self, sample_repo: Path) -> None:
         """A repo with no syntax errors does not raise."""
