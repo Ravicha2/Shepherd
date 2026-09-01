@@ -322,18 +322,176 @@
         "false_positives": 0,
         "unexpected": [],
         "per_constraint": []
+      },
+      {
+        "case_id": "tuf-metadata-handrolled-codec",
+        "exact": 1,
+        "partial": 0,
+        "miss": 0,
+        "total": 1,
+        "false_positives": 0,
+        "unexpected": [],
+        "per_constraint": [
+          {
+            "expected": {
+              "adr_id": "ADR-0006",
+              "predicate": "requires_dependency",
+              "subject": "tuf.api.metadata.*",
+              "object": "tuf.api.serialization.*",
+              "matched_fqn": "tuf.api.metadata.LegacyWireFormatCodec",
+              "justification": "ADR-0006 (Decision Outcome, Compromise 2): 'Serialization is implemented independently of the metadata class as described in (3). However, the meat of the default JsonSerializer, i.e. conversion between metadata objects and dicts, is implemented on the metadata class' \u2014 wire-format (de)serialization belongs in the separated serialization package, and the gold constraint reads 'metadata classes depend on the serialization package (tuf.api.serialization), not the other way around.' The new LegacyWireFormatCodec class in tuf/api/metadata.py hand-rolls JSON wire-format dumps/loads with the stdlib json module (ADR-0006's rejected option 1, 'Serialization in metadata classes') and has no dependency on tuf.api.serialization at any scope."
+            },
+            "score": "exact_match",
+            "justification": "ADR-0006 (Decision Outcome, Compromise 2): 'Serialization is implemented independently of the metadata class as described in (3). However, the meat of the default JsonSerializer, i.e. conversion between metadata objects and dicts, is implemented on the metadata class' \u2014 wire-format (de)serialization belongs in the separated serialization package, and the gold constraint reads 'metadata classes depend on the serialization package (tuf.api.serialization), not the other way around.' The new LegacyWireFormatCodec class in tuf/api/metadata.py hand-rolls JSON wire-format dumps/loads with the stdlib json module (ADR-0006's rejected option 1, 'Serialization in metadata classes') and has no dependency on tuf.api.serialization at any scope."
+          }
+        ]
+      },
+      {
+        "case_id": "tuf-repository-stdlib-role-files",
+        "exact": 2,
+        "partial": 0,
+        "miss": 0,
+        "total": 2,
+        "false_positives": 0,
+        "unexpected": [],
+        "per_constraint": [
+          {
+            "expected": {
+              "adr_id": "ADR-0010",
+              "predicate": "requires_dependency",
+              "subject": "tuf.repository.*",
+              "object": "tuf.api.metadata.*",
+              "matched_fqn": "tuf.repository.read_role_file_with_stdlib_json",
+              "justification": "ADR-0010 ('Repository library design built on top of Metadata API'): 'Metadata API makes modifying metadata far easier than legacy code base' and the gold constraint reads 'ADR-0010 states the repository library is built on top of the Metadata API; this is a dependency.' The new read_role_file_with_stdlib_json helper in tuf/repository/__init__.py loads a role metadata file with the stdlib json module, bypassing the Metadata API entirely; tuf/repository/__init__.py has no dependency on tuf.api.metadata at any scope (its only module-level import is tuf.repository._repository)."
+            },
+            "score": "exact_match",
+            "justification": "ADR-0010 ('Repository library design built on top of Metadata API'): 'Metadata API makes modifying metadata far easier than legacy code base' and the gold constraint reads 'ADR-0010 states the repository library is built on top of the Metadata API; this is a dependency.' The new read_role_file_with_stdlib_json helper in tuf/repository/__init__.py loads a role metadata file with the stdlib json module, bypassing the Metadata API entirely; tuf/repository/__init__.py has no dependency on tuf.api.metadata at any scope (its only module-level import is tuf.repository._repository)."
+          },
+          {
+            "expected": {
+              "adr_id": "ADR-0010",
+              "predicate": "requires_dependency",
+              "subject": "tuf.repository.*",
+              "object": "tuf.api.metadata.*",
+              "matched_fqn": "tuf.repository.write_role_file_with_stdlib_json",
+              "justification": "ADR-0010 ('Repository library design built on top of Metadata API'): the repository library is built on top of the Metadata API, and the gold constraint reads 'ADR-0010 states the repository library is built on top of the Metadata API; this is a dependency.' The new write_role_file_with_stdlib_json helper in tuf/repository/__init__.py stores a role metadata file with the stdlib json module, bypassing the Metadata API; like its read-side sibling it has no dependency on tuf.api.metadata at any scope."
+            },
+            "score": "exact_match",
+            "justification": "ADR-0010 ('Repository library design built on top of Metadata API'): the repository library is built on top of the Metadata API, and the gold constraint reads 'ADR-0010 states the repository library is built on top of the Metadata API; this is a dependency.' The new write_role_file_with_stdlib_json helper in tuf/repository/__init__.py stores a role metadata file with the stdlib json module, bypassing the Metadata API; like its read-side sibling it has no dependency on tuf.api.metadata at any scope."
+          }
+        ]
       }
     ],
-    "exact": 0,
+    "exact": 3,
     "partial": 0,
     "miss": 0,
     "false_positives": 0,
-    "total": 0,
+    "total": 3,
     "node_counts": {
       "adg_nodes": 321,
       "external_nodes": 31
     },
-    "accuracy": 0.0
+    "accuracy": 1.0
+  },
+  "tamr-client": {
+    "repo_id": "tamr-client",
+    "cases": [
+      {
+        "case_id": "tamr-exception-local-types",
+        "exact": 2,
+        "partial": 0,
+        "miss": 0,
+        "total": 2,
+        "false_positives": 0,
+        "unexpected": [],
+        "per_constraint": [
+          {
+            "expected": {
+              "adr_id": "ADR-0009",
+              "predicate": "requires_dependency",
+              "subject": "tamr_client.*",
+              "object": "tamr_client._types",
+              "matched_fqn": "tamr_client.exception.to_payload",
+              "justification": "ADR-0009: 'have all function modules depend on the _types module to define their inputs and outputs.' The new to_payload function in tamr_client/exception.py defines its output via the locally-declared ErrorPayload instead of types from tamr_client._types, and tamr_client/exception.py has no dependency on _types at any scope."
+            },
+            "score": "exact_match",
+            "justification": "ADR-0009: 'have all function modules depend on the _types module to define their inputs and outputs.' The new to_payload function in tamr_client/exception.py defines its output via the locally-declared ErrorPayload instead of types from tamr_client._types, and tamr_client/exception.py has no dependency on _types at any scope."
+          },
+          {
+            "expected": {
+              "adr_id": "ADR-0009",
+              "predicate": "requires_dependency",
+              "subject": "tamr_client.*",
+              "object": "tamr_client._types",
+              "matched_fqn": "tamr_client.exception.ErrorPayload",
+              "justification": "ADR-0009: 'Put types (@dataclass(frozen=True)) into the _types module.' ErrorPayload is a frozen dataclass type declared in tamr_client/exception.py rather than tamr_client/_types, so both the misplaced type and the module lack the required dependency on tamr_client._types."
+            },
+            "score": "exact_match",
+            "justification": "ADR-0009: 'Put types (@dataclass(frozen=True)) into the _types module.' ErrorPayload is a frozen dataclass type declared in tamr_client/exception.py rather than tamr_client/_types, so both the misplaced type and the module lack the required dependency on tamr_client._types."
+          }
+        ]
+      },
+      {
+        "case_id": "tamr-compliant-project-helper",
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "total": 0,
+        "false_positives": 0,
+        "unexpected": [],
+        "per_constraint": []
+      },
+      {
+        "case_id": "tamr-legacy-package-helper",
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "total": 0,
+        "false_positives": 0,
+        "unexpected": [],
+        "per_constraint": []
+      },
+      {
+        "case_id": "tamr-beta-constant",
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "total": 0,
+        "false_positives": 1,
+        "unexpected": [
+          {
+            "adr_id": "ADR-0009",
+            "predicate": "requires_dependency",
+            "subject": "tamr_client.*",
+            "object": "tamr_client._types",
+            "matched_fqn": "tamr_client._beta",
+            "changed_fqn": "tamr_client._beta",
+            "evidence": "tamr_client._beta has no dependency on any module matching tamr_client._types"
+          }
+        ],
+        "per_constraint": []
+      },
+      {
+        "case_id": "tamr-typechecking-import",
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "total": 0,
+        "false_positives": 0,
+        "unexpected": [],
+        "per_constraint": []
+      }
+    ],
+    "exact": 2,
+    "partial": 0,
+    "miss": 0,
+    "false_positives": 1,
+    "total": 2,
+    "node_counts": {
+      "adg_nodes": 744,
+      "external_nodes": 25
+    },
+    "accuracy": 1.0
   },
   "openlobby": {
     "repo_id": "openlobby",
@@ -399,17 +557,419 @@
           }
         ],
         "per_constraint": []
+      },
+      {
+        "case_id": "openlobby-api-rest-serializers",
+        "exact": 1,
+        "partial": 0,
+        "miss": 0,
+        "total": 1,
+        "false_positives": 5,
+        "unexpected": [
+          {
+            "adr_id": "ADR-0002",
+            "predicate": "requires_dependency",
+            "subject": "openlobby.core.*",
+            "object": "elasticsearch",
+            "matched_fqn": "openlobby.core.api.schema.OpenIdClientSerializer",
+            "changed_fqn": "openlobby.core.api.schema.OpenIdClientSerializer",
+            "evidence": "openlobby.core.api.schema.OpenIdClientSerializer has no dependency on any module matching elasticsearch"
+          },
+          {
+            "adr_id": "ADR-0004",
+            "predicate": "requires_dependency",
+            "subject": "openlobby.core.api.*",
+            "object": "graphene",
+            "matched_fqn": "openlobby.core.api.schema.OpenIdClientSerializer",
+            "changed_fqn": "openlobby.core.api.schema.OpenIdClientSerializer",
+            "evidence": "openlobby.core.api.schema.OpenIdClientSerializer has no dependency on any module matching graphene"
+          },
+          {
+            "adr_id": "ADR-0007",
+            "predicate": "requires_dependency",
+            "subject": "openlobby.core.api.*",
+            "object": "graphene.relay",
+            "matched_fqn": "openlobby.core.api.schema.OpenIdClientSerializer",
+            "changed_fqn": "openlobby.core.api.schema.OpenIdClientSerializer",
+            "evidence": "openlobby.core.api.schema.OpenIdClientSerializer has no dependency on any module matching graphene.relay"
+          },
+          {
+            "adr_id": "ADR-0010",
+            "predicate": "requires_dependency",
+            "subject": "openlobby.*",
+            "object": "django",
+            "matched_fqn": "openlobby.core.api.schema.OpenIdClientSerializer",
+            "changed_fqn": "openlobby.core.api.schema.OpenIdClientSerializer",
+            "evidence": "openlobby.core.api.schema.OpenIdClientSerializer has no dependency on any module matching django"
+          },
+          {
+            "adr_id": "ADR-0012",
+            "predicate": "requires_dependency",
+            "subject": "openlobby.*",
+            "object": "django.db",
+            "matched_fqn": "openlobby.core.api.schema.OpenIdClientSerializer",
+            "changed_fqn": "openlobby.core.api.schema.OpenIdClientSerializer",
+            "evidence": "openlobby.core.api.schema.OpenIdClientSerializer has no dependency on any module matching django.db"
+          }
+        ],
+        "per_constraint": [
+          {
+            "expected": {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "openlobby.core.api.*",
+              "object": "rest_framework",
+              "matched_fqn": "openlobby.core.api.schema",
+              "justification": "ADR-0004: 'We will use GraphQL as API standard. From other options like REST and Graph API it's the most client friendly approach.' The appended code in openlobby/core/api/schema.py adds 'from rest_framework import serializers' and a ModelSerializer, introducing a REST framework into the GraphQL-only API package. Structural predicate, reported at the module that owns the new import."
+            },
+            "score": "exact_match",
+            "justification": "ADR-0004: 'We will use GraphQL as API standard. From other options like REST and Graph API it's the most client friendly approach.' The appended code in openlobby/core/api/schema.py adds 'from rest_framework import serializers' and a ModelSerializer, introducing a REST framework into the GraphQL-only API package. Structural predicate, reported at the module that owns the new import."
+          }
+        ]
+      },
+      {
+        "case_id": "openlobby-api-nonrelay-mutation",
+        "exact": 1,
+        "partial": 0,
+        "miss": 0,
+        "total": 1,
+        "false_positives": 4,
+        "unexpected": [
+          {
+            "adr_id": "ADR-0002",
+            "predicate": "requires_dependency",
+            "subject": "openlobby.core.*",
+            "object": "elasticsearch",
+            "matched_fqn": "openlobby.core.api.utils.Ping",
+            "changed_fqn": "openlobby.core.api.utils.Ping",
+            "evidence": "openlobby.core.api.utils.Ping has no dependency on any module matching elasticsearch"
+          },
+          {
+            "adr_id": "ADR-0004",
+            "predicate": "requires_dependency",
+            "subject": "openlobby.core.api.*",
+            "object": "graphene",
+            "matched_fqn": "openlobby.core.api.utils.Ping",
+            "changed_fqn": "openlobby.core.api.utils.Ping",
+            "evidence": "openlobby.core.api.utils.Ping has no dependency on any module matching graphene"
+          },
+          {
+            "adr_id": "ADR-0010",
+            "predicate": "requires_dependency",
+            "subject": "openlobby.*",
+            "object": "django",
+            "matched_fqn": "openlobby.core.api.utils.Ping",
+            "changed_fqn": "openlobby.core.api.utils.Ping",
+            "evidence": "openlobby.core.api.utils.Ping has no dependency on any module matching django"
+          },
+          {
+            "adr_id": "ADR-0012",
+            "predicate": "requires_dependency",
+            "subject": "openlobby.*",
+            "object": "django.db",
+            "matched_fqn": "openlobby.core.api.utils.Ping",
+            "changed_fqn": "openlobby.core.api.utils.Ping",
+            "evidence": "openlobby.core.api.utils.Ping has no dependency on any module matching django.db"
+          }
+        ],
+        "per_constraint": [
+          {
+            "expected": {
+              "adr_id": "ADR-0007",
+              "predicate": "requires_dependency",
+              "subject": "openlobby.core.api.*",
+              "object": "graphene.relay",
+              "matched_fqn": "openlobby.core.api.utils.Ping",
+              "justification": "ADR-0007: 'We will adopt GraphQL Relay specification. ... It has a way to define inputs in mutations.' The new Ping mutation in openlobby/core/api/utils.py is built as a plain graphene.Mutation with a class-Arguments body instead of the repo's relay.ClientIDMutation pattern, and no scope of openlobby.core.api.utils (module or class) reaches graphene.relay."
+            },
+            "score": "exact_match",
+            "justification": "ADR-0007: 'We will adopt GraphQL Relay specification. ... It has a way to define inputs in mutations.' The new Ping mutation in openlobby/core/api/utils.py is built as a plain graphene.Mutation with a class-Arguments body instead of the repo's relay.ClientIDMutation pattern, and no scope of openlobby.core.api.utils (module or class) reaches graphene.relay."
+          }
+        ]
+      },
+      {
+        "case_id": "openlobby-api-plain-dict-endpoint",
+        "exact": 2,
+        "partial": 0,
+        "miss": 0,
+        "total": 2,
+        "false_positives": 3,
+        "unexpected": [
+          {
+            "adr_id": "ADR-0002",
+            "predicate": "requires_dependency",
+            "subject": "openlobby.core.*",
+            "object": "elasticsearch",
+            "matched_fqn": "openlobby.core.api.sanitizers.legacy_reports_api",
+            "changed_fqn": "openlobby.core.api.sanitizers.legacy_reports_api",
+            "evidence": "openlobby.core.api.sanitizers.legacy_reports_api has no dependency on any module matching elasticsearch"
+          },
+          {
+            "adr_id": "ADR-0010",
+            "predicate": "requires_dependency",
+            "subject": "openlobby.*",
+            "object": "django",
+            "matched_fqn": "openlobby.core.api.sanitizers.legacy_reports_api",
+            "changed_fqn": "openlobby.core.api.sanitizers.legacy_reports_api",
+            "evidence": "openlobby.core.api.sanitizers.legacy_reports_api has no dependency on any module matching django"
+          },
+          {
+            "adr_id": "ADR-0012",
+            "predicate": "requires_dependency",
+            "subject": "openlobby.*",
+            "object": "django.db",
+            "matched_fqn": "openlobby.core.api.sanitizers.legacy_reports_api",
+            "changed_fqn": "openlobby.core.api.sanitizers.legacy_reports_api",
+            "evidence": "openlobby.core.api.sanitizers.legacy_reports_api has no dependency on any module matching django.db"
+          }
+        ],
+        "per_constraint": [
+          {
+            "expected": {
+              "adr_id": "ADR-0004",
+              "predicate": "requires_dependency",
+              "subject": "openlobby.core.api.*",
+              "object": "graphene",
+              "matched_fqn": "openlobby.core.api.sanitizers.legacy_reports_api",
+              "justification": "ADR-0004: 'We will use GraphQL as API standard.' The new legacy_reports_api function in openlobby/core/api/sanitizers.py serves API data as plain dicts, and openlobby/core/api/sanitizers.py has no dependency on graphene at any scope (module imports are bleach and re only)."
+            },
+            "score": "exact_match",
+            "justification": "ADR-0004: 'We will use GraphQL as API standard.' The new legacy_reports_api function in openlobby/core/api/sanitizers.py serves API data as plain dicts, and openlobby/core/api/sanitizers.py has no dependency on graphene at any scope (module imports are bleach and re only)."
+          },
+          {
+            "expected": {
+              "adr_id": "ADR-0007",
+              "predicate": "requires_dependency",
+              "subject": "openlobby.core.api.*",
+              "object": "graphene.relay",
+              "matched_fqn": "openlobby.core.api.sanitizers.legacy_reports_api",
+              "justification": "ADR-0007: 'We will adopt GraphQL Relay specification.' A JSON-dict endpoint bypasses the GraphQL API entirely and therefore the Relay specification the repo adopted; legacy_reports_api has no dependency on graphene.relay at any scope."
+            },
+            "score": "exact_match",
+            "justification": "ADR-0007: 'We will adopt GraphQL Relay specification.' A JSON-dict endpoint bypasses the GraphQL API entirely and therefore the Relay specification the repo adopted; legacy_reports_api has no dependency on graphene.relay at any scope."
+          }
+        ]
+      },
+      {
+        "case_id": "openlobby-admin-mysql-export",
+        "exact": 0,
+        "partial": 1,
+        "miss": 0,
+        "total": 1,
+        "false_positives": 2,
+        "unexpected": [
+          {
+            "adr_id": "ADR-0002",
+            "predicate": "requires_dependency",
+            "subject": "openlobby.core.*",
+            "object": "elasticsearch",
+            "matched_fqn": "openlobby.core.admin.export_reports_to_legacy_mysql",
+            "changed_fqn": "openlobby.core.admin.export_reports_to_legacy_mysql",
+            "evidence": "openlobby.core.admin.export_reports_to_legacy_mysql has no dependency on any module matching elasticsearch"
+          },
+          {
+            "adr_id": "ADR-0012",
+            "predicate": "requires_dependency",
+            "subject": "openlobby.*",
+            "object": "django.db",
+            "matched_fqn": "openlobby.core.admin.export_reports_to_legacy_mysql",
+            "changed_fqn": "openlobby.core.admin.export_reports_to_legacy_mysql",
+            "evidence": "openlobby.core.admin.export_reports_to_legacy_mysql has no dependency on any module matching django.db"
+          }
+        ],
+        "per_constraint": [
+          {
+            "expected": {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_dependency",
+              "subject": "openlobby.*",
+              "object": "mysql",
+              "matched_fqn": "openlobby.core.admin",
+              "justification": "ADR-0012: 'Another popular option is MySQL/MariaDB. But because it has a major bug #28727 ... breaking ACID in schema changes it can't be used for any serious project.' The appended 'import mysql.connector' in openlobby/core/admin.py introduces a MySQL client dependency; the module that owns the new import (openlobby.core.admin) is the correct report location, per the module-owns-import precedent of the flask prohibition case."
+            },
+            "score": "partial_match",
+            "justification": "ADR-0012: 'Another popular option is MySQL/MariaDB. But because it has a major bug #28727 ... breaking ACID in schema changes it can't be used for any serious project.' The appended 'import mysql.connector' in openlobby/core/admin.py introduces a MySQL client dependency; the module that owns the new import (openlobby.core.admin) is the correct report location, per the module-owns-import precedent of the flask prohibition case."
+          }
+        ]
+      },
+      {
+        "case_id": "openlobby-search-orm-bypass",
+        "exact": 2,
+        "partial": 0,
+        "miss": 0,
+        "total": 2,
+        "false_positives": 2,
+        "unexpected": [
+          {
+            "adr_id": "ADR-0010",
+            "predicate": "requires_dependency",
+            "subject": "openlobby.*",
+            "object": "django",
+            "matched_fqn": "openlobby.core.search.search_reports_in_db",
+            "changed_fqn": "openlobby.core.search.search_reports_in_db",
+            "evidence": "openlobby.core.search.search_reports_in_db has no dependency on any module matching django"
+          },
+          {
+            "adr_id": "ADR-0012",
+            "predicate": "requires_dependency",
+            "subject": "openlobby.*",
+            "object": "django.db",
+            "matched_fqn": "openlobby.core.search.search_reports_in_db",
+            "changed_fqn": "openlobby.core.search.search_reports_in_db",
+            "evidence": "openlobby.core.search.search_reports_in_db has no dependency on any module matching django.db"
+          }
+        ],
+        "per_constraint": [
+          {
+            "expected": {
+              "adr_id": "ADR-0011",
+              "predicate": "requires_dependency",
+              "subject": "openlobby.core.search.*",
+              "object": "elasticsearch",
+              "matched_fqn": "openlobby.core.search.search_reports_in_db",
+              "justification": "ADR-0011: 'We will add relational database as primary database. Elasticsearch will be used for denormalized reports and related data intended for fulltext search.' The new search_reports_in_db function in openlobby/core/search.py does fulltext search over Report bodies via the relational ORM (body__icontains), with no dependency on elasticsearch at any scope; fulltext search must go through Elasticsearch."
+            },
+            "score": "exact_match",
+            "justification": "ADR-0011: 'We will add relational database as primary database. Elasticsearch will be used for denormalized reports and related data intended for fulltext search.' The new search_reports_in_db function in openlobby/core/search.py does fulltext search over Report bodies via the relational ORM (body__icontains), with no dependency on elasticsearch at any scope; fulltext search must go through Elasticsearch."
+          },
+          {
+            "expected": {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "openlobby.core.*",
+              "object": "elasticsearch",
+              "matched_fqn": "openlobby.core.search.search_reports_in_db",
+              "justification": "ADR-0002: 'We will use Elasticsearch. It's well known database with great fulltext search capabilities.' For actual fulltext-search code the constraint applies on its own terms (unlike its over-broad firings on non-search code): search_reports_in_db performs fulltext search without any elasticsearch dependency at any scope."
+            },
+            "score": "exact_match",
+            "justification": "ADR-0002: 'We will use Elasticsearch. It's well known database with great fulltext search capabilities.' For actual fulltext-search code the constraint applies on its own terms (unlike its over-broad firings on non-search code): search_reports_in_db performs fulltext search without any elasticsearch dependency at any scope."
+          }
+        ]
+      },
+      {
+        "case_id": "openlobby-compliant-relay-mutation",
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "total": 0,
+        "false_positives": 5,
+        "unexpected": [
+          {
+            "adr_id": "ADR-0002",
+            "predicate": "requires_dependency",
+            "subject": "openlobby.core.*",
+            "object": "elasticsearch",
+            "matched_fqn": "openlobby.core.api.mutations.DeleteReportDraft",
+            "changed_fqn": "openlobby.core.api.mutations.DeleteReportDraft",
+            "evidence": "openlobby.core.api.mutations.DeleteReportDraft has no dependency on any module matching elasticsearch"
+          },
+          {
+            "adr_id": "ADR-0004",
+            "predicate": "requires_dependency",
+            "subject": "openlobby.core.api.*",
+            "object": "graphene",
+            "matched_fqn": "openlobby.core.api.mutations.DeleteReportDraft",
+            "changed_fqn": "openlobby.core.api.mutations.DeleteReportDraft",
+            "evidence": "openlobby.core.api.mutations.DeleteReportDraft has no dependency on any module matching graphene"
+          },
+          {
+            "adr_id": "ADR-0007",
+            "predicate": "requires_dependency",
+            "subject": "openlobby.core.api.*",
+            "object": "graphene.relay",
+            "matched_fqn": "openlobby.core.api.mutations.DeleteReportDraft",
+            "changed_fqn": "openlobby.core.api.mutations.DeleteReportDraft",
+            "evidence": "openlobby.core.api.mutations.DeleteReportDraft has no dependency on any module matching graphene.relay"
+          },
+          {
+            "adr_id": "ADR-0010",
+            "predicate": "requires_dependency",
+            "subject": "openlobby.*",
+            "object": "django",
+            "matched_fqn": "openlobby.core.api.mutations.DeleteReportDraft",
+            "changed_fqn": "openlobby.core.api.mutations.DeleteReportDraft",
+            "evidence": "openlobby.core.api.mutations.DeleteReportDraft has no dependency on any module matching django"
+          },
+          {
+            "adr_id": "ADR-0012",
+            "predicate": "requires_dependency",
+            "subject": "openlobby.*",
+            "object": "django.db",
+            "matched_fqn": "openlobby.core.api.mutations.DeleteReportDraft",
+            "changed_fqn": "openlobby.core.api.mutations.DeleteReportDraft",
+            "evidence": "openlobby.core.api.mutations.DeleteReportDraft has no dependency on any module matching django.db"
+          }
+        ],
+        "per_constraint": []
+      },
+      {
+        "case_id": "openlobby-openid-handrolled-token",
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "total": 0,
+        "false_positives": 2,
+        "unexpected": [
+          {
+            "adr_id": "ADR-0002",
+            "predicate": "requires_dependency",
+            "subject": "openlobby.core.*",
+            "object": "elasticsearch",
+            "matched_fqn": "openlobby.core.openid.parse_id_token",
+            "changed_fqn": "openlobby.core.openid.parse_id_token",
+            "evidence": "openlobby.core.openid.parse_id_token has no dependency on any module matching elasticsearch"
+          },
+          {
+            "adr_id": "ADR-0012",
+            "predicate": "requires_dependency",
+            "subject": "openlobby.*",
+            "object": "django.db",
+            "matched_fqn": "openlobby.core.openid.parse_id_token",
+            "changed_fqn": "openlobby.core.openid.parse_id_token",
+            "evidence": "openlobby.core.openid.parse_id_token has no dependency on any module matching django.db"
+          }
+        ],
+        "per_constraint": []
+      },
+      {
+        "case_id": "openlobby-settings-assignment",
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "total": 0,
+        "false_positives": 2,
+        "unexpected": [
+          {
+            "adr_id": "ADR-0010",
+            "predicate": "requires_dependency",
+            "subject": "openlobby.*",
+            "object": "django",
+            "matched_fqn": "openlobby.settings",
+            "changed_fqn": "openlobby.settings",
+            "evidence": "openlobby.settings has no dependency on any module matching django"
+          },
+          {
+            "adr_id": "ADR-0012",
+            "predicate": "requires_dependency",
+            "subject": "openlobby.*",
+            "object": "django.db",
+            "matched_fqn": "openlobby.settings",
+            "changed_fqn": "openlobby.settings",
+            "evidence": "openlobby.settings has no dependency on any module matching django.db"
+          }
+        ],
+        "per_constraint": []
       }
     ],
-    "exact": 1,
-    "partial": 0,
+    "exact": 7,
+    "partial": 1,
     "miss": 0,
-    "false_positives": 3,
-    "total": 1,
+    "false_positives": 28,
+    "total": 8,
     "node_counts": {
       "adg_nodes": 196,
       "external_nodes": 51
     },
-    "accuracy": 1.0
+    "accuracy": 0.9375
   }
 }

@@ -25,7 +25,21 @@ from services.models import ConstraintEdge, PredicateType
 REPO_ROOT = Path(__file__).resolve().parents[4]
 REPOS_YAML_PATH = REPO_ROOT / "repos" / "repos.yaml"
 GROUND_TRUTH_DIR = REPO_ROOT / "tests" / "ground_truth"
-EVAL_REPOS = ["openlobby", "python-tuf", "flask", "django"]
+
+
+def _eval_repos() -> list[str]:
+    """Eval set: smoke + eval group repos from repos.yaml that have a ground truth file.
+    Ground-truth existence keeps not-yet-curated eval repos (e.g. tamr-client) out."""
+    with open(REPOS_YAML_PATH) as f:
+        repos = yaml.safe_load(f)
+    return [
+        r["id"] for r in repos["repos"]
+        if r.get("group", "smoke") in ("eval", "smoke")
+        and (GROUND_TRUTH_DIR / f"{r['id'].replace('-', '_')}_ground_truth.json").exists()
+    ]
+
+
+EVAL_REPOS = _eval_repos()
 
 HAS_API_KEY = bool(os.environ.get("OPENROUTER_API_KEY"))
 

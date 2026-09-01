@@ -230,6 +230,137 @@
         ],
         "expected_violations": [],
         "grading_note": "Zero violations expected: tuf.ngclient is under tuf.* (which only prohibits the dead Python versions) but outside tuf.api.metadata.* and tuf.repository.*."
+      },
+      {
+        "case_id": "tuf-metadata-handrolled-codec",
+        "description": "New class on the metadata model hand-rolls JSON wire-format (de)serialization with the stdlib json module, bypassing the serialization package",
+        "diff": [
+          {
+            "path": "tuf/api/metadata.py",
+            "append": "\n\nimport json\n\n\nclass LegacyWireFormatCodec:\n    \"\"\"Hand-rolled JSON wire-format (de)serialization on the metadata class model (new code).\n\n    Implements ADR-0006's rejected option 1 (serialization in metadata classes)\n    with the stdlib json module instead of the tuf.api.serialization package.\n    \"\"\"\n\n    @staticmethod\n    def dumps(signed_dict):\n        \"\"\"Encode a signed metadata dict to a JSON wire-format blob.\"\"\"\n        return json.dumps(signed_dict).encode(\"utf-8\")\n\n    @staticmethod\n    def loads(wire_bytes):\n        \"\"\"Decode a JSON wire-format blob back to a signed metadata dict.\"\"\"\n        return json.loads(wire_bytes.decode(\"utf-8\"))\n"
+          }
+        ],
+        "expected_violations": [
+          {
+            "adr_id": "ADR-0006",
+            "predicate": "requires_dependency",
+            "subject": "tuf.api.metadata.*",
+            "object": "tuf.api.serialization.*",
+            "matched_fqn": "tuf.api.metadata.LegacyWireFormatCodec",
+            "justification": "ADR-0006 (Decision Outcome, Compromise 2): 'Serialization is implemented independently of the metadata class as described in (3). However, the meat of the default JsonSerializer, i.e. conversion between metadata objects and dicts, is implemented on the metadata class' — wire-format (de)serialization belongs in the separated serialization package, and the gold constraint reads 'metadata classes depend on the serialization package (tuf.api.serialization), not the other way around.' The new LegacyWireFormatCodec class in tuf/api/metadata.py hand-rolls JSON wire-format dumps/loads with the stdlib json module (ADR-0006's rejected option 1, 'Serialization in metadata classes') and has no dependency on tuf.api.serialization at any scope."
+          }
+        ],
+        "grading_note": "The firing is exact and genuine: the class-level FQN does not inherit enclosing-module imports (#115 seeding covers function/method scopes only), and the only module-scope serialization import in metadata.py is an 'if TYPE_CHECKING:' from-import, which the codec never uses. The methods dumps/loads stay quiet because enclosing-module seeding sees the guard-agnostic TYPE_CHECKING import and satisfies method scope; the class is the correct report location for the codec as a whole. Fragility note: if class-scope seeding is ever added (symmetric to openlobby-compliant-relay-mutation), the guard-agnostic TYPE_CHECKING import would mask this true finding and the case would flip to a miss — per ADR-0006 the codec remains a violation (it implements the rejected option 1), so the expectation stays."
+      },
+      {
+        "case_id": "tuf-repository-stdlib-role-files",
+        "description": "New helper in the repository package reads and writes role metadata files with the stdlib json module, bypassing the Metadata API",
+        "diff": [
+          {
+            "path": "tuf/repository/__init__.py",
+            "append": "\n\nimport json\nimport os\n\n\ndef read_role_file_with_stdlib_json(role_path):\n    \"\"\"Load a role metadata file with the stdlib json module, bypassing the Metadata API (new code).\"\"\"\n    with open(os.fspath(role_path), \"rb\") as file:\n        return json.loads(file.read().decode(\"utf-8\"))\n\n\ndef write_role_file_with_stdlib_json(role_path, signed_dict):\n    \"\"\"Store a role metadata file with the stdlib json module, bypassing the Metadata API (new code).\"\"\"\n    with open(os.fspath(role_path), \"wb\") as file:\n        file.write(json.dumps(signed_dict).encode(\"utf-8\"))\n"
+          }
+        ],
+        "expected_violations": [
+          {
+            "adr_id": "ADR-0010",
+            "predicate": "requires_dependency",
+            "subject": "tuf.repository.*",
+            "object": "tuf.api.metadata.*",
+            "matched_fqn": "tuf.repository.read_role_file_with_stdlib_json",
+            "justification": "ADR-0010 ('Repository library design built on top of Metadata API'): 'Metadata API makes modifying metadata far easier than legacy code base' and the gold constraint reads 'ADR-0010 states the repository library is built on top of the Metadata API; this is a dependency.' The new read_role_file_with_stdlib_json helper in tuf/repository/__init__.py loads a role metadata file with the stdlib json module, bypassing the Metadata API entirely; tuf/repository/__init__.py has no dependency on tuf.api.metadata at any scope (its only module-level import is tuf.repository._repository)."
+          },
+          {
+            "adr_id": "ADR-0010",
+            "predicate": "requires_dependency",
+            "subject": "tuf.repository.*",
+            "object": "tuf.api.metadata.*",
+            "matched_fqn": "tuf.repository.write_role_file_with_stdlib_json",
+            "justification": "ADR-0010 ('Repository library design built on top of Metadata API'): the repository library is built on top of the Metadata API, and the gold constraint reads 'ADR-0010 states the repository library is built on top of the Metadata API; this is a dependency.' The new write_role_file_with_stdlib_json helper in tuf/repository/__init__.py stores a role metadata file with the stdlib json module, bypassing the Metadata API; like its read-side sibling it has no dependency on tuf.api.metadata at any scope."
+          }
+        ],
+        "grading_note": "Both firings are exact and genuine (no seeding artifact: tuf/repository/__init__.py imports only tuf.repository._repository, and the transitive path __init__ -> _repository -> tuf.api.metadata does not satisfy the requires, which is exactly what makes __init__.py the discriminating counterpart to the masked tuf-repository-helper case in _repository.py). If a future change resolves transitive imports into requires satisfaction, both firings would flip to misses while remaining true findings per ADR-0010, so the expectations stay. The appended module-level 'import json' / 'import os' must stay quiet under ADR-0001: those prohibitions name only python2.7 and python3.5."
+      }
+    ]
+  },
+  "tamr-client": {
+    "cases": [
+      {
+        "case_id": "tamr-exception-local-types",
+        "description": "New helper in exception.py defines its own local dataclass instead of depending on tamr_client._types",
+        "diff": [
+          {
+            "path": "tamr_client/exception.py",
+            "append": "\n\nfrom dataclasses import dataclass\n\n\n@dataclass(frozen=True)\nclass ErrorPayload:\n    \"\"\"Structured error payload; per ADR-0009 this type belongs in tamr_client._types.\"\"\"\n\n    code: str\n    message: str\n\n\ndef to_payload(exc: TamrClientException) -> ErrorPayload:\n    \"\"\"Convert an exception to a structured payload (new helper).\"\"\"\n    return ErrorPayload(code=type(exc).__name__, message=str(exc))\n"
+          }
+        ],
+        "expected_violations": [
+          {
+            "adr_id": "ADR-0009",
+            "predicate": "requires_dependency",
+            "subject": "tamr_client.*",
+            "object": "tamr_client._types",
+            "matched_fqn": "tamr_client.exception.to_payload",
+            "justification": "ADR-0009: 'have all function modules depend on the _types module to define their inputs and outputs.' The new to_payload function in tamr_client/exception.py defines its output via the locally-declared ErrorPayload instead of types from tamr_client._types, and tamr_client/exception.py has no dependency on _types at any scope."
+          },
+          {
+            "adr_id": "ADR-0009",
+            "predicate": "requires_dependency",
+            "subject": "tamr_client.*",
+            "object": "tamr_client._types",
+            "matched_fqn": "tamr_client.exception.ErrorPayload",
+            "justification": "ADR-0009: 'Put types (@dataclass(frozen=True)) into the _types module.' ErrorPayload is a frozen dataclass type declared in tamr_client/exception.py rather than tamr_client/_types, so both the misplaced type and the module lack the required dependency on tamr_client._types."
+          }
+        ],
+        "grading_note": "Both firings are architecturally real per ADR-0009 and both stay in the gold: the misplaced type (ErrorPayload) and the function that uses it (to_payload) each independently fail the requires. If a future dedup change collapses them to one report, the remaining violation must still match one expectation; a firing at tamr_client.exception (module level) would score partial via ancestor-descendant tolerance."
+      },
+      {
+        "case_id": "tamr-compliant-project-helper",
+        "description": "New project helper imports its types from tamr_client._types: the sanctioned pattern",
+        "diff": [
+          {
+            "path": "tamr_client/project.py",
+            "append": "\n\ndef by_display_name(session: Session, instance: Instance, name: str) -> Project:\n    \"\"\"Get a project by display name, raising Ambiguous on ties (new helper).\"\"\"\n    matches = [p for p in get_all(session, instance) if p.name == name]\n    if not matches:\n        raise NotFound(name)\n    if len(matches) > 1:\n        raise Ambiguous(name)\n    return matches[0]\n"
+          }
+        ],
+        "expected_violations": [],
+        "grading_note": "Zero violations expected: tamr_client/project.py imports Attribute/Instance/JsonDict/Project/Session/URL from tamr_client._types at module level, so ADR-0009's requires is satisfied for the appended by_display_name (enclosing-module seeding, #115). Any violation firing on by_display_name would be a false positive: the new helper uses the sanctioned type-import pattern."
+      },
+      {
+        "case_id": "tamr-legacy-package-helper",
+        "description": "New helper in the legacy tamr_unify_client package: outside the ADR-0009 subject",
+        "diff": [
+          {
+            "path": "tamr_unify_client/client.py",
+            "append": "\n\ndef _origin_from_url(url: str) -> str:\n    \"\"\"Parse an HTTP origin from a full URL (legacy-package helper).\"\"\"\n    parsed = urlparse(url)\n    return f\"{parsed.scheme}://{parsed.netloc}\"\n"
+          }
+        ],
+        "expected_violations": [],
+        "grading_note": "Zero violations expected: tamr_unify_client is outside the ADR-0009 subject tamr_client.*, and ADR-0007 explicitly says 'Continue to support tamr_unify_client' with new functionality 'may be included in tamr_unify_client', so new code in the legacy package violates nothing. Any tamr-client constraint firing on tamr_unify_client.* would be a subject-overreach false positive."
+      },
+      {
+        "case_id": "tamr-beta-constant",
+        "description": "Module-level constant in the _beta feature-flag support module: architecturally inert",
+        "diff": [
+          {
+            "path": "tamr_client/_beta.py",
+            "append": "\n\nBETA_ENV_VAR_NAME = \"TAMR_CLIENT_BETA\"\n"
+          }
+        ],
+        "expected_violations": [],
+        "grading_note": "Zero violations expected per the ADR, but this case is the documented over-broad-subject false positive: the only changed FQN is the module tamr_client._beta (a module-level constant emits no def-level FQN), and ADR-0009 currently fires requires tamr_client.* -> tamr_client._types there because _beta.py has no _types import. Per ADR-0009 the rule governs 'all function modules'; _beta.py is the TAMR_CLIENT_BETA runtime feature-flag gate (ADR-0007), not a function module defining typed inputs/outputs, so this firing counts as a false positive and expected_violations stays empty (same over-broad-subject FP class as openlobby's elasticsearch/django.db firings)."
+      },
+      {
+        "case_id": "tamr-typechecking-import",
+        "description": "New helper in primary_key.py whose only _types dependency is a TYPE_CHECKING-guarded import (ADR-0009's sanctioned cycle pattern)",
+        "diff": [
+          {
+            "path": "tamr_client/primary_key.py",
+            "append": "\n\nfrom typing import TYPE_CHECKING, Optional\n\nif TYPE_CHECKING:\n    from tamr_client._types import JsonDict\n\n\ndef to_json(name: str, value: Optional[str]) -> \"JsonDict\":\n    \"\"\"Serialize a primary key reference to JSON (new helper).\"\"\"\n    payload = {\"name\": name}\n    if value is not None:\n        payload[\"value\"] = value\n    return payload\n"
+          }
+        ],
+        "expected_violations": [],
+        "grading_note": "Zero violations expected: ADR-0009 explicitly sanctions typing.TYPE_CHECKING forward references 'for the rare cases where cyclical dependencies for types are unavoidable', so a module whose only _types dependency is the guarded from-import still depends on tamr_client._types in the ADR's sense. The system agrees today only because module-level import extraction is guard-agnostic (walk_imports sees the from-import inside the if TYPE_CHECKING: block and satisfies the module-scope requires, #115); a parser that skipped guarded imports would turn this into a miss, which is why the case is in the gold."
       }
     ]
   },
@@ -267,6 +398,163 @@
         ],
         "expected_violations": [],
         "grading_note": "Zero violations expected: models.py imports django.db at module level (satisfying ADR-0010/0012 for openlobby.core.models.* and openlobby.*), and a module-level assignment is architecturally inert. ADR-0002 requires elasticsearch for openlobby.core.* firing here is a false positive: ADR-0002 is about fulltext search, not the data model."
+      },
+      {
+        "case_id": "openlobby-api-rest-serializers",
+        "description": "New REST-framework serializer in the GraphQL API package, violating ADR-0004's GraphQL-only mandate",
+        "diff": [
+          {
+            "path": "openlobby/core/api/schema.py",
+            "append": "\n\nfrom rest_framework import serializers\n\n\nclass OpenIdClientSerializer(serializers.ModelSerializer):\n    \"\"\"Legacy REST-style serializer (new code).\"\"\"\n\n    class Meta:\n        model = OpenIdClient\n        fields = [\"id\", \"name\", \"issuer\"]\n"
+          }
+        ],
+        "expected_violations": [
+          {
+            "adr_id": "ADR-0004",
+            "predicate": "prohibits_dependency",
+            "subject": "openlobby.core.api.*",
+            "object": "rest_framework",
+            "matched_fqn": "openlobby.core.api.schema",
+            "justification": "ADR-0004: 'We will use GraphQL as API standard. From other options like REST and Graph API it's the most client friendly approach.' The appended code in openlobby/core/api/schema.py adds 'from rest_framework import serializers' and a ModelSerializer, introducing a REST framework into the GraphQL-only API package. Structural predicate, reported at the module that owns the new import."
+          }
+        ],
+        "grading_note": "The five requires firings on the new class openlobby.core.api.schema.OpenIdClientSerializer (ADR-0002 elasticsearch, ADR-0004 graphene, ADR-0007 graphene.relay, ADR-0010 django, ADR-0012 django.db) are the documented class-scope over-trigger: class-level FQNs do not inherit enclosing-module imports (the #115 seeding covers function/method scopes only), and core/api/schema.py already imports graphene and relay at module level, so the ADR-0004/0007 firings are artifacts of the missing class-scope seeding. ADR-0002 (schema.py is not search code), ADR-0010 and ADR-0012 (a serializer is not web-framework or data-access code) are the recorded over-broad-subject FP classes. Only the rest_framework prohibition is a true finding."
+      },
+      {
+        "case_id": "openlobby-api-nonrelay-mutation",
+        "description": "New GraphQL mutation built with plain graphene.Mutation instead of the Relay specification",
+        "diff": [
+          {
+            "path": "openlobby/core/api/utils.py",
+            "append": "\n\nimport graphene\n\n\nclass Ping(graphene.Mutation):\n    \"\"\"Legacy-style mutation without the Relay specification (new code).\"\"\"\n\n    class Arguments:\n        pass\n\n    ok = graphene.Boolean()\n\n    def mutate(self, info):\n        return Ping(ok=True)\n"
+          }
+        ],
+        "expected_violations": [
+          {
+            "adr_id": "ADR-0007",
+            "predicate": "requires_dependency",
+            "subject": "openlobby.core.api.*",
+            "object": "graphene.relay",
+            "matched_fqn": "openlobby.core.api.utils.Ping",
+            "justification": "ADR-0007: 'We will adopt GraphQL Relay specification. ... It has a way to define inputs in mutations.' The new Ping mutation in openlobby/core/api/utils.py is built as a plain graphene.Mutation with a class-Arguments body instead of the repo's relay.ClientIDMutation pattern, and no scope of openlobby.core.api.utils (module or class) reaches graphene.relay."
+          }
+        ],
+        "grading_note": "The other four requires firings on openlobby.core.api.utils.Ping are false positives: the append adds 'import graphene' at module level of utils.py, so ADR-0004's requires is satisfied at the module that owns the import and the class-level firing is the class-scope over-trigger (class FQNs do not inherit enclosing-module imports, #115 covers function/method scopes only); ADR-0010 django, ADR-0012 django.db and ADR-0002 elasticsearch are the recorded over-broad-subject FP classes (a ping mutation touches neither the web framework, the database, nor search). Only the missing graphene.relay dependency is a true finding: unlike the compliant case, no scope of utils.py can reach graphene.relay."
+      },
+      {
+        "case_id": "openlobby-api-plain-dict-endpoint",
+        "description": "New API helper returning plain dicts instead of graphene types, bypassing the GraphQL API standard",
+        "diff": [
+          {
+            "path": "openlobby/core/api/sanitizers.py",
+            "append": "\n\ndef legacy_reports_api(query, limit=10):\n    \"\"\"Legacy JSON-style API helper returning plain dicts instead of GraphQL types (new code).\"\"\"\n    return {\"items\": [{\"title\": extract_text(query)}], \"limit\": limit}\n"
+          }
+        ],
+        "expected_violations": [
+          {
+            "adr_id": "ADR-0004",
+            "predicate": "requires_dependency",
+            "subject": "openlobby.core.api.*",
+            "object": "graphene",
+            "matched_fqn": "openlobby.core.api.sanitizers.legacy_reports_api",
+            "justification": "ADR-0004: 'We will use GraphQL as API standard.' The new legacy_reports_api function in openlobby/core/api/sanitizers.py serves API data as plain dicts, and openlobby/core/api/sanitizers.py has no dependency on graphene at any scope (module imports are bleach and re only)."
+          },
+          {
+            "adr_id": "ADR-0007",
+            "predicate": "requires_dependency",
+            "subject": "openlobby.core.api.*",
+            "object": "graphene.relay",
+            "matched_fqn": "openlobby.core.api.sanitizers.legacy_reports_api",
+            "justification": "ADR-0007: 'We will adopt GraphQL Relay specification.' A JSON-dict endpoint bypasses the GraphQL API entirely and therefore the Relay specification the repo adopted; legacy_reports_api has no dependency on graphene.relay at any scope."
+          }
+        ],
+        "grading_note": "Both requires are genuine (function scope and module scope both lack the dependencies, so no seeding artifact is involved); the ADR-0007 firing is derivative of the ADR-0004 bypass. The remaining firings on legacy_reports_api are the recorded over-broad-subject FP classes: ADR-0002 elasticsearch (sanitizers are not search code), ADR-0010 django and ADR-0012 django.db (sanitizer helpers touch neither the web framework nor the database)."
+      },
+      {
+        "case_id": "openlobby-admin-mysql-export",
+        "description": "New admin export writes to a MySQL instance, violating ADR-0012's PostgreSQL-only decision",
+        "diff": [
+          {
+            "path": "openlobby/core/admin.py",
+            "append": "\n\nimport mysql.connector\n\n\ndef export_reports_to_legacy_mysql():\n    \"\"\"Mirror reports into a legacy MySQL instance for old consumers (new code).\"\"\"\n    connection = mysql.connector.connect(host=\"legacy\", database=\"reports\")\n    try:\n        cursor = connection.cursor()\n        cursor.execute(\"SELECT COUNT(*) FROM reports\")\n        return cursor.fetchone()[0]\n    finally:\n        connection.close()\n"
+          }
+        ],
+        "expected_violations": [
+          {
+            "adr_id": "ADR-0012",
+            "predicate": "prohibits_dependency",
+            "subject": "openlobby.*",
+            "object": "mysql",
+            "matched_fqn": "openlobby.core.admin",
+            "justification": "ADR-0012: 'Another popular option is MySQL/MariaDB. But because it has a major bug #28727 ... breaking ACID in schema changes it can't be used for any serious project.' The appended 'import mysql.connector' in openlobby/core/admin.py introduces a MySQL client dependency; the module that owns the new import (openlobby.core.admin) is the correct report location, per the module-owns-import precedent of the flask prohibition case."
+          }
+        ],
+        "grading_note": "The system currently reports this prohibition at the package openlobby.core via the CONTAINS path openlobby.core -> openlobby.core.admin -> IMPORTS mysql.connector, which scores partial against the expected module-level location through ancestor-descendant tolerance; the module that owns the import is the architecturally precise location. The ADR-0002 elasticsearch and ADR-0012 django.db requires firings on export_reports_to_legacy_mysql are the recorded over-broad-subject FP classes (an admin export action is neither search code nor application data access). ADR-0006 requires flask stays quiet on this no-flask change: supersession by ADR-0010 holds."
+      },
+      {
+        "case_id": "openlobby-search-orm-bypass",
+        "description": "New fulltext search function queries the relational ORM instead of Elasticsearch",
+        "diff": [
+          {
+            "path": "openlobby/core/search.py",
+            "append": "\n\nfrom .models import Report\n\n\ndef search_reports_in_db(query):\n    \"\"\"Fulltext search over Report bodies via the relational ORM instead of Elasticsearch (new code).\"\"\"\n    return list(\n        Report.objects.filter(is_draft=False, body__icontains=query)[:100]\n    )\n"
+          }
+        ],
+        "expected_violations": [
+          {
+            "adr_id": "ADR-0011",
+            "predicate": "requires_dependency",
+            "subject": "openlobby.core.search.*",
+            "object": "elasticsearch",
+            "matched_fqn": "openlobby.core.search.search_reports_in_db",
+            "justification": "ADR-0011: 'We will add relational database as primary database. Elasticsearch will be used for denormalized reports and related data intended for fulltext search.' The new search_reports_in_db function in openlobby/core/search.py does fulltext search over Report bodies via the relational ORM (body__icontains), with no dependency on elasticsearch at any scope; fulltext search must go through Elasticsearch."
+          },
+          {
+            "adr_id": "ADR-0002",
+            "predicate": "requires_dependency",
+            "subject": "openlobby.core.*",
+            "object": "elasticsearch",
+            "matched_fqn": "openlobby.core.search.search_reports_in_db",
+            "justification": "ADR-0002: 'We will use Elasticsearch. It's well known database with great fulltext search capabilities.' For actual fulltext-search code the constraint applies on its own terms (unlike its over-broad firings on non-search code): search_reports_in_db performs fulltext search without any elasticsearch dependency at any scope."
+          }
+        ],
+        "grading_note": "This is the discriminating case for ADR-0002's over-broad openlobby.core.* subject: on real search code the firing is a true finding, on non-search code it is a recorded FP. The ADR-0012 django.db firing on search_reports_in_db is a system-limited false positive: the function accesses data through the Django ORM (Report.objects.filter), which is exactly the django.db access path ADR-0012 mandates, but chained-call root resolution (#116) resolves Report.objects to openlobby.core.models.Report so no django.db dependency is recorded. The ADR-0010 django firing is the over-broad-subject FP (search code need not import the web framework; core/search.py has no django import)."
+      },
+      {
+        "case_id": "openlobby-compliant-relay-mutation",
+        "description": "New report-draft deletion mutation following the sanctioned Relay + ORM pattern",
+        "diff": [
+          {
+            "path": "openlobby/core/api/mutations.py",
+            "append": "\n\nclass DeleteReportDraft(relay.ClientIDMutation):\n    class Input:\n        id = graphene.ID(required=True)\n\n    success = graphene.Boolean()\n\n    @classmethod\n    def mutate_and_get_payload(cls, root, info, **input):\n        type, id = from_global_id(input.get(\"id\"))\n        Report.objects.filter(\n            id=id, author_id=info.context.user.id, is_draft=True\n        ).delete()\n        return DeleteReportDraft(success=True)\n"
+          }
+        ],
+        "expected_violations": [],
+        "grading_note": "Zero violations expected: the new mutation is the sanctioned pattern (relay.ClientIDMutation in a module that imports graphene and relay at module level, data access through the Report.objects ORM). All five requires firings on the class openlobby.core.api.mutations.DeleteReportDraft (ADR-0002 elasticsearch, ADR-0004 graphene, ADR-0007 graphene.relay, ADR-0010 django, ADR-0012 django.db) are false positives documenting the class-scope gap: class-level FQNs do not inherit enclosing-module imports (the #115 seeding covers function/method scopes only, which is why the enclosing mutate_and_get_payload method stays clean), and 'from graphene import relay' does not register a dependency on graphene.relay. A firing on any of the five would remain an FP even though the class literally extends relay.ClientIDMutation."
+      },
+      {
+        "case_id": "openlobby-openid-handrolled-token",
+        "description": "New openid helper decodes ID-token payloads by hand, deliberately avoiding the oic library",
+        "diff": [
+          {
+            "path": "openlobby/core/openid.py",
+            "append": "\n\nimport base64\nimport json\n\n\ndef parse_id_token(id_token):\n    \"\"\"Hand-rolled JWT payload decoding without the oic library (new code).\"\"\"\n    payload_part = id_token.split(\".\")[1]\n    padded = payload_part + \"=\" * (-len(payload_part) % 4)\n    return json.loads(base64.b64decode(padded))\n"
+          }
+        ],
+        "expected_violations": [],
+        "grading_note": "Zero violations expected under the module-scope reading of ADR-0009 (tuf-repository-helper precedent): openlobby/core/openid.py imports oic at module level, so openlobby.core.openid owns the required dependency and the requires is satisfied for every scope via enclosing-module seeding (#115). parse_id_token deliberately hand-rolls JWT decoding with base64/json and never touches oic, so the case discriminates a per-function-usage reading: a future scope change to per-function dependency usage would flip this case to a fire, and any ADR-0009 firing today would mean the #115 seeding regressed and counts as an over-trigger FP. The ADR-0002 elasticsearch and ADR-0012 django.db firings on parse_id_token are the recorded over-broad-subject FP classes (openid auth code is neither search code nor data access)."
+      },
+      {
+        "case_id": "openlobby-settings-assignment",
+        "description": "Module-level assignment in the settings module: no django or flask import anywhere in the file",
+        "diff": [
+          {
+            "path": "openlobby/settings.py",
+            "append": "\n\nRATELIMIT_ENABLED = False\n"
+          }
+        ],
+        "expected_violations": [],
+        "grading_note": "Zero violations expected: the module-level assignment is architecturally inert, and openlobby/settings.py conventionally never imports django or django.db (it is Django's own configuration surface, referenced by name in INSTALLED_APPS strings), so the ADR-0010 requires django and ADR-0012 requires django.db firings at openlobby.settings are the recorded over-broad-subject FP classes (same class as ADR-0012 firing on modules that never touch data). This case is also the supersession probe: openlobby.settings has no flask import, so ADR-0006 requires flask would fire if supersession were not respected; ADR-0010 supersedes ADR-0006, so any ADR-0006 firing is a supersession false positive. Today it stays quiet."
       }
     ]
   }

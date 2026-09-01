@@ -1,0 +1,69 @@
+[
+  {
+    "adr_id": "ADR-0001",
+    "adr_path": "docs/contributor-guide/adr/0001-record-architecture-decisions.md",
+    "constraints": [],
+    "note": "Process ADR about documentation methodology (adopting Nygard-style ADRs); governs how decisions are written down, not how code is structured. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0002",
+    "adr_path": "docs/contributor-guide/adr/0002-linting-and-formatting.md",
+    "constraints": [],
+    "note": "Tooling ADR: flake8, flake8-import-order, and black are dev-time linting/formatting tools run in the noxfile lint/format sessions; no shipped module imports them, so no FQN-level dependency or implementation edge exists. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0003",
+    "adr_path": "docs/contributor-guide/adr/0003-reproducibility.md",
+    "constraints": [],
+    "note": "Dev-environment/CI process ADR: pyenv, poetry, nox, and GitHub Actions govern how Python versions, dependencies, and CI tests are managed; these are workflow tools, not dependencies of the tamr_client/tamr_unify_client modules. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0004",
+    "adr_path": "docs/contributor-guide/adr/0004-documentation-and-docstrings.md",
+    "constraints": [],
+    "note": "Documentation-process ADR: sphinx/recommonmark/sphinx-autodoc/napoleon/ReadTheDocs choices govern doc generation and docstring style; no dependency or implementation relation between code FQNs. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0005",
+    "adr_path": "docs/contributor-guide/adr/0005-composable-functions.md",
+    "constraints": [],
+    "note": "Code-representation ADR: 'Use @dataclass(frozen=True) to model types and plain modules and functions for business logic (no fluent method chaining)' is about how types and logic are represented inside modules (e.g. the frozen dataclasses in tamr_client/_types/*.py), not a dependency or implementation relation between FQNs; immutability/purity are defaults that 'not all types and functions have to' follow (explicitly optional). Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0006",
+    "adr_path": "docs/contributor-guide/adr/0006-type-checking.md",
+    "constraints": [],
+    "note": "Type-checking is a dev-time tool decision: mypy is configured via mypy.ini and run in the noxfile typecheck session ('mypy --package tamr_client'); no module in the repo imports mypy, so the decision yields no FQN-level dependency or implementation edge. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0007",
+    "adr_path": "docs/contributor-guide/adr/0007-tamr-client-package.md",
+    "constraints": [],
+    "note": "Package-governance ADR. 'Any new functionality must be included in tamr_client, may be included in tamr_unify_client' is a forward-looking development-process rule about where future features go, not a dependency or implementation relation between existing FQNs. 'Continue to support tamr_unify_client' is a maintenance commitment. The TAMR_CLIENT_BETA=1 gate is a runtime environment-variable check (tamr_client/_beta.py, invoked from tamr_client/__init__.py), not expressible as an FQN-level edge; tamr_client does not import tamr_unify_client anywhere. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0008",
+    "adr_path": "docs/contributor-guide/adr/0008-standardized-imports.md",
+    "constraints": [],
+    "note": "Import-style ADR: the ADR itself calls the choice 'a syntactic choice without semantic meaning'; rules about import statement form inside tamr_client (from-imports, no direct function imports, absolute imports) are not expressible as dependency or implementation edges between FQNs. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0009",
+    "adr_path": "docs/contributor-guide/adr/0009-separate-types-and-functions.md",
+    "constraints": [
+      {
+        "subject": "tamr_client.*",
+        "predicate": "requires_dependency",
+        "object": "tamr_client._types",
+        "justification": "ADR-0009 mandates putting types into the _types module and having 'all function modules depend on the _types module to define their inputs and outputs'; e.g. tamr_client/project.py imports Project, Session, Instance, and URL from tamr_client._types, and every tamr_client function module (dataset, attribute, operation, session, backup, etc.) follows the same pattern"
+      }
+    ],
+    "note": "Do NOT emit an edge for the @dataclass(frozen=True) part: that restates ADR-0005's type-representation choice (see ADR-0005 note), and the checkable structural rule of this ADR is the module dependency of function modules on _types. Object is the package FQN tamr_client._types, matching the real import target ('from tamr_client._types import ...')."
+  },
+  {
+    "adr_id": "ADR-0010",
+    "adr_path": "docs/contributor-guide/adr/0010-confirm-performance-issues-before-optimizing.md",
+    "constraints": [],
+    "note": "Design-priority ADR: 'the simplest and most understandably-written implementation should be prioritized over performance' is a development-value statement about how features are written, with no dependency or implementation relation between FQNs. Emit no edges."
+  }
+]

@@ -21,9 +21,11 @@ class RepoConfig:
     id: str
     url: str
     size: str = "small"
+    group: str = "smoke"
     ports: dict[str, int] = field(default_factory=dict)
     neo4j_memory: Neo4jMemoryConfig = field(default_factory=Neo4jMemoryConfig)
     adr_dir: str = "docs/adr"
+    adr_repo: str | None = None
 
 
 @dataclass
@@ -63,9 +65,11 @@ def load_config(path: Path | None = None) -> GlobalConfig:
             id=repo["id"],
             url=repo.get("url", f"./{repo['id']}"),
             size=repo.get("size", "small"),
+            group=repo.get("group", "smoke"),
             ports=repo.get("ports", {}),
             neo4j_memory=_parse_neo4j_memory(repo.get("neo4j_memory")),
             adr_dir=repo.get("adr_dir", "docs/adr"),
+            adr_repo=repo.get("adr_repo"),
         )
         for repo in data.get("repos", [])
     ]
