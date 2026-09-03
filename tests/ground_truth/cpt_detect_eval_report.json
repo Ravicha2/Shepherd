@@ -795,8 +795,8 @@
       },
       {
         "case_id": "openlobby-admin-mysql-export",
-        "exact": 0,
-        "partial": 1,
+        "exact": 1,
+        "partial": 0,
         "miss": 0,
         "total": 1,
         "false_positives": 2,
@@ -830,7 +830,7 @@
               "matched_fqn": "openlobby.core.admin",
               "justification": "ADR-0012: 'Another popular option is MySQL/MariaDB. But because it has a major bug #28727 ... breaking ACID in schema changes it can't be used for any serious project.' The appended 'import mysql.connector' in openlobby/core/admin.py introduces a MySQL client dependency; the module that owns the new import (openlobby.core.admin) is the correct report location, per the module-owns-import precedent of the flask prohibition case."
             },
-            "score": "partial_match",
+            "score": "exact_match",
             "justification": "ADR-0012: 'Another popular option is MySQL/MariaDB. But because it has a major bug #28727 ... breaking ACID in schema changes it can't be used for any serious project.' The appended 'import mysql.connector' in openlobby/core/admin.py introduces a MySQL client dependency; the module that owns the new import (openlobby.core.admin) is the correct report location, per the module-owns-import precedent of the flask prohibition case."
           }
         ]
@@ -1052,8 +1052,8 @@
         "per_constraint": []
       }
     ],
-    "exact": 7,
-    "partial": 1,
+    "exact": 8,
+    "partial": 0,
     "miss": 0,
     "false_positives": 31,
     "total": 8,
@@ -1061,6 +1061,6 @@
       "adg_nodes": 196,
       "external_nodes": 51
     },
-    "accuracy": 0.9375
+    "accuracy": 1.0
   }
 }

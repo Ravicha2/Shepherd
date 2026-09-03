@@ -1475,3 +1475,88 @@ class TestModuleScopeSeeding:
         prohibits = [v for v in result.violations if v.constraint.predicate == PredicateType.PROHIBITS_DEPENDENCY]
         assert len(prohibits) == 1
         assert str(prohibits[0].matched_fqn) == "app.routes.users"
+
+
+# ===========================================================================
+# 11. Issue 126: prohibits reports at the evidence-owning node, not the
+# CONTAINS-ancestor package that merely contains it
+# ===========================================================================
+
+
+class TestProhibitsReportsAtEvidenceOwner:
+    """When the evidence path from a subject descends via CONTAINS, the node
+    owning the decisive dependency edge (source of the first non-CONTAINS hop)
+    is where the violation is reported. Paths that stay in the subject's own
+    scope (function seeded with module edges, direct edges) keep the current
+    report location."""
+
+    @staticmethod
+    def _mysql_adg() -> ADG:
+        """app.core.admin imports mysql.connector at module level. The bare
+        `mysql` node mirrors what merge_constraint_edges creates for a
+        prohibits object absent from the codebase's own imports."""
+        nodes = [
+            FQNNode(fqn=FQN.from_dotted("app"), kind=FQNKind.MODULE, file_path="app/__init__.py", line_start=0, line_end=0, start_byte=0, end_byte=0),
+            FQNNode(fqn=FQN.from_dotted("app.core"), kind=FQNKind.MODULE, file_path="app/core/__init__.py", line_start=0, line_end=0, start_byte=0, end_byte=0),
+            FQNNode(fqn=FQN.from_dotted("app.core.admin"), kind=FQNKind.MODULE, file_path="app/core/admin.py", line_start=0, line_end=20, start_byte=0, end_byte=0),
+            FQNNode(fqn=FQN.from_dotted("mysql"), kind=FQNKind.EXTERNAL, file_path="", line_start=0, line_end=0, start_byte=0, end_byte=0),
+        ]
+        edges = [
+            Edge(source="app", target="app.core", kind="CONTAINS"),
+            Edge(source="app.core", target="app.core.admin", kind="CONTAINS"),
+            Edge(source="app.core.admin", target="mysql.connector", kind="IMPORTS"),
+        ]
+        return ADG(nodes=nodes, edges=edges)
+
+    def test_package_subject_reports_at_importing_module(self) -> None:
+        """A wildcard subject whose path to the prohibited object descends via
+        CONTAINS reports at the import-owning module, not the package."""
+        from services.cpt.engine import detect
+
+        constraints = [
+            ConstraintEdge(
+                subject="app.*",
+                predicate=PredicateType.PROHIBITS_DEPENDENCY,
+                object="mysql",
+                justification="MySQL is prohibited; use the sanctioned database.",
+                adr_id="ADR-001",
+                adr_path="docs/adr/001.md",
+            ),
+        ]
+        adg = ADG(nodes=self._mysql_adg().nodes, edges=self._mysql_adg().edges, constraint_edges=constraints)
+        diff = DiffResult(
+            to_sha="abc123",
+            from_sha="def456",
+            changed_files=[FileChange(path="app/core/admin.py", status="modified")],
+            changed_fqns=[_changed_fqn("app.core.admin")],
+        )
+        result = detect(diff, adg)
+        assert len(result.violations) == 1
+        assert str(result.violations[0].matched_fqn) == "app.core.admin"
+        assert result.violations[0].location == {"file_path": "app/core/admin.py", "line_start": 0, "line_end": 20}
+
+    def test_exact_package_subject_reports_at_importing_module(self) -> None:
+        """Same for an exact package subject: the location is the module that
+        owns the import, not the package that merely contains it."""
+        from services.cpt.engine import detect
+
+        constraints = [
+            ConstraintEdge(
+                subject="app.core",
+                predicate=PredicateType.PROHIBITS_DEPENDENCY,
+                object="mysql",
+                justification="MySQL is prohibited.",
+                adr_id="ADR-001",
+                adr_path="docs/adr/001.md",
+            ),
+        ]
+        adg = ADG(nodes=self._mysql_adg().nodes, edges=self._mysql_adg().edges, constraint_edges=constraints)
+        diff = DiffResult(
+            to_sha="abc123",
+            from_sha="def456",
+            changed_files=[FileChange(path="app/core/admin.py", status="modified")],
+            changed_fqns=[_changed_fqn("app.core.admin")],
+        )
+        result = detect(diff, adg)
+        assert len(result.violations) == 1
+        assert str(result.violations[0].matched_fqn) == "app.core.admin"

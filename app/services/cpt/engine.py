@@ -213,13 +213,25 @@ def check_structural_predicates(
                         continue
                     if _path_excused(path, object_str, excusing_requires):
                         continue
+                    # issue 126: when the evidence lives outside the subject's own
+                    # scope (path descends via CONTAINS), report at the node that
+                    # owns the decisive edge, not the containing ancestor. Paths
+                    # within the subject's own scope (own edges, seeded module
+                    # edges) keep the report location above.
+                    if path[0].kind == "CONTAINS":
+                        evidence_str = next(
+                            (edge.source for edge in path if edge.kind != "CONTAINS"),
+                            report_str,
+                        )
+                    else:
+                        evidence_str = report_str
                     path_summary = " -> ".join(f"{edge.kind} {edge.target}" for edge in path)
                     violations.append(Violation(
                         constraint=matched_constraint.constraint,
                         changed_fqn=subject_fqn,
-                        matched_fqn=FQN.from_dotted_safe(report_str),
+                        matched_fqn=FQN.from_dotted_safe(evidence_str),
                         match_status=higher,
-                        evidence=f"{report_str} {label} {object_str} via {path_summary}",
+                        evidence=f"{evidence_str} {label} {object_str} via {path_summary}",
                         change_type="structural",
                         path_hops=[{"kind": edge.kind, "target": edge.target} for edge in path],
                     ))
@@ -359,7 +371,12 @@ def detect(diff_result: DiffResult, adg: ADG) -> CPTResult:
 
     node_by_fqn = {str(node.fqn): node for node in adg.nodes}
     for violation in violations:
-        node = node_by_fqn.get(str(violation.changed_fqn))
+        # structural prohibits report at the evidence-owning node (issue 126):
+        # changed_fqn is just the wildcard subject's match anchor; the location
+        # must follow the reported FQN. Change-triggered requires keep the
+        # changed node: that is what a reviewer reviews.
+        anchor_fqn = str(violation.matched_fqn) if violation.change_type == "structural" else str(violation.changed_fqn)
+        node = node_by_fqn.get(anchor_fqn) or node_by_fqn.get(str(violation.changed_fqn))
         if node:
             violation.location = {"file_path": node.file_path, "line_start": node.line_start, "line_end": node.line_end}
         for hop in violation.path_hops or ():
