@@ -5,9 +5,14 @@ Also exposes fqn_matches_pattern and MatchStatus for the CPT engine.
 
 from __future__ import annotations
 
+import builtins
 from enum import Enum
 
 from services.fqn import FQN
+
+# Builtin names (type, str, len, ...). A bare builtin name must never resolve
+# to a repo-internal FQN: `type(exc)` is the builtin, not tamr_client.attribute.type.
+_BUILTINS = frozenset(n for n in dir(builtins) if not n.startswith("__"))
 
 
 class MatchStatus(Enum):
@@ -46,8 +51,14 @@ class NameResolver:
         return fqn in self._fqns
 
     def resolve(self, text: str) -> FQN | None:
-        """Resolve a bare or dotted name to a known FQN. via suffix index."""
+        """Resolve a bare or dotted name to a known FQN via suffix index.
+
+        Tie-breaking is deterministic: exact FQN match > fewest parts > lexical.
+        Bare builtin names (type, str, len, ...) never resolve to repo-internal FQNs.
+        """
+        if "." not in text and text in _BUILTINS:
+            return None
         matches = self._suffix_index.get(text)
-        if matches:
-            return matches[0]
-        return None
+        if not matches:
+            return None
+        return min(matches, key=lambda fqn: (str(fqn) != text, len(fqn.parts), str(fqn)))

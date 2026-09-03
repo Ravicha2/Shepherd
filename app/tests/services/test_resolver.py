@@ -139,7 +139,56 @@ class TestNameResolverResolve:
 
 
 # ===========================================================================
-# 6. MatchStatus enum
+# 6. NameResolver.resolve: deterministic tie-breaking (#122)
+# ===========================================================================
+
+
+class TestNameResolverDeterministicTiebreak:
+    def test_exact_match_wins_over_suffix(self) -> None:
+        resolver = NameResolver({
+            FQN.from_dotted("json"),
+            FQN.from_dotted("tuf.api.serialization.json"),
+        })
+        assert resolver.resolve("json") == FQN.from_dotted("json")
+
+    def test_fewest_parts_wins(self) -> None:
+        resolver = NameResolver({
+            FQN.from_dotted("app.auth.middleware"),
+            FQN.from_dotted("app.middleware"),
+        })
+        assert resolver.resolve("middleware") == FQN.from_dotted("app.middleware")
+
+    def test_lexical_tiebreak(self) -> None:
+        resolver = NameResolver({
+            FQN.from_dotted("z.middleware"),
+            FQN.from_dotted("a.middleware"),
+        })
+        assert resolver.resolve("middleware") == FQN.from_dotted("a.middleware")
+
+
+# ===========================================================================
+# 7. NameResolver.resolve: builtins never resolve to repo-internal FQNs (#122)
+# ===========================================================================
+
+
+class TestNameResolverBuiltins:
+    def test_builtin_bare_name_returns_none(self) -> None:
+        resolver = NameResolver({
+            FQN.from_dotted("tamr_client.attribute.type"),
+            FQN.from_dotted("tamr_client.attribute.str"),
+        })
+        assert resolver.resolve("type") is None
+        assert resolver.resolve("str") is None
+
+    def test_dotted_repo_reference_to_builtin_name_still_resolves(self) -> None:
+        resolver = NameResolver({
+            FQN.from_dotted("tamr_client.attribute.type"),
+        })
+        assert resolver.resolve("tamr_client.attribute.type") == FQN.from_dotted("tamr_client.attribute.type")
+
+
+# ===========================================================================
+# 8. MatchStatus enum
 # ===========================================================================
 
 
