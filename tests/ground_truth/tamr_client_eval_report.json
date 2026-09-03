@@ -1,0 +1,22 @@
+{
+  "exact": 0,
+  "partial": 0,
+  "miss": 1,
+  "total": 1,
+  "false_positives": 24,
+  "accuracy": 0.0,
+  "per_constraint": [
+    {
+      "adr_id": "ADR-0009",
+      "expected": {
+        "subject": "tamr_client.*",
+        "predicate": "requires_dependency",
+        "object": "tamr_client._types",
+        "justification": "ADR-0009 mandates putting types into the _types module and having 'all function modules depend on the _types module to define their inputs and outputs'; e.g. tamr_client/project.py imports Project, Session, Instance, and URL from tamr_client._types, and every tamr_client function module (dataset, attribute, operation, session, backup, etc.) follows the same pattern"
+      },
+      "score": "miss",
+      "resolved_subject": "tamr_client.attribute.*",
+      "resolved_object": "tamr_client._types.*"
+    }
+  ]
+}
