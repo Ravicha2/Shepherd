@@ -1476,6 +1476,70 @@ class TestModuleScopeSeeding:
         assert len(prohibits) == 1
         assert str(prohibits[0].matched_fqn) == "app.routes.users"
 
+    @staticmethod
+    def _class_scope_adg() -> ADG:
+        """app.routes.users imports the model and the service at module level;
+        Gate (class) has no own edges."""
+        adg = TestModuleScopeSeeding._module_scope_adg()
+        adg.nodes.append(FQNNode(fqn=FQN.from_dotted("app.routes.users.Gate"), kind=FQNKind.CLASS, file_path="app/routes/users.py", line_start=12, line_end=20, start_byte=0, end_byte=0))
+        adg.edges.append(Edge(source="app.routes.users", target="app.routes.users.Gate", kind="CONTAINS"))
+        return adg
+
+    def test_class_scope_requires_satisfied_by_enclosing_module_import(self) -> None:
+        """Issue 124 (option a, uniform seeding): a class scope inherits its
+        enclosing module's module-level edges, so an appended class in a
+        module that already imports the dependency must not over-trigger a
+        requires."""
+        from services.cpt.engine import detect
+
+        constraints = [
+            ConstraintEdge(
+                subject="app.routes.users.*",
+                predicate=PredicateType.REQUIRES_DEPENDENCY,
+                object="app.services.*",
+                justification="Routes must go through services.",
+                adr_id="ADR-002",
+                adr_path="docs/adr/002.md",
+            ),
+        ]
+        adg = ADG(nodes=self._class_scope_adg().nodes, edges=self._class_scope_adg().edges, constraint_edges=constraints)
+        diff = DiffResult(
+            to_sha="abc123",
+            from_sha="def456",
+            changed_files=[FileChange(path="app/routes/users.py", status="modified")],
+            changed_fqns=[_changed_fqn("app.routes.users.Gate")],
+        )
+        result = detect(diff, adg)
+        assert len(result.violations) == 0
+
+    def test_class_scope_prohibits_fires_at_enclosing_module(self) -> None:
+        """Issue 124 (option a, uniform seeding): a class scope also sees the
+        enclosing module's module-level imports for prohibits, reported once
+        at the enclosing module like function scopes (B1 analog)."""
+        from services.cpt.engine import detect
+
+        constraints = [
+            ConstraintEdge(
+                subject="app.routes.users.Gate",
+                predicate=PredicateType.PROHIBITS_DEPENDENCY,
+                object="app.models.*",
+                justification="Gate must not touch models.",
+                adr_id="ADR-001",
+                adr_path="docs/adr/001.md",
+            ),
+        ]
+        adg = ADG(nodes=self._class_scope_adg().nodes, edges=self._class_scope_adg().edges, constraint_edges=constraints)
+        diff = DiffResult(
+            to_sha="abc123",
+            from_sha="def456",
+            changed_files=[FileChange(path="app/routes/users.py", status="modified")],
+            changed_fqns=[_changed_fqn("app.routes.users.Gate")],
+        )
+        result = detect(diff, adg)
+        prohibits = [v for v in result.violations if v.constraint.predicate == PredicateType.PROHIBITS_DEPENDENCY]
+        assert len(prohibits) == 1
+        assert str(prohibits[0].matched_fqn) == "app.routes.users"
+
 
 # ===========================================================================
 # 11. Issue 126: prohibits reports at the evidence-owning node, not the

@@ -325,9 +325,9 @@
       },
       {
         "case_id": "tuf-metadata-handrolled-codec",
-        "exact": 1,
+        "exact": 0,
         "partial": 0,
-        "miss": 0,
+        "miss": 1,
         "total": 1,
         "false_positives": 0,
         "unexpected": [],
@@ -341,7 +341,7 @@
               "matched_fqn": "tuf.api.metadata.LegacyWireFormatCodec",
               "justification": "ADR-0006 (Decision Outcome, Compromise 2): 'Serialization is implemented independently of the metadata class as described in (3). However, the meat of the default JsonSerializer, i.e. conversion between metadata objects and dicts, is implemented on the metadata class' \u2014 wire-format (de)serialization belongs in the separated serialization package, and the gold constraint reads 'metadata classes depend on the serialization package (tuf.api.serialization), not the other way around.' The new LegacyWireFormatCodec class in tuf/api/metadata.py hand-rolls JSON wire-format dumps/loads with the stdlib json module (ADR-0006's rejected option 1, 'Serialization in metadata classes') and has no dependency on tuf.api.serialization at any scope."
             },
-            "score": "exact_match",
+            "score": "miss",
             "justification": "ADR-0006 (Decision Outcome, Compromise 2): 'Serialization is implemented independently of the metadata class as described in (3). However, the meat of the default JsonSerializer, i.e. conversion between metadata objects and dicts, is implemented on the metadata class' \u2014 wire-format (de)serialization belongs in the separated serialization package, and the gold constraint reads 'metadata classes depend on the serialization package (tuf.api.serialization), not the other way around.' The new LegacyWireFormatCodec class in tuf/api/metadata.py hand-rolls JSON wire-format dumps/loads with the stdlib json module (ADR-0006's rejected option 1, 'Serialization in metadata classes') and has no dependency on tuf.api.serialization at any scope."
           }
         ]
@@ -392,16 +392,16 @@
         "per_constraint": []
       }
     ],
-    "exact": 3,
+    "exact": 2,
     "partial": 0,
-    "miss": 0,
+    "miss": 1,
     "false_positives": 0,
     "total": 3,
     "node_counts": {
       "adg_nodes": 321,
       "external_nodes": 31
     },
-    "accuracy": 1.0
+    "accuracy": 0.6667
   },
   "tamr-client": {
     "repo_id": "tamr-client",
@@ -493,9 +493,9 @@
       },
       {
         "case_id": "tamr-operation-local-type",
-        "exact": 1,
+        "exact": 0,
         "partial": 0,
-        "miss": 0,
+        "miss": 1,
         "total": 1,
         "false_positives": 0,
         "unexpected": [],
@@ -507,10 +507,10 @@
               "subject": "tamr_client.*",
               "object": "tamr_client._types",
               "matched_fqn": "tamr_client.operation.PollingPolicy",
-              "justification": "ADR-0009: 'Put types (@dataclass(frozen=True)) into the _types module.' PollingPolicy is a frozen dataclass type declared in tamr_client/operation.py rather than tamr_client/_types, and the class-level FQN has no dependency on tamr_client._types at any scope (class FQNs do not inherit the enclosing module's imports), so the misplaced type fails the requires."
+              "justification": "ADR-0009: 'Put types (@dataclass(frozen=True)) into the _types module.' PollingPolicy is a frozen dataclass type declared in tamr_client/operation.py rather than tamr_client/_types, and the class-level FQN has no dependency on tamr_client._types at any scope, so the misplaced type fails the requires. Documented miss: module-scope inheritance masks the firing under #124 option (a)."
             },
-            "score": "exact_match",
-            "justification": "ADR-0009: 'Put types (@dataclass(frozen=True)) into the _types module.' PollingPolicy is a frozen dataclass type declared in tamr_client/operation.py rather than tamr_client/_types, and the class-level FQN has no dependency on tamr_client._types at any scope (class FQNs do not inherit the enclosing module's imports), so the misplaced type fails the requires."
+            "score": "miss",
+            "justification": "ADR-0009: 'Put types (@dataclass(frozen=True)) into the _types module.' PollingPolicy is a frozen dataclass type declared in tamr_client/operation.py rather than tamr_client/_types, and the class-level FQN has no dependency on tamr_client._types at any scope, so the misplaced type fails the requires. Documented miss: module-scope inheritance masks the firing under #124 option (a)."
           }
         ]
       },
@@ -525,16 +525,16 @@
         "per_constraint": []
       }
     ],
-    "exact": 3,
+    "exact": 2,
     "partial": 0,
-    "miss": 0,
+    "miss": 1,
     "false_positives": 1,
     "total": 3,
     "node_counts": {
       "adg_nodes": 744,
       "external_nodes": 25
     },
-    "accuracy": 1.0
+    "accuracy": 0.6667
   },
   "openlobby": {
     "repo_id": "openlobby",
@@ -607,54 +607,8 @@
         "partial": 0,
         "miss": 0,
         "total": 1,
-        "false_positives": 5,
-        "unexpected": [
-          {
-            "adr_id": "ADR-0002",
-            "predicate": "requires_dependency",
-            "subject": "openlobby.core.*",
-            "object": "elasticsearch",
-            "matched_fqn": "openlobby.core.api.schema.OpenIdClientSerializer",
-            "changed_fqn": "openlobby.core.api.schema.OpenIdClientSerializer",
-            "evidence": "openlobby.core.api.schema.OpenIdClientSerializer has no dependency on any module matching elasticsearch"
-          },
-          {
-            "adr_id": "ADR-0004",
-            "predicate": "requires_dependency",
-            "subject": "openlobby.core.api.*",
-            "object": "graphene",
-            "matched_fqn": "openlobby.core.api.schema.OpenIdClientSerializer",
-            "changed_fqn": "openlobby.core.api.schema.OpenIdClientSerializer",
-            "evidence": "openlobby.core.api.schema.OpenIdClientSerializer has no dependency on any module matching graphene"
-          },
-          {
-            "adr_id": "ADR-0007",
-            "predicate": "requires_dependency",
-            "subject": "openlobby.core.api.*",
-            "object": "graphene.relay",
-            "matched_fqn": "openlobby.core.api.schema.OpenIdClientSerializer",
-            "changed_fqn": "openlobby.core.api.schema.OpenIdClientSerializer",
-            "evidence": "openlobby.core.api.schema.OpenIdClientSerializer has no dependency on any module matching graphene.relay"
-          },
-          {
-            "adr_id": "ADR-0010",
-            "predicate": "requires_dependency",
-            "subject": "openlobby.*",
-            "object": "django",
-            "matched_fqn": "openlobby.core.api.schema.OpenIdClientSerializer",
-            "changed_fqn": "openlobby.core.api.schema.OpenIdClientSerializer",
-            "evidence": "openlobby.core.api.schema.OpenIdClientSerializer has no dependency on any module matching django"
-          },
-          {
-            "adr_id": "ADR-0012",
-            "predicate": "requires_dependency",
-            "subject": "openlobby.*",
-            "object": "django.db",
-            "matched_fqn": "openlobby.core.api.schema.OpenIdClientSerializer",
-            "changed_fqn": "openlobby.core.api.schema.OpenIdClientSerializer",
-            "evidence": "openlobby.core.api.schema.OpenIdClientSerializer has no dependency on any module matching django.db"
-          }
-        ],
+        "false_positives": 0,
+        "unexpected": [],
         "per_constraint": [
           {
             "expected": {
@@ -676,7 +630,7 @@
         "partial": 0,
         "miss": 0,
         "total": 1,
-        "false_positives": 4,
+        "false_positives": 2,
         "unexpected": [
           {
             "adr_id": "ADR-0002",
@@ -686,24 +640,6 @@
             "matched_fqn": "openlobby.core.api.utils.Ping",
             "changed_fqn": "openlobby.core.api.utils.Ping",
             "evidence": "openlobby.core.api.utils.Ping has no dependency on any module matching elasticsearch"
-          },
-          {
-            "adr_id": "ADR-0004",
-            "predicate": "requires_dependency",
-            "subject": "openlobby.core.api.*",
-            "object": "graphene",
-            "matched_fqn": "openlobby.core.api.utils.Ping",
-            "changed_fqn": "openlobby.core.api.utils.Ping",
-            "evidence": "openlobby.core.api.utils.Ping has no dependency on any module matching graphene"
-          },
-          {
-            "adr_id": "ADR-0010",
-            "predicate": "requires_dependency",
-            "subject": "openlobby.*",
-            "object": "django",
-            "matched_fqn": "openlobby.core.api.utils.Ping",
-            "changed_fqn": "openlobby.core.api.utils.Ping",
-            "evidence": "openlobby.core.api.utils.Ping has no dependency on any module matching django"
           },
           {
             "adr_id": "ADR-0012",
@@ -895,54 +831,8 @@
         "partial": 0,
         "miss": 0,
         "total": 0,
-        "false_positives": 5,
-        "unexpected": [
-          {
-            "adr_id": "ADR-0002",
-            "predicate": "requires_dependency",
-            "subject": "openlobby.core.*",
-            "object": "elasticsearch",
-            "matched_fqn": "openlobby.core.api.mutations.DeleteReportDraft",
-            "changed_fqn": "openlobby.core.api.mutations.DeleteReportDraft",
-            "evidence": "openlobby.core.api.mutations.DeleteReportDraft has no dependency on any module matching elasticsearch"
-          },
-          {
-            "adr_id": "ADR-0004",
-            "predicate": "requires_dependency",
-            "subject": "openlobby.core.api.*",
-            "object": "graphene",
-            "matched_fqn": "openlobby.core.api.mutations.DeleteReportDraft",
-            "changed_fqn": "openlobby.core.api.mutations.DeleteReportDraft",
-            "evidence": "openlobby.core.api.mutations.DeleteReportDraft has no dependency on any module matching graphene"
-          },
-          {
-            "adr_id": "ADR-0007",
-            "predicate": "requires_dependency",
-            "subject": "openlobby.core.api.*",
-            "object": "graphene.relay",
-            "matched_fqn": "openlobby.core.api.mutations.DeleteReportDraft",
-            "changed_fqn": "openlobby.core.api.mutations.DeleteReportDraft",
-            "evidence": "openlobby.core.api.mutations.DeleteReportDraft has no dependency on any module matching graphene.relay"
-          },
-          {
-            "adr_id": "ADR-0010",
-            "predicate": "requires_dependency",
-            "subject": "openlobby.*",
-            "object": "django",
-            "matched_fqn": "openlobby.core.api.mutations.DeleteReportDraft",
-            "changed_fqn": "openlobby.core.api.mutations.DeleteReportDraft",
-            "evidence": "openlobby.core.api.mutations.DeleteReportDraft has no dependency on any module matching django"
-          },
-          {
-            "adr_id": "ADR-0012",
-            "predicate": "requires_dependency",
-            "subject": "openlobby.*",
-            "object": "django.db",
-            "matched_fqn": "openlobby.core.api.mutations.DeleteReportDraft",
-            "changed_fqn": "openlobby.core.api.mutations.DeleteReportDraft",
-            "evidence": "openlobby.core.api.mutations.DeleteReportDraft has no dependency on any module matching django.db"
-          }
-        ],
+        "false_positives": 0,
+        "unexpected": [],
         "per_constraint": []
       },
       {
@@ -1055,7 +945,7 @@
     "exact": 8,
     "partial": 0,
     "miss": 0,
-    "false_positives": 31,
+    "false_positives": 19,
     "total": 8,
     "node_counts": {
       "adg_nodes": 196,

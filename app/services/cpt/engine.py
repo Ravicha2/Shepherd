@@ -48,11 +48,13 @@ def _build_adjacency(edges: Iterable[Edge]) -> dict[str, list[Edge]]:
 
 
 def _enclosing_module_map(adg: ADG) -> dict[str, str]:
-    """function/method FQN -> enclosing module FQN (nearest MODULE ancestor)."""
+    """function/method/class FQN -> enclosing module FQN (nearest MODULE ancestor).
+    Any nested scope inherits its enclosing module's module-level edges (issue 115
+    for functions, issue 124 option (a) extends the rule to classes)."""
     module_kinds = {str(node.fqn) for node in adg.nodes if node.kind == FQNKind.MODULE}
     scope: dict[str, str] = {}
     for node in adg.nodes:
-        if node.kind not in (FQNKind.FUNCTION, FQNKind.METHOD):
+        if node.kind not in (FQNKind.FUNCTION, FQNKind.METHOD, FQNKind.CLASS):
             continue
         parts = str(node.fqn).split(".")
         for i in range(len(parts) - 1, 0, -1):
