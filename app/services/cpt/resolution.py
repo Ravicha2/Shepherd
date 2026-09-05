@@ -38,7 +38,9 @@ def resolve(violations: list[Violation]) -> list[Violation]:
     deduped_violation: list[Violation] = []
 
     for violation in violations:
-        key = (violation.constraint.subject, violation.constraint.predicate, violation.constraint.object, str(violation.matched_fqn))
+        # adr_id is part of identity: two ADRs can carry the same live mandate
+        # (same subject/predicate/object); each attribution is its own finding (#125)
+        key = (violation.constraint.adr_id, violation.constraint.subject, violation.constraint.predicate, violation.constraint.object, str(violation.matched_fqn))
         if key not in seen:
             seen.add(key)
             deduped_violation.append(violation)
@@ -47,7 +49,7 @@ def resolve(violations: list[Violation]) -> list[Violation]:
     # O(n²) per constraint group, fine for typical violation counts
     by_constraint: dict[tuple, list[int]] = {}
     for i, violation in enumerate(deduped_violation):
-        constraint_key = (violation.constraint.subject, violation.constraint.predicate, violation.constraint.object)
+        constraint_key = (violation.constraint.adr_id, violation.constraint.subject, violation.constraint.predicate, violation.constraint.object)
         by_constraint.setdefault(constraint_key, []).append(i)
 
     to_remove: set[int] = set()

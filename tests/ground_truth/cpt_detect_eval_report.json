@@ -545,27 +545,8 @@
         "partial": 0,
         "miss": 0,
         "total": 1,
-        "false_positives": 2,
-        "unexpected": [
-          {
-            "adr_id": "ADR-0002",
-            "predicate": "requires_dependency",
-            "subject": "openlobby.core.*",
-            "object": "elasticsearch",
-            "matched_fqn": "openlobby.core.views.legacy_view",
-            "changed_fqn": "openlobby.core.views.legacy_view",
-            "evidence": "openlobby.core.views.legacy_view has no dependency on any module matching elasticsearch"
-          },
-          {
-            "adr_id": "ADR-0012",
-            "predicate": "requires_dependency",
-            "subject": "openlobby.*",
-            "object": "django.db",
-            "matched_fqn": "openlobby.core.views.legacy_view",
-            "changed_fqn": "openlobby.core.views.legacy_view",
-            "evidence": "openlobby.core.views.legacy_view has no dependency on any module matching django.db"
-          }
-        ],
+        "false_positives": 0,
+        "unexpected": [],
         "per_constraint": [
           {
             "expected": {
@@ -587,18 +568,8 @@
         "partial": 0,
         "miss": 0,
         "total": 0,
-        "false_positives": 1,
-        "unexpected": [
-          {
-            "adr_id": "ADR-0002",
-            "predicate": "requires_dependency",
-            "subject": "openlobby.core.*",
-            "object": "elasticsearch",
-            "matched_fqn": "openlobby.core.models",
-            "changed_fqn": "openlobby.core.models",
-            "evidence": "openlobby.core.models has no dependency on any module matching elasticsearch"
-          }
-        ],
+        "false_positives": 0,
+        "unexpected": [],
         "per_constraint": []
       },
       {
@@ -630,27 +601,8 @@
         "partial": 0,
         "miss": 0,
         "total": 1,
-        "false_positives": 2,
-        "unexpected": [
-          {
-            "adr_id": "ADR-0002",
-            "predicate": "requires_dependency",
-            "subject": "openlobby.core.*",
-            "object": "elasticsearch",
-            "matched_fqn": "openlobby.core.api.utils.Ping",
-            "changed_fqn": "openlobby.core.api.utils.Ping",
-            "evidence": "openlobby.core.api.utils.Ping has no dependency on any module matching elasticsearch"
-          },
-          {
-            "adr_id": "ADR-0012",
-            "predicate": "requires_dependency",
-            "subject": "openlobby.*",
-            "object": "django.db",
-            "matched_fqn": "openlobby.core.api.utils.Ping",
-            "changed_fqn": "openlobby.core.api.utils.Ping",
-            "evidence": "openlobby.core.api.utils.Ping has no dependency on any module matching django.db"
-          }
-        ],
+        "false_positives": 0,
+        "unexpected": [],
         "per_constraint": [
           {
             "expected": {
@@ -672,36 +624,8 @@
         "partial": 0,
         "miss": 0,
         "total": 2,
-        "false_positives": 3,
-        "unexpected": [
-          {
-            "adr_id": "ADR-0002",
-            "predicate": "requires_dependency",
-            "subject": "openlobby.core.*",
-            "object": "elasticsearch",
-            "matched_fqn": "openlobby.core.api.sanitizers.legacy_reports_api",
-            "changed_fqn": "openlobby.core.api.sanitizers.legacy_reports_api",
-            "evidence": "openlobby.core.api.sanitizers.legacy_reports_api has no dependency on any module matching elasticsearch"
-          },
-          {
-            "adr_id": "ADR-0010",
-            "predicate": "requires_dependency",
-            "subject": "openlobby.*",
-            "object": "django",
-            "matched_fqn": "openlobby.core.api.sanitizers.legacy_reports_api",
-            "changed_fqn": "openlobby.core.api.sanitizers.legacy_reports_api",
-            "evidence": "openlobby.core.api.sanitizers.legacy_reports_api has no dependency on any module matching django"
-          },
-          {
-            "adr_id": "ADR-0012",
-            "predicate": "requires_dependency",
-            "subject": "openlobby.*",
-            "object": "django.db",
-            "matched_fqn": "openlobby.core.api.sanitizers.legacy_reports_api",
-            "changed_fqn": "openlobby.core.api.sanitizers.legacy_reports_api",
-            "evidence": "openlobby.core.api.sanitizers.legacy_reports_api has no dependency on any module matching django.db"
-          }
-        ],
+        "false_positives": 0,
+        "unexpected": [],
         "per_constraint": [
           {
             "expected": {
@@ -735,27 +659,8 @@
         "partial": 0,
         "miss": 0,
         "total": 1,
-        "false_positives": 2,
-        "unexpected": [
-          {
-            "adr_id": "ADR-0002",
-            "predicate": "requires_dependency",
-            "subject": "openlobby.core.*",
-            "object": "elasticsearch",
-            "matched_fqn": "openlobby.core.admin.export_reports_to_legacy_mysql",
-            "changed_fqn": "openlobby.core.admin.export_reports_to_legacy_mysql",
-            "evidence": "openlobby.core.admin.export_reports_to_legacy_mysql has no dependency on any module matching elasticsearch"
-          },
-          {
-            "adr_id": "ADR-0012",
-            "predicate": "requires_dependency",
-            "subject": "openlobby.*",
-            "object": "django.db",
-            "matched_fqn": "openlobby.core.admin.export_reports_to_legacy_mysql",
-            "changed_fqn": "openlobby.core.admin.export_reports_to_legacy_mysql",
-            "evidence": "openlobby.core.admin.export_reports_to_legacy_mysql has no dependency on any module matching django.db"
-          }
-        ],
+        "false_positives": 0,
+        "unexpected": [],
         "per_constraint": [
           {
             "expected": {
@@ -777,27 +682,8 @@
         "partial": 0,
         "miss": 0,
         "total": 2,
-        "false_positives": 2,
-        "unexpected": [
-          {
-            "adr_id": "ADR-0010",
-            "predicate": "requires_dependency",
-            "subject": "openlobby.*",
-            "object": "django",
-            "matched_fqn": "openlobby.core.search.search_reports_in_db",
-            "changed_fqn": "openlobby.core.search.search_reports_in_db",
-            "evidence": "openlobby.core.search.search_reports_in_db has no dependency on any module matching django"
-          },
-          {
-            "adr_id": "ADR-0012",
-            "predicate": "requires_dependency",
-            "subject": "openlobby.*",
-            "object": "django.db",
-            "matched_fqn": "openlobby.core.search.search_reports_in_db",
-            "changed_fqn": "openlobby.core.search.search_reports_in_db",
-            "evidence": "openlobby.core.search.search_reports_in_db has no dependency on any module matching django.db"
-          }
-        ],
+        "false_positives": 0,
+        "unexpected": [],
         "per_constraint": [
           {
             "expected": {
@@ -815,13 +701,13 @@
             "expected": {
               "adr_id": "ADR-0002",
               "predicate": "requires_dependency",
-              "subject": "openlobby.core.*",
+              "subject": "openlobby.core.search.*",
               "object": "elasticsearch",
               "matched_fqn": "openlobby.core.search.search_reports_in_db",
-              "justification": "ADR-0002: 'We will use Elasticsearch. It's well known database with great fulltext search capabilities.' For actual fulltext-search code the constraint applies on its own terms (unlike its over-broad firings on non-search code): search_reports_in_db performs fulltext search without any elasticsearch dependency at any scope."
+              "justification": "ADR-0002: 'We will use Elasticsearch. It's well known database with great fulltext search capabilities based on Apache Lucene.' Post-resolution (#125 narrowed the subject from openlobby.core.*, whose 'database for all data' clause ADR-0011 superseded) the constraint's locus is the search code itself: search_reports_in_db performs fulltext search without any elasticsearch dependency at any scope."
             },
             "score": "exact_match",
-            "justification": "ADR-0002: 'We will use Elasticsearch. It's well known database with great fulltext search capabilities.' For actual fulltext-search code the constraint applies on its own terms (unlike its over-broad firings on non-search code): search_reports_in_db performs fulltext search without any elasticsearch dependency at any scope."
+            "justification": "ADR-0002: 'We will use Elasticsearch. It's well known database with great fulltext search capabilities based on Apache Lucene.' Post-resolution (#125 narrowed the subject from openlobby.core.*, whose 'database for all data' clause ADR-0011 superseded) the constraint's locus is the search code itself: search_reports_in_db performs fulltext search without any elasticsearch dependency at any scope."
           }
         ]
       },
@@ -841,27 +727,8 @@
         "partial": 0,
         "miss": 0,
         "total": 0,
-        "false_positives": 2,
-        "unexpected": [
-          {
-            "adr_id": "ADR-0002",
-            "predicate": "requires_dependency",
-            "subject": "openlobby.core.*",
-            "object": "elasticsearch",
-            "matched_fqn": "openlobby.core.openid.parse_id_token",
-            "changed_fqn": "openlobby.core.openid.parse_id_token",
-            "evidence": "openlobby.core.openid.parse_id_token has no dependency on any module matching elasticsearch"
-          },
-          {
-            "adr_id": "ADR-0012",
-            "predicate": "requires_dependency",
-            "subject": "openlobby.*",
-            "object": "django.db",
-            "matched_fqn": "openlobby.core.openid.parse_id_token",
-            "changed_fqn": "openlobby.core.openid.parse_id_token",
-            "evidence": "openlobby.core.openid.parse_id_token has no dependency on any module matching django.db"
-          }
-        ],
+        "false_positives": 0,
+        "unexpected": [],
         "per_constraint": []
       },
       {
@@ -870,27 +737,8 @@
         "partial": 0,
         "miss": 0,
         "total": 0,
-        "false_positives": 2,
-        "unexpected": [
-          {
-            "adr_id": "ADR-0010",
-            "predicate": "requires_dependency",
-            "subject": "openlobby.*",
-            "object": "django",
-            "matched_fqn": "openlobby.settings",
-            "changed_fqn": "openlobby.settings",
-            "evidence": "openlobby.settings has no dependency on any module matching django"
-          },
-          {
-            "adr_id": "ADR-0012",
-            "predicate": "requires_dependency",
-            "subject": "openlobby.*",
-            "object": "django.db",
-            "matched_fqn": "openlobby.settings",
-            "changed_fqn": "openlobby.settings",
-            "evidence": "openlobby.settings has no dependency on any module matching django.db"
-          }
-        ],
+        "false_positives": 0,
+        "unexpected": [],
         "per_constraint": []
       },
       {
@@ -909,43 +757,15 @@
         "partial": 0,
         "miss": 0,
         "total": 0,
-        "false_positives": 3,
-        "unexpected": [
-          {
-            "adr_id": "ADR-0002",
-            "predicate": "requires_dependency",
-            "subject": "openlobby.core.*",
-            "object": "elasticsearch",
-            "matched_fqn": "openlobby.core.middleware.get_author_usernames",
-            "changed_fqn": "openlobby.core.middleware.get_author_usernames",
-            "evidence": "openlobby.core.middleware.get_author_usernames has no dependency on any module matching elasticsearch"
-          },
-          {
-            "adr_id": "ADR-0010",
-            "predicate": "requires_dependency",
-            "subject": "openlobby.*",
-            "object": "django",
-            "matched_fqn": "openlobby.core.middleware.get_author_usernames",
-            "changed_fqn": "openlobby.core.middleware.get_author_usernames",
-            "evidence": "openlobby.core.middleware.get_author_usernames has no dependency on any module matching django"
-          },
-          {
-            "adr_id": "ADR-0012",
-            "predicate": "requires_dependency",
-            "subject": "openlobby.*",
-            "object": "django.db",
-            "matched_fqn": "openlobby.core.middleware.get_author_usernames",
-            "changed_fqn": "openlobby.core.middleware.get_author_usernames",
-            "evidence": "openlobby.core.middleware.get_author_usernames has no dependency on any module matching django.db"
-          }
-        ],
+        "false_positives": 0,
+        "unexpected": [],
         "per_constraint": []
       }
     ],
     "exact": 8,
     "partial": 0,
     "miss": 0,
-    "false_positives": 19,
+    "false_positives": 0,
     "total": 8,
     "node_counts": {
       "adg_nodes": 196,

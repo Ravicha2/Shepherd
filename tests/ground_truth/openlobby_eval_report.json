@@ -1,20 +1,20 @@
 {
-  "exact": 5,
-  "partial": 5,
+  "exact": 2,
+  "partial": 6,
   "miss": 2,
-  "total": 12,
-  "false_positives": 10,
-  "accuracy": 0.625,
+  "total": 10,
+  "false_positives": 11,
+  "accuracy": 0.5,
   "per_constraint": [
     {
       "adr_id": "ADR-0002",
       "expected": {
-        "subject": "openlobby.core.*",
+        "subject": "openlobby.core.search.*",
         "predicate": "requires_dependency",
         "object": "elasticsearch",
-        "justification": "ADR-0002 mandates Elasticsearch as the primary database for all data storage and fulltext search"
+        "justification": "ADR-0002: 'We will use Elasticsearch. It's well known database with great fulltext search capabilities based on Apache Lucene.' The 'database for all data' clause is content-superseded by ADR-0011: 'Elasticsearch will be used for denormalized reports and related data intended for fulltext search.' Post-resolution, ADR-0002's live mandate is Elasticsearch for fulltext search, whose locus is the search code (#125: post-resolution gold reading)."
       },
-      "score": "exact_match",
+      "score": "partial_match",
       "resolved_subject": "openlobby.core.*",
       "resolved_object": "elasticsearch"
     },
@@ -82,18 +82,6 @@
       "adr_id": "ADR-0010",
       "expected": {
         "subject": "openlobby.*",
-        "predicate": "requires_dependency",
-        "object": "django",
-        "justification": "ADR-0010 mandates Django as the web framework, replacing Flask"
-      },
-      "score": "exact_match",
-      "resolved_subject": "openlobby.*",
-      "resolved_object": "django"
-    },
-    {
-      "adr_id": "ADR-0010",
-      "expected": {
-        "subject": "openlobby.*",
         "predicate": "prohibits_dependency",
         "object": "flask",
         "justification": "ADR-0010 prohibits Flask; it is replaced by Django"
@@ -125,18 +113,6 @@
       "score": "partial_match",
       "resolved_subject": "openlobby.core.*",
       "resolved_object": "elasticsearch"
-    },
-    {
-      "adr_id": "ADR-0012",
-      "expected": {
-        "subject": "openlobby.*",
-        "predicate": "requires_dependency",
-        "object": "django.db",
-        "justification": "ADR-0012 mandates PostgreSQL as the relational database; access goes through the Django ORM (django.db). The codebase does not import postgresql directly (transitive via django.db)."
-      },
-      "score": "exact_match",
-      "resolved_subject": "openlobby.*",
-      "resolved_object": "django.db"
     },
     {
       "adr_id": "ADR-0012",

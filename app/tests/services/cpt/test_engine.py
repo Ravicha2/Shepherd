@@ -564,6 +564,28 @@ class TestResolve:
         result = resolve([v1, v2])
         assert len(result) == 1
 
+    def test_dedup_keeps_distinct_adr_attributions(self) -> None:
+        """Same subject/predicate/object/matched_fqn from different ADRs are distinct
+        findings: two ADRs can carry the same live mandate (#125, e.g. ADR-0002 and
+        ADR-0011 both requiring elasticsearch on openlobby.core.search.*). Collapsing
+        them would attribute the violation to whichever ADR comes first in the
+        constraint file — arbitrary, and invisible to per-ADR eval expectations."""
+        from services.cpt.resolution import resolve
+
+        v1 = self._make_violation(
+            "openlobby.core.search.*", PredicateType.REQUIRES_DEPENDENCY, "elasticsearch",
+            specificity=2.5, matched_fqn="openlobby.core.search.search_reports_in_db",
+            adr_id="ADR-0002",
+        )
+        v2 = self._make_violation(
+            "openlobby.core.search.*", PredicateType.REQUIRES_DEPENDENCY, "elasticsearch",
+            specificity=2.5, matched_fqn="openlobby.core.search.search_reports_in_db",
+            adr_id="ADR-0011",
+        )
+        result = resolve([v1, v2])
+        assert len(result) == 2
+        assert {v.constraint.adr_id for v in result} == {"ADR-0002", "ADR-0011"}
+
     def test_different_matched_fqns_not_deduped(self) -> None:
         """Sibling FQNs (not parent-child) stay separate."""
         from services.cpt.resolution import resolve

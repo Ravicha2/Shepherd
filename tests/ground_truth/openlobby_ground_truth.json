@@ -10,10 +10,10 @@
     "adr_path": "docs/architecture/decisions/0002-use-elasticsearch-for-fulltext-search.md",
     "constraints": [
       {
-        "subject": "openlobby.core.*",
+        "subject": "openlobby.core.search.*",
         "predicate": "requires_dependency",
         "object": "elasticsearch",
-        "justification": "ADR-0002 mandates Elasticsearch as the primary database for all data storage and fulltext search"
+        "justification": "ADR-0002: 'We will use Elasticsearch. It's well known database with great fulltext search capabilities based on Apache Lucene.' The 'database for all data' clause is content-superseded by ADR-0011: 'Elasticsearch will be used for denormalized reports and related data intended for fulltext search.' Post-resolution, ADR-0002's live mandate is Elasticsearch for fulltext search, whose locus is the search code (#125: post-resolution gold reading)."
       }
     ]
   },
@@ -97,12 +97,6 @@
     "constraints": [
       {
         "subject": "openlobby.*",
-        "predicate": "requires_dependency",
-        "object": "django",
-        "justification": "ADR-0010 mandates Django as the web framework, replacing Flask"
-      },
-      {
-        "subject": "openlobby.*",
         "predicate": "prohibits_dependency",
         "object": "flask",
         "justification": "ADR-0010 prohibits Flask; it is replaced by Django"
@@ -113,7 +107,8 @@
         "object": "django.db",
         "justification": "ADR-0010 mandates Django as the web framework; relational data access goes through the Django ORM (django.db). Moved from ADR-0011 since the Django ORM choice is what makes django.db the access path."
       }
-    ]
+    ],
+    "note": "Dropped in #125 (non-FQN-checkable, ADR-0003/0005 precedent): 'We will switch to Django.' is a framework choice with no FQN-derivable requires subject — settings.py is compliant Django-project code without importing django, so an import-level requires on openlobby.* asserts compliant modules are violating. The checkable content is carried by the flask prohibition and the models-locus django.db requires."
   },
   {
     "adr_id": "ADR-0011",
@@ -133,17 +128,12 @@
     "constraints": [
       {
         "subject": "openlobby.*",
-        "predicate": "requires_dependency",
-        "object": "django.db",
-        "justification": "ADR-0012 mandates PostgreSQL as the relational database; access goes through the Django ORM (django.db). The codebase does not import postgresql directly (transitive via django.db)."
-      },
-      {
-        "subject": "openlobby.*",
         "predicate": "prohibits_dependency",
         "object": "mysql",
         "justification": "ADR-0012 prohibits MySQL/MariaDB due to ACID-breaking bug in schema changes"
       }
-    ]
+    ],
+    "note": "Dropped in #125 (non-FQN-checkable, ADR-0003/0005 precedent): 'We will use PostgreSQL. ... It has very good support in Django's ORM.' scopes the mandate to data access, which is not an FQN prefix; the derivable data-access locus (openlobby.core.models.*) is already encoded under ADR-0010's django.db requires, and modules like openid.py or settings.py are compliant without django.db reachability."
   },
   {
     "adr_id": "ADR-0013",
