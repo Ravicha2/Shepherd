@@ -175,7 +175,7 @@ def run_eval(
     ground_truth: list[dict],
     adg,
     repo_id: str,
-    write_report: bool = False,
+    report_to_disk: bool = False,
 ) -> EvalResult:
     """Run the unified resolver on every ADR fixture and score against ground truth."""
     repo_root = _repo_root(repo_id)
@@ -226,7 +226,7 @@ def run_eval(
             if id(edge) not in matched_edge_ids
         )
 
-    if write_report:
+    if report_to_disk:
         write_report(report_path(repo_id), result.to_report())
     return result
 
@@ -236,7 +236,7 @@ def run_eval(
 def test_unified_resolver_eval(adg, ground_truth, repo_id) -> None:
     """End-to-end eval harness. Verifies scoring runs and tallies are consistent.
     Accuracy is reported, not gated — resolver quality is a separate concern."""
-    result = run_eval(ground_truth, adg, repo_id, write_report=True)
+    result = run_eval(ground_truth, adg, repo_id, report_to_disk=True)
     print(f"\n[resolver_eval:{repo_id}] exact={result.exact} partial={result.partial} miss={result.miss} "
           f"total={result.total} false_positives={result.false_positives} "
           f"accuracy={result.accuracy:.3f}")
@@ -252,5 +252,5 @@ if __name__ == "__main__":
     with open(_ground_truth_path(rid)) as f:
         gt = json.load(f)
     adg_obj = parse_repo(_repo_root(rid))
-    result = run_eval(gt, adg_obj, rid, write_report=True)
+    result = run_eval(gt, adg_obj, rid, report_to_disk=True)
     print(json.dumps(result.to_report(), indent=2))
