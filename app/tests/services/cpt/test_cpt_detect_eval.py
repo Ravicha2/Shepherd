@@ -21,6 +21,7 @@ from services.cpt.diff_processor import process_diff
 from services.cpt.engine import detect
 from services.models import ConstraintEdge, Diff, FileChange, FQNKind, PredicateType
 from services.pipeline import adg_with_specificity, augment_immutable
+from tests.eval_paths import RUN_DIR, write_report
 from tests.services.adg.test_unified_resolver_eval import _score_fqn
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -227,9 +228,9 @@ def test_cpt_detect_eval(repo_id, repo_report) -> None:
 
 
 def test_cpt_eval_report_write() -> None:
-    """Write the aggregated report JSON next to the other eval reports."""
+    """Write the aggregated report into the timestamped run directory."""
     reports = {repo_id: run_repo_eval(repo_id) for repo_id in _all_repos()}
-    (GROUND_TRUTH_DIR / "cpt_detect_eval_report.json").write_text(json.dumps(reports, indent=2))
+    write_report(RUN_DIR / "cpt_detect_eval_report.json", reports)
 
 
 if __name__ == "__main__":

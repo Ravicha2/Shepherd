@@ -23,7 +23,7 @@ Scores the unified resolver against `tests/ground_truth/<repo>_ground_truth.json
 
 - Gold coverage is complete: every ADR in every eval repo has an entry, including process/style ADRs with zero constraints (notes explain why). Zero-constraint entries exist so that anything the resolver extracts from them is counted as a false positive instead of being silently unmeasured.
 - Scoring: each expected constraint is matched against resolved edges by predicate, with subject/object FQN patterns scored exact / partial (ancestor-descendant tolerance) / miss. Accuracy = (exact + 0.5*partial) / total; false positives = resolved edges matched to no expectation.
-- Reports: `tests/ground_truth/<repo>_eval_report.json`.
+- Reports: every run writes `tests/ground_truth/reports/<timestamp>/<repo>_eval_report.json` (never overwritten; `_meta.git_commit` records the code version). The top-level `tests/ground_truth/<repo>_eval_report.json` files are the frozen pre-versioning baselines — diff against a run to see drift.
 
 ## Retrieval group (`cpt_eval`)
 
@@ -36,7 +36,7 @@ Scores CPT detect against `tests/ground_truth/cpt_detect_ground_truth.json`: per
   - Function/method subjects inherit their enclosing module's module-level edges (#115), so module-import-only dependencies count at module scope. Known remaining misses are recorded in `grading_note` with their cause, e.g. the two flask middleware expectations (auth.py's module-level `require_auth` import satisfies the function-scope requires even though the decorator is not applied, so the endpoints stay unauthenticated per ADR-002).
   - Over-triggers are deliberately listed in `grading_note` as false positives rather than expected. Post-#125 the openlobby over-broad-subject class is resolved at the gold level (see baselines); the one remaining instance is tamr ADR-0009 `tamr_client.*` firing on non-function modules (`_beta.py`), kept because the ADR's own scope ("all function modules") is not expressible in kind-blind FQN-prefix subjects.
 - Scoring matches on (adr_id, predicate, subject, object); matched_fqn is scored exact / partial with the same ancestor tolerance, since module-level dedup can shift which namespace level a violation is reported at.
-- Aggregate report: `tests/ground_truth/cpt_detect_eval_report.json`.
+- Aggregate report: `tests/ground_truth/reports/<timestamp>/cpt_detect_eval_report.json` (same versioning as the ingestion group).
 
 ## Reference baselines
 

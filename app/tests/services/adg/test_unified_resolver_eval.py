@@ -20,6 +20,7 @@ from services.adg.treesitter import parse_repo
 from services.adg.unified_resolver import resolve_adr_constraints
 from services.extract.config import LangExtractConfig
 from services.models import ConstraintEdge, PredicateType
+from tests.eval_paths import report_path, write_report
 
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -152,10 +153,6 @@ def _ground_truth_path(repo_id: str) -> Path:
     return GROUND_TRUTH_DIR / f"{repo_id.replace('-', '_')}_ground_truth.json"
 
 
-def _report_path(repo_id: str) -> Path:
-    return GROUND_TRUTH_DIR / f"{repo_id.replace('-', '_')}_eval_report.json"
-
-
 @pytest.fixture(scope="module", params=EVAL_REPOS, ids=lambda r: r)
 def repo_id(request) -> str:
     return request.param
@@ -230,7 +227,7 @@ def run_eval(
         )
 
     if write_report:
-        _report_path(repo_id).write_text(json.dumps(result.to_report(), indent=2))
+        write_report(report_path(repo_id), result.to_report())
     return result
 
 
