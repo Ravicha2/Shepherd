@@ -19,7 +19,7 @@ from services.models import (
     FQNNode,
     PredicateType,
 )
-from services.adg.adg_tools import dive, list_modules
+from services.adg.adg_tools import list_children
 from services.adg.unified_resolver import (
     _add_wildcard_for_modules,
     _external_packages,
@@ -166,12 +166,21 @@ def _tool_call(call_id: str, name: str, arguments: dict) -> dict:
     }
 
 
+def _stub_backend(query: str, top_k: int = 10) -> list[dict]:
+    """Stub search backend (ADR 017 decision 6 seam): fixed lift payload."""
+    return [
+        {"fqn": "app.api.users", "kind": "module", "file": "app/api/users.py", "snippet": "def get(self): ..."},
+        {"fqn": "app.api.users.UserView", "kind": "class", "file": "app/api/users.py", "snippet": "def get(self): ..."},
+    ]
+
+
 def _run_unified(
     adr_text: str,
     adr_id: str,
     adr_path: str,
     adg: ADG,
     responses: list,
+    search_backend=_stub_backend,
 ) -> list[ConstraintEdge]:
     mock_client = MagicMock()
     responses_iter = iter(responses)
@@ -180,7 +189,7 @@ def _run_unified(
     with patch("services.adg.unified_resolver.OpenAI", return_value=mock_client), \
          patch.dict("os.environ", {"TEST_API_KEY": "test-key"}):
         config = _make_config()
-        return resolve_adr_constraints(adr_text, adr_id, adr_path, adg, config)
+        return resolve_adr_constraints(adr_text, adr_id, adr_path, adg, config, search_backend)
 
 
 # -- Test: basic resolution --------------------------------------------------
@@ -264,13 +273,12 @@ class TestBasicResolution:
 
 class TestToolCalling:
     def test_uses_tools_then_resolves(self, sample_adg: ADG) -> None:
-        """Agent calls list_modules, dive, then produces constraints."""
-        modules_result = json.dumps(list_modules(sample_adg))
-        dive_result = json.dumps(dive("app.api", sample_adg, depth=2))
-
+        """Agent searches, inspects with the neighborhood tools, then produces constraints."""
         responses = [
-            _make_mock_response(tool_calls=[_tool_call("tc1", "list_modules", {})]),
-            _make_mock_response(tool_calls=[_tool_call("tc2", "dive", {"fqn": "app.api", "depth": 2})]),
+            _make_mock_response(tool_calls=[_tool_call("tc1", "search_code", {"query": "user view"})]),
+            _make_mock_response(tool_calls=[_tool_call("tc2", "list_children", {"fqn": "app.api"})]),
+            _make_mock_response(tool_calls=[_tool_call("tc3", "list_dependencies", {"fqn": "app.api.users"})]),
+            _make_mock_response(tool_calls=[_tool_call("tc4", "list_dependents", {"fqn": "app.auth.middleware"})]),
             _make_mock_response(
                 content=json.dumps([{
                     "subject": "app.api.*",
@@ -285,6 +293,27 @@ class TestToolCalling:
         edges = _run_unified(ADR_PROHIBIT_DEP, "ADR-001", "docs/adr/001.md", sample_adg, responses)
         assert len(edges) == 1
         assert edges[0].subject == "app.api.*"
+
+    def test_neighborhood_tool_results_reach_llm(self, sample_adg: ADG) -> None:
+        """list_children result is delivered as the tool message content."""
+        captured: list[dict] = []
+        mock_client = MagicMock()
+        responses_iter = iter([
+            _make_mock_response(tool_calls=[_tool_call("tc1", "list_children", {"fqn": "app.api"})]),
+            _make_mock_response(content="[]"),
+        ])
+
+        def _next(**kwargs):
+            captured.append(kwargs.get("messages"))
+            return next(responses_iter)
+
+        mock_client.chat.completions.create.side_effect = _next
+        with patch("services.adg.unified_resolver.OpenAI", return_value=mock_client), \
+             patch.dict("os.environ", {"TEST_API_KEY": "test-key"}):
+            resolve_adr_constraints(ADR_PROHIBIT_DEP, "ADR-001", "docs/adr/001.md", sample_adg, _make_config(), _stub_backend)
+
+        tool_messages = [m for messages in captured for m in messages if m.get("role") == "tool"]
+        assert json.loads(tool_messages[0]["content"]) == list_children("app.api", sample_adg)
 
 
 # -- Test: wildcard fallback ------------------------------------------------
@@ -336,7 +365,7 @@ class TestToolCallCap:
         many_responses = []
         for i in range(TOOL_CALL_CAP):
             many_responses.append(
-                _make_mock_response(tool_calls=[_tool_call(f"tc{i}", "dive", {"fqn": "app.api", "depth": 2})])
+                _make_mock_response(tool_calls=[_tool_call(f"tc{i}", "list_children", {"fqn": "app.api"})])
             )
         # Best-effort response after cap
         many_responses.append(
@@ -360,7 +389,7 @@ class TestToolCallCap:
         many_responses = []
         for i in range(TOOL_CALL_CAP):
             many_responses.append(
-                _make_mock_response(tool_calls=[_tool_call(f"tc{i}", "dive", {"fqn": "app.api", "depth": 2})])
+                _make_mock_response(tool_calls=[_tool_call(f"tc{i}", "list_children", {"fqn": "app.api"})])
             )
         many_responses.append(_make_mock_response(content="Cannot resolve."))
         edges = _run_unified(ADR_PROHIBIT_DEP, "ADR-001", "docs/adr/001.md", sample_adg, many_responses)
@@ -680,14 +709,192 @@ class TestIsInternal:
         assert _is_internal("app.hallucinated.*", sample_adg) is False
 
 
+# -- Test: search_code tool ------------------------------------------------------
+
+class TestSearchCodeTool:
+    def test_search_code_result_delivered_to_llm(self, sample_adg: ADG) -> None:
+        """Agent calls search_code; the stub backend's lift payload reaches the
+        next LLM turn as the tool result, capped by the dispatch choke point."""
+        captured: list[dict] = []
+        mock_client = MagicMock()
+        responses = [
+            _make_mock_response(tool_calls=[_tool_call("tc1", "search_code", {"query": "user view"})]),
+            _make_mock_response(content=json.dumps([{
+                "subject": "app.api.users.*",
+                "object": "app.db.*",
+                "predicate": "prohibits_dependency",
+                "justification": "test",
+                "adr_id": "ADR-001",
+                "adr_path": "docs/adr/001.md",
+            }])),
+        ]
+        responses_iter = iter(responses)
+
+        def _next(**kwargs):
+            captured.append(kwargs.get("messages"))
+            return next(responses_iter)
+
+        mock_client.chat.completions.create.side_effect = _next
+        with patch("services.adg.unified_resolver.OpenAI", return_value=mock_client), \
+             patch.dict("os.environ", {"TEST_API_KEY": "test-key"}):
+            resolve_adr_constraints(ADR_PROHIBIT_DEP, "ADR-001", "docs/adr/001.md", sample_adg, _make_config(), _stub_backend)
+
+        tool_messages = [m for messages in captured for m in messages if m.get("role") == "tool"]
+        assert json.loads(tool_messages[0]["content"]) == _stub_backend("user view")
+
+    def test_search_code_registered_in_tools_sent_to_llm(self, sample_adg: ADG) -> None:
+        from services.adg.unified_resolver import _TOOLS
+        names = {tool["function"]["name"] for tool in _TOOLS}
+        assert "search_code" in names
+
+
+# -- Test: system prompt (ADR 017 decisions 1, 3) ---------------------------------
+
+def _capture_system_message(adg: ADG) -> str:
+    captured: list[dict] = []
+    mock_client = MagicMock()
+    responses_iter = iter([_make_mock_response(content="[]")])
+
+    def _next(**kwargs):
+        captured.append(kwargs.get("messages"))
+        return next(responses_iter)
+
+    mock_client.chat.completions.create.side_effect = _next
+    with patch("services.adg.unified_resolver.OpenAI", return_value=mock_client), \
+         patch.dict("os.environ", {"TEST_API_KEY": "test-key"}):
+        resolve_adr_constraints(ADR_PROHIBIT_DEP, "ADR-001", "docs/adr/001.md", adg, _make_config(), _stub_backend)
+    return captured[0][0]["content"]
+
+
+class TestSystemPrompt:
+    def test_contains_root_and_external_packages(self) -> None:
+        adg_with_external = ADG(
+            nodes=[
+                FQNNode(fqn=FQN.from_dotted("app"), kind=FQNKind.MODULE, file_path="app/__init__.py", line_start=0, line_end=0, start_byte=0, end_byte=0),
+                FQNNode(fqn=FQN.from_dotted("app.api"), kind=FQNKind.MODULE, file_path="app/api.py", line_start=0, line_end=0, start_byte=0, end_byte=0),
+            ],
+            edges=[
+                Edge(source="app", target="app.api", kind="CONTAINS"),
+                Edge(source="app.api", target="elasticsearch", kind="IMPORTS"),
+            ],
+        )
+        prompt = _capture_system_message(adg_with_external)
+        assert "app" in prompt
+        assert "elasticsearch" in prompt
+
+    def test_module_list_hint_removed(self, sample_adg: ADG) -> None:
+        prompt = _capture_system_message(sample_adg)
+        assert "Module list" not in prompt
+        assert "list_modules" not in prompt
+
+    def test_fqn_grounding_rule_replaces_first_call_mandate(self, sample_adg: ADG) -> None:
+        prompt = _capture_system_message(sample_adg)
+        assert "root package list" in prompt
+        assert "MUST call" not in prompt
+
+    def test_examples_use_search_first_flow(self, sample_adg: ADG) -> None:
+        prompt = _capture_system_message(sample_adg)
+        assert "search_code" in prompt
+        assert "dive(" not in prompt
+
+
+# -- Test: worst-case session traffic (ADR 017 consequence) ------------------------
+
+class TestWorstCaseTraffic:
+    """20 calls x ~4K tokens = 80K tokens worst case (ADR 017). The dispatch
+    ceiling bounds every tool result, so the bound holds for a session that
+    spends its entire tool budget on maximally-sized results."""
+
+    def test_cap_times_ceiling_under_80k_tokens(self) -> None:
+        from services.adg.unified_resolver import TOOL_CALL_CAP, TOOL_RESULT_CHAR_LIMIT
+
+        worst_case_chars = TOOL_CALL_CAP * TOOL_RESULT_CHAR_LIMIT
+        assert worst_case_chars <= 80_000 * 4  # ~4 chars per token
+
+    def test_hub_results_stay_within_ceiling(self) -> None:
+        """A pathological hub ADG cannot produce an oversized tool result:
+        every tool's serialized output stays under the dispatch ceiling."""
+        from services.adg.unified_resolver import TOOL_RESULT_CHAR_LIMIT, _dispatch_tool
+        from services.adg.adg_tools import NEIGHBORHOOD_CAP
+
+        hub_adg = ADG(
+            nodes=[
+                FQNNode(fqn=FQN.from_dotted("app.hub"), kind=FQNKind.MODULE, file_path="app/hub.py", line_start=0, line_end=0, start_byte=0, end_byte=0),
+                *[
+                    FQNNode(fqn=FQN.from_dotted(f"app.hub.child_{i}"), kind=FQNKind.FUNCTION, file_path="app/hub.py", line_start=0, line_end=0, start_byte=0, end_byte=0)
+                    for i in range(NEIGHBORHOOD_CAP * 3)
+                ],
+            ],
+            edges=[
+                Edge(source="app.hub", target=f"app.hub.child_{i}", kind="CONTAINS")
+                for i in range(NEIGHBORHOOD_CAP * 3)
+            ]
+            + [
+                Edge(source="app.hub", target=f"ext_{i}", kind="IMPORTS")
+                for i in range(NEIGHBORHOOD_CAP * 3)
+            ],
+        )
+        fat_backend = lambda query, top_k=10: [
+            {"fqn": f"app.hub.hit_{i}", "kind": "class", "file": "app/hub.py", "snippet": "x" * 500}
+            for i in range(top_k)
+        ]
+
+        for name, args in [
+            ("list_children", {"fqn": "app.hub"}),
+            ("list_dependencies", {"fqn": "app.hub"}),
+            ("list_dependents", {"fqn": "app.hub"}),
+            ("search_code", {"query": "hub"}),
+        ]:
+            result = _dispatch_tool(name, args, hub_adg, backend=fat_backend)
+            assert len(result) <= TOOL_RESULT_CHAR_LIMIT, name
+
+
+# -- Test: dispatch backstop ------------------------------------------------------
+
+class TestDispatchBackstop:
+    """ADR 017 decision 4: every tool result passes one choke point with a
+    serialized-length ceiling; oversized results become a truncated notice."""
+
+    def test_oversized_result_replaced_with_truncated_notice(self, sample_adg: ADG, monkeypatch) -> None:
+        from services.adg.unified_resolver import _TOOL_FUNCTIONS, _dispatch_tool, TOOL_RESULT_CHAR_LIMIT
+
+        monkeypatch.setitem(_TOOL_FUNCTIONS, "huge", lambda args, adg, backend: "x" * (TOOL_RESULT_CHAR_LIMIT + 5000))
+        result = _dispatch_tool("huge", {}, sample_adg, backend=None)
+        assert len(result) <= TOOL_RESULT_CHAR_LIMIT
+        assert "truncated" in result
+
+    def test_ceiling_binds_any_future_tool(self, sample_adg: ADG, monkeypatch) -> None:
+        """The invariant is structural: a tool registered after today inherits the bound."""
+        from services.adg.unified_resolver import _TOOL_FUNCTIONS, _dispatch_tool, TOOL_RESULT_CHAR_LIMIT
+
+        def future_tool(args, adg, backend):
+            return {"blob": "y" * (TOOL_RESULT_CHAR_LIMIT * 2)}
+
+        monkeypatch.setitem(_TOOL_FUNCTIONS, "future", future_tool)
+        result = _dispatch_tool("future", {}, sample_adg, backend=None)
+        assert len(result) <= TOOL_RESULT_CHAR_LIMIT
+
+    def test_normal_result_passes_through_unchanged(self, sample_adg: ADG) -> None:
+        from services.adg.unified_resolver import _dispatch_tool
+
+        result = _dispatch_tool("list_children", {"fqn": "app.api"}, sample_adg, backend=None)
+        assert json.loads(result) == list_children("app.api", sample_adg)
+
+    def test_unknown_tool_returns_error(self, sample_adg: ADG) -> None:
+        from services.adg.unified_resolver import _dispatch_tool
+
+        result = _dispatch_tool("no_such_tool", {}, sample_adg, backend=None)
+        assert "unknown tool" in result
+
+
 # -- Test: loop detection ------------------------------------------------------
 
 class TestLoopDetection:
     def test_repeated_tool_call_injects_nudge(self, sample_adg: ADG) -> None:
         """If LLM repeats the same dive call, a nudge message is injected."""
         responses = [
-            _make_mock_response(tool_calls=[_tool_call("tc1", "dive", {"fqn": "app.api", "depth": 2})]),
-            _make_mock_response(tool_calls=[_tool_call("tc2", "dive", {"fqn": "app.api", "depth": 2})]),
+            _make_mock_response(tool_calls=[_tool_call("tc1", "list_children", {"fqn": "app.api"})]),
+            _make_mock_response(tool_calls=[_tool_call("tc2", "list_children", {"fqn": "app.api"})]),
             _make_mock_response(
                 content=json.dumps([{
                     "subject": "app.api.*",

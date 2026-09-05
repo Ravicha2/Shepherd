@@ -105,7 +105,8 @@ class TestPipelineBuildSeed:
 
         mock_config = MagicMock()
 
-        with patch("services.adg.unified_resolver.resolve_adr_constraints") as mock_resolve:
+        with patch("services.adg.unified_resolver.resolve_adr_constraints") as mock_resolve, \
+             patch("services.adg.search.build_search_backend") as mock_backend:
             mock_resolve.return_value = [
                 ConstraintEdge(
                     subject="app.api.*",
@@ -116,11 +117,39 @@ class TestPipelineBuildSeed:
                     adr_path=str(adr_dir / "001-test.md"),
                 ),
             ]
-            result = ADGPipeline.build_seed(sample_adg, adr_dir, config=mock_config)
+            result = ADGPipeline.build_seed(sample_adg, adr_dir, project_root=tmp_path, config=mock_config)
 
             mock_resolve.assert_called_once()
             assert len(result.constraint_edges) == 1
             assert result.constraint_edges[0].specificity > 0.0
+
+    def test_build_seed_builds_backend_once_and_injects(self, sample_adg, tmp_path):
+        """ADR 017 decision 6: the search backend is built once per seed and
+        passed into every resolve_adr_constraints call."""
+        adr_dir = tmp_path / "docs" / "adr"
+        adr_dir.mkdir(parents=True)
+        for name in ("001-test.md", "002-test.md"):
+            (adr_dir / name).write_text(f"# {name}\n\nWe chose X.")
+
+        with patch("services.adg.unified_resolver.resolve_adr_constraints") as mock_resolve, \
+             patch("services.adg.search.build_search_backend") as mock_backend:
+            mock_resolve.return_value = []
+            ADGPipeline.build_seed(sample_adg, adr_dir, project_root=tmp_path, config=MagicMock())
+
+            mock_backend.assert_called_once()
+            assert mock_backend.call_args.args[0] == tmp_path
+            injected = {call.args[-1] for call in mock_resolve.call_args_list}
+            assert injected == {mock_backend.return_value}
+
+    def test_build_seed_requires_project_root_when_adrs_present(self, sample_adg, tmp_path):
+        """Loud failure (ADR 017 decision 5): no silent degradation without a
+        project root to index for search."""
+        adr_dir = tmp_path / "docs" / "adr"
+        adr_dir.mkdir(parents=True)
+        (adr_dir / "001-test.md").write_text("# ADR 001\n\nWe chose X.")
+
+        with pytest.raises(ValueError, match="project_root"):
+            ADGPipeline.build_seed(sample_adg, adr_dir, config=MagicMock())
 
     def test_build_seed_requires_config(self, sample_adg, tmp_path):
         """build_seed() must raise ValueError if config is not provided."""

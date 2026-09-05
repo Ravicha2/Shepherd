@@ -1,4 +1,4 @@
-"""Tests for ADG query tools: list_modules, list_children, list_imports, list_inherits.
+"""Tests for ADG query tools: list_children, list_imports, list_inherits, list_dependencies, list_dependents.
 
 These tools wrap the in-memory ADG for agent tool-call consumption.
 No Neo4j dependency; pure list/set operations on ADG.nodes and ADG.edges.
@@ -10,7 +10,7 @@ import pytest
 
 from services.fqn import FQN
 from services.models import ADG, Edge, FQNKind, FQNNode
-from services.adg.adg_tools import list_modules, list_children, list_imports, list_inherits, dive
+from services.adg.adg_tools import NEIGHBORHOOD_CAP, list_children, list_dependencies, list_dependents, list_imports, list_inherits
 
 
 # -- Fixtures ---------------------------------------------------------------
@@ -51,68 +51,84 @@ def empty_adg() -> ADG:
     return ADG(nodes=[], edges=[])
 
 
-# -- list_modules -----------------------------------------------------------
-
-class TestListModules:
-    def test_returns_modules_with_kind(self, sample_adg: ADG) -> None:
-        result = list_modules(sample_adg)
-        assert all(isinstance(entry, dict) and "fqn" in entry and "kind" in entry for entry in result)
-
-    def test_includes_all_modules(self, sample_adg: ADG) -> None:
-        result = list_modules(sample_adg)
-        result_fqns = {entry["fqn"] for entry in result}
-        expected = {"app", "app.api", "app.api.users", "app.auth", "app.auth.middleware"}
-        assert result_fqns == expected
-
-    def test_kind_values(self, sample_adg: ADG) -> None:
-        result = list_modules(sample_adg)
-        assert all(entry["kind"] == "module" for entry in result)
-
-    def test_empty_adg(self, empty_adg: ADG) -> None:
-        assert list_modules(empty_adg) == []
-
-    def test_excludes_non_modules(self) -> None:
-        nodes = [
-            FQNNode(fqn=FQN.from_dotted("app"), kind=FQNKind.MODULE, file_path="app/__init__.py", line_start=0, line_end=0, start_byte=0, end_byte=0),
-            FQNNode(fqn=FQN.from_dotted("app.MyClass"), kind=FQNKind.CLASS, file_path="app/mod.py", line_start=0, line_end=10, start_byte=0, end_byte=0),
-        ]
-        adg = ADG(nodes=nodes, edges=[])
-        result = list_modules(adg)
-        assert result == [{"fqn": "app", "kind": "module"}]
-
-
 # -- list_children -----------------------------------------------------------
 
 class TestListChildren:
     def test_returns_contained_nodes(self, sample_adg: ADG) -> None:
         result = list_children("app.api.users", sample_adg)
-        fqns = {r["fqn"] for r in result}
+        fqns = {r["fqn"] for r in result["entries"]}
         assert "app.api.users.UserView" in fqns
         assert "app.api.users.list_users" in fqns
 
     def test_children_include_kind(self, sample_adg: ADG) -> None:
         result = list_children("app.api.users", sample_adg)
-        by_fqn = {r["fqn"]: r for r in result}
+        by_fqn = {r["fqn"]: r for r in result["entries"]}
         assert by_fqn["app.api.users.UserView"]["kind"] == "class"
         assert by_fqn["app.api.users.list_users"]["kind"] == "function"
 
     def test_nested_children_only_direct(self, sample_adg: ADG) -> None:
         """Only direct children, not grandchildren."""
         result = list_children("app.api.users", sample_adg)
-        fqns = {r["fqn"] for r in result}
+        fqns = {r["fqn"] for r in result["entries"]}
         # UserView.get is a child of UserView, not of users module directly
         assert "app.api.users.UserView.get" not in fqns
 
     def test_leaf_node_no_children(self, sample_adg: ADG) -> None:
         result = list_children("app.api.users.UserView.get", sample_adg)
-        assert result == []
+        assert result == {"entries": [], "truncated": False}
 
     def test_nonexistent_fqn_returns_empty(self, sample_adg: ADG) -> None:
-        result = list_children("does.not.exist", sample_adg)
-        assert result == []
+        assert list_children("does.not.exist", sample_adg) == {"entries": [], "truncated": False}
 
     def test_empty_adg(self, empty_adg: ADG) -> None:
-        assert list_children("app", empty_adg) == []
+        assert list_children("app", empty_adg) == {"entries": [], "truncated": False}
+
+
+# -- neighborhood cap ---------------------------------------------------------
+
+def _hub_adg(child_count: int = NEIGHBORHOOD_CAP + 10) -> ADG:
+    """Pathological hub: one module with `child_count` contained children."""
+    nodes = [FQNNode(fqn=FQN.from_dotted("app.hub"), kind=FQNKind.MODULE, file_path="app/hub.py", line_start=0, line_end=0, start_byte=0, end_byte=0)]
+    nodes += [
+        FQNNode(fqn=FQN.from_dotted(f"app.hub.child_{i}"), kind=FQNKind.FUNCTION, file_path="app/hub.py", line_start=0, line_end=0, start_byte=0, end_byte=0)
+        for i in range(child_count)
+    ]
+    edges = [Edge(source="app.hub", target=f"app.hub.child_{i}", kind="CONTAINS") for i in range(child_count)]
+    return ADG(nodes=nodes, edges=edges)
+
+
+class TestNeighborhoodCap:
+    def test_children_capped_at_150_with_truncated_flag(self) -> None:
+        result = list_children("app.hub", _hub_adg())
+        assert len(result["entries"]) == NEIGHBORHOOD_CAP
+        assert result["truncated"] is True
+
+    def test_truncated_result_carries_search_guidance(self) -> None:
+        result = list_children("app.hub", _hub_adg())
+        assert "app.hub" in result["note"]
+        assert "search" in result["note"].lower()
+
+    def test_untruncated_result_has_no_note(self, sample_adg: ADG) -> None:
+        result = list_children("app.api.users", sample_adg)
+        assert "note" not in result
+
+    def test_dependencies_capped(self) -> None:
+        adg = ADG(
+            nodes=[FQNNode(fqn=FQN.from_dotted("app.hub"), kind=FQNKind.MODULE, file_path="app/hub.py", line_start=0, line_end=0, start_byte=0, end_byte=0)],
+            edges=[Edge(source="app.hub", target=f"ext_{i}", kind="IMPORTS") for i in range(NEIGHBORHOOD_CAP + 10)],
+        )
+        result = list_dependencies("app.hub", adg)
+        assert len(result["entries"]) == NEIGHBORHOOD_CAP
+        assert result["truncated"] is True
+
+    def test_dependents_capped(self) -> None:
+        adg = ADG(
+            nodes=[FQNNode(fqn=FQN.from_dotted("app.hub"), kind=FQNKind.MODULE, file_path="app/hub.py", line_start=0, line_end=0, start_byte=0, end_byte=0)],
+            edges=[Edge(source=f"app.user_{i}", target="app.hub", kind="IMPORTS") for i in range(NEIGHBORHOOD_CAP + 10)],
+        )
+        result = list_dependents("app.hub", adg)
+        assert len(result["entries"]) == NEIGHBORHOOD_CAP
+        assert result["truncated"] is True
 
 
 # -- list_imports -----------------------------------------------------------
@@ -186,63 +202,73 @@ class TestListInherits:
         assert result == []  # app.api has CONTAINS edges but no INHERITS
 
 
-# -- dive --------------------------------------------------------------------
+# -- list_dependencies --------------------------------------------------------
 
-class TestDive:
-    """dive(fqn, depth) returns all nodes + edges within N hops."""
+def _dependency_adg() -> ADG:
+    """app.mod imports os and inherits Base; a CALLS edge must not appear."""
+    nodes = [
+        FQNNode(fqn=FQN.from_dotted("app"), kind=FQNKind.MODULE, file_path="app/__init__.py", line_start=0, line_end=0, start_byte=0, end_byte=0),
+        FQNNode(fqn=FQN.from_dotted("app.mod"), kind=FQNKind.MODULE, file_path="app/mod.py", line_start=0, line_end=10, start_byte=0, end_byte=0),
+        FQNNode(fqn=FQN.from_dotted("app.Base"), kind=FQNKind.CLASS, file_path="app/base.py", line_start=0, line_end=10, start_byte=0, end_byte=0),
+        FQNNode(fqn=FQN.from_dotted("app.helper"), kind=FQNKind.FUNCTION, file_path="app/helper.py", line_start=0, line_end=10, start_byte=0, end_byte=0),
+    ]
+    edges = [
+        Edge(source="app", target="app.mod", kind="CONTAINS"),
+        Edge(source="app.mod", target="os", kind="IMPORTS"),
+        Edge(source="app.mod", target="app.Base", kind="INHERITS"),
+        Edge(source="app.mod", target="app.helper", kind="CALLS"),
+    ]
+    return ADG(nodes=nodes, edges=edges)
 
-    def test_dive_depth0_returns_only_seed(self, sample_adg: ADG) -> None:
-        result = dive("app.api.users", sample_adg, depth=0)
-        assert result["nodes"] == [{"fqn": "app.api.users", "kind": "module"}]
-        assert result["edges"] == []
 
-    def test_dive_depth1_returns_direct_neighbors(self, sample_adg: ADG) -> None:
-        result = dive("app.api.users", sample_adg, depth=1)
-        node_fqns = {n["fqn"] for n in result["nodes"]}
-        # Direct neighbors: parent (app.api), children (UserView, list_users),
-        # imports (app.auth.middleware)
-        assert "app.api" in node_fqns
-        assert "app.api.users" in node_fqns
-        assert "app.api.users.UserView" in node_fqns
-        assert "app.api.users.list_users" in node_fqns
-        assert "app.auth.middleware" in node_fqns
+class TestListDependencies:
+    def test_imports_and_inherits_aggregated_with_edge_kind(self) -> None:
+        result = list_dependencies("app.mod", _dependency_adg())
+        assert result["entries"] == [
+            {"fqn": "os", "edge": "IMPORTS"},
+            {"fqn": "app.Base", "edge": "INHERITS"},
+        ]
+        assert result["truncated"] is False
 
-    def test_dive_depth2_expands_further(self, sample_adg: ADG) -> None:
-        result = dive("app.api.users", sample_adg, depth=2)
-        node_fqns = {n["fqn"] for n in result["nodes"]}
-        # depth 1 gave us UserView; depth 2 adds UserView's children and inherits
-        assert "app.api.users.UserView.get" in node_fqns
-        assert "app.auth.middleware.AuthMiddleware" in node_fqns
+    def test_calls_edges_excluded(self) -> None:
+        result = list_dependencies("app.mod", _dependency_adg())
+        assert all(entry["fqn"] != "app.helper" for entry in result["entries"])
 
-    def test_dive_depth3_default(self, sample_adg: ADG) -> None:
-        result = dive("app.api.users", sample_adg, depth=3)
-        node_fqns = {n["fqn"] for n in result["nodes"]}
-        # depth 3 from users reaches AuthMiddleware.check
-        assert "app.auth.middleware.AuthMiddleware.check" in node_fqns
+    def test_no_dependencies(self, sample_adg: ADG) -> None:
+        result = list_dependencies("app.auth", sample_adg)
+        assert result == {"entries": [], "truncated": False}
 
-    def test_dive_default_depth_is_3(self, sample_adg: ADG) -> None:
-        result = dive("app.api.users", sample_adg)
-        result3 = dive("app.api.users", sample_adg, depth=3)
-        assert result == result3
+    def test_nonexistent_fqn_returns_empty(self, sample_adg: ADG) -> None:
+        result = list_dependencies("does.not.exist", sample_adg)
+        assert result == {"entries": [], "truncated": False}
 
-    def test_dive_includes_edges(self, sample_adg: ADG) -> None:
-        result = dive("app.api.users", sample_adg, depth=1)
-        edge_set = {(e["source"], e["target"], e["kind"]) for e in result["edges"]}
-        # Should include edges connecting nodes in the neighborhood
-        assert ("app.api.users", "app.api.users.UserView", "CONTAINS") in edge_set
-        assert ("app.api.users", "app.auth.middleware", "IMPORTS") in edge_set
+    def test_empty_adg(self, empty_adg: ADG) -> None:
+        assert list_dependencies("app", empty_adg) == {"entries": [], "truncated": False}
 
-    def test_dive_nonexistent_fqn_returns_empty(self, sample_adg: ADG) -> None:
-        result = dive("does.not.exist", sample_adg, depth=3)
-        assert result["nodes"] == []
-        assert result["edges"] == []
 
-    def test_dive_empty_adg(self, empty_adg: ADG) -> None:
-        result = dive("app", empty_adg, depth=3)
-        assert result["nodes"] == []
-        assert result["edges"] == []
+# -- list_dependents -----------------------------------------------------------
 
-    def test_dive_inherits_edge_included(self, sample_adg: ADG) -> None:
-        result = dive("app.auth.middleware.AuthMiddleware", sample_adg, depth=1)
-        edge_set = {(e["source"], e["target"], e["kind"]) for e in result["edges"]}
-        assert ("app.auth.middleware.AuthMiddleware", "app.api.users.UserView", "INHERITS") in edge_set
+class TestListDependents:
+    def test_reverses_imports_and_inherits_edges(self, sample_adg: ADG) -> None:
+        """app.auth.middleware is imported by app.api.users and its AuthMiddleware
+        inherits from app.api.users.UserView — both point back when reversed."""
+        assert list_dependents("app.auth.middleware", sample_adg) == {
+            "entries": [{"fqn": "app.api.users", "edge": "IMPORTS"}],
+            "truncated": False,
+        }
+        assert list_dependents("app.api.users.UserView", sample_adg) == {
+            "entries": [{"fqn": "app.auth.middleware.AuthMiddleware", "edge": "INHERITS"}],
+            "truncated": False,
+        }
+
+    def test_calls_edges_excluded(self) -> None:
+        result = list_dependents("app.helper", _dependency_adg())
+        assert result == {"entries": [], "truncated": False}
+
+    def test_no_dependents(self, sample_adg: ADG) -> None:
+        assert list_dependents("app.db", sample_adg) == {"entries": [], "truncated": False}
+
+    def test_empty_adg(self, empty_adg: ADG) -> None:
+        assert list_dependents("app", empty_adg) == {"entries": [], "truncated": False}
+
+

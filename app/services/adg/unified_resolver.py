@@ -1,8 +1,10 @@
 """Unified ADR-to-ConstraintEdge resolver.
 
 One LLM session per ADR. Reads full ADR text (including Decision Outcome),
-uses list_modules and dive tools to map prose concepts to FQN patterns,
-and produces ConstraintEdge objects directly. No SymbolicConstraint intermediate.
+uses the search-first tool surface (search_code, list_children,
+list_dependencies, list_dependents; ADR 017) to map prose concepts to FQN
+patterns, and produces ConstraintEdge objects directly. No SymbolicConstraint
+intermediate.
 """
 from __future__ import annotations
 
@@ -14,7 +16,7 @@ from dataclasses import dataclass, field
 
 from openai import OpenAI
 
-from services.adg.adg_tools import dive, list_modules
+from services.adg.adg_tools import list_children, list_dependencies, list_dependents
 from services.extract.config import LangExtractConfig
 from services.models import ADG, ConstraintEdge, FQNKind, PredicateType
 
@@ -22,32 +24,74 @@ log = logging.getLogger(__name__)
 
 TOOL_CALL_CAP = 20
 
+# ADR 017 decision 4: serialized-length ceiling on every tool result (~4K tokens
+# at 4 chars/token; 20 calls x 4K tokens = 80K tokens worst case).
+TOOL_RESULT_CHAR_LIMIT = 16_000
+
+_FQN_PARAM = {"type": "string", "description": "Fully qualified name from a tool result or the root package list"}
+
 _TOOLS = [
     {
         "type": "function",
         "function": {
-            "name": "list_modules",
-            "description": "List all module FQNs in the codebase graph. Use this first to find relevant modules, then dive into promising ones.",
-            "parameters": {"type": "object", "properties": {}, "required": []},
+            "name": "search_code",
+            "description": (
+                "Search the codebase for where an ADR concept lives. Returns "
+                "code snippets lifted to FQN handles: {fqn, kind, file, snippet}. "
+                "Start here with a prose query drawn from the ADR (e.g. "
+                "'passive update coordinator'), then inspect the hits with "
+                "list_children / list_dependencies / list_dependents."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Prose query, e.g. 'user view authentication'"},
+                },
+                "required": ["query"],
+            },
         },
     },
     {
         "type": "function",
         "function": {
-            "name": "dive",
+            "name": "list_children",
             "description": (
-                "Explore the neighborhood around an FQN. Returns all nodes and edges "
-                "within `depth` hops via CONTAINS, IMPORTS, and INHERITS edges "
-                "(bidirectional). Use depth=1 for direct neighbors, depth=2-3 for "
-                "broader context. Start with modules from list_modules, then dive "
-                "into the ones that match the constraint's prose description."
+                "What is directly inside `fqn`? Returns contained children "
+                "{fqn, kind}, capped at 150 entries (truncated flag + guidance if more)."
             ),
             "parameters": {
                 "type": "object",
-                "properties": {
-                    "fqn": {"type": "string", "description": "Fully qualified name to explore around"},
-                    "depth": {"type": "integer", "description": "Number of hops to explore (default 3)", "default": 3},
-                },
+                "properties": {"fqn": _FQN_PARAM},
+                "required": ["fqn"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_dependencies",
+            "description": (
+                "What does `fqn` use? Returns IMPORTS and INHERITS edges out of "
+                "`fqn`, labeled with the edge kind. CALLS edges are not included."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {"fqn": _FQN_PARAM},
+                "required": ["fqn"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_dependents",
+            "description": (
+                "Who uses `fqn`? Same IMPORTS/INHERITS edges reversed: sources "
+                "that import or inherit from `fqn`, labeled with the edge kind."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {"fqn": _FQN_PARAM},
                 "required": ["fqn"],
             },
         },
@@ -55,9 +99,34 @@ _TOOLS = [
 ]
 
 _TOOL_FUNCTIONS = {
-    "list_modules": lambda args, adg: json.dumps(list_modules(adg)),
-    "dive": lambda args, adg: json.dumps(dive(args["fqn"], adg, depth=args.get("depth", 3))),
+    "search_code": lambda args, adg, backend: json.dumps(backend(args["query"])),
+    "list_children": lambda args, adg, backend: json.dumps(list_children(args["fqn"], adg)),
+    "list_dependencies": lambda args, adg, backend: json.dumps(list_dependencies(args["fqn"], adg)),
+    "list_dependents": lambda args, adg, backend: json.dumps(list_dependents(args["fqn"], adg)),
 }
+
+
+def _dispatch_tool(name: str, args: dict, adg: ADG, backend) -> str:
+    """Single choke point every tool result passes through (ADR 017 decision 4).
+
+    Enforces the serialized-length ceiling so any future tool inherits the
+    bound automatically; graph growth cannot reintroduce context overflow.
+    """
+    handler = _TOOL_FUNCTIONS.get(name)
+    if handler is None:
+        return json.dumps({"error": f"unknown tool: {name}"})
+    result = handler(args, adg, backend)
+    if not isinstance(result, str):
+        result = json.dumps(result)
+    if len(result) > TOOL_RESULT_CHAR_LIMIT:
+        return json.dumps({
+            "truncated": True,
+            "note": (
+                f"tool result exceeded {TOOL_RESULT_CHAR_LIMIT} chars and was dropped; "
+                "narrow your query (e.g. search within a prefix) and try again"
+            ),
+        })
+    return result
 
 
 @dataclass
@@ -85,27 +154,24 @@ decision outcome, not something to be prohibited.
 
 ## Required exploration
 
-Before producing any output, **you MUST call list_modules at least once, and dive into any \
-module referenced by the ADR** before writing a constraint about it. list_modules only shows \
-top-level modules — submodules and classes are only visible once you dive into a module, and \
-sometimes only after diving more than one level deep. Do not guess FQNs from the ADR's prose \
-alone or from what a typical project of this kind usually looks like. Output produced without \
-a preceding list_modules call will be rejected.
+**FQNs in your output MUST come from tool results or the root package list.** Do not guess \
+FQNs from the ADR's prose alone or from what a typical project of this kind usually looks \
+like. Start with search_code to find where an ADR concept lives in the code (hits come back \
+as FQN handles with snippets), then inspect the neighborhood with list_children, \
+list_dependencies, and list_dependents to confirm the exact FQNs before writing a constraint.
 
 ## ADR Document
 
 {adr_text}
 
-## Module list
+## Root packages
 
-The following modules exist in the codebase graph. **Internal FQN patterns MUST come from this list. Do NOT invent internal module names.**
-
-{module_hint}
+The codebase's root package(s): {root_packages}. Every internal FQN starts with one of these.
 
 ## Subject and object rules
 
-- subject: MUST be an internal FQN pattern from the module list (internal codebase module).
-  If you cannot map the ADR's subject concept to a module, return an empty array.
+- subject: MUST be an internal FQN pattern grounded in tool results (or the root package
+  itself). If you cannot map the ADR's subject concept to a real FQN, return an empty array.
 - object: depends on predicate:
   - `requires_dependency` / `requires_implementation`: object is either (a) an
     internal FQN pattern from the module list, or (b) an external package name. Prefer
@@ -199,37 +265,30 @@ If the ADR contains no enforceable architectural constraints, return an empty ar
 
 ## Examples
 
-The examples below use the actual module list for this codebase graph — app.routes,
-app.models, app.services, app.middleware.auth — not generic names from a typical project.
-**Always ground your FQNs in the module list you were actually given**, not these examples.
+The examples below use illustrative names (app.routes, app.models, app.middleware.auth) —
+**always ground your FQNs in the tool results you actually received**, not these names.
 
 Example 1: ADR prohibits route handlers from accessing models directly.
 
-Step 1: Call list_modules → see app.routes, app.models, app.services, app.middleware.auth
-Step 2: Call dive("app.routes", depth=1) → see route handler functions
-Step 3: Call dive("app.models", depth=1) → see model classes
+Step 1: search_code("route handler endpoint") → hits app.routes.get_user, app.routes.create_order
+Step 2: search_code("database model") → hits app.models.User, app.models.Order
+Step 3: list_children("app.routes") → confirm the handler population
 
 Result:
 [{{"subject": "app.routes.*", "object": "app.models.*", "predicate": "prohibits_dependency", "justification": "ADR states route handlers must not import model classes directly; data access must go through the service layer", "adr_id": "{adr_id}", "adr_path": "{adr_path}"}}]
 
 Example 2: ADR requires every endpoint to enforce auth middleware.
 
-Step 1: Call list_modules → see app.routes, app.models, app.services, app.middleware.auth
-Step 2: Call dive("app.middleware.auth", depth=1) → see the auth decorator/class
-Step 3: Call dive("app.routes", depth=1) → see route handler functions
+Step 1: search_code("authentication middleware decorator") → hits app.middleware.auth.AuthMiddleware
+Step 2: list_dependents("app.middleware.auth.AuthMiddleware") → who already uses it
 
 Result:
 [{{"subject": "app.routes.*", "object": "app.middleware.auth.*", "predicate": "requires_dependency", "justification": "ADR states every endpoint must apply the auth middleware before handling a request", "adr_id": "{adr_id}", "adr_path": "{adr_path}"}}]
 
 Example 3: ADR requires all service classes to inherit from a shared base service class.
-The base class isn't visible from a depth=1 dive — it lives inside a submodule that only
-appears once you go one level deeper.
 
-Step 1: Call list_modules → see app.routes, app.models, app.services, app.middleware.auth
-Step 2: Call dive("app.services", depth=1) → see submodules app.services.user, 
-app.services.order, app.services.base (no classes visible yet at this depth)
-Step 3: Call dive("app.services", depth=2) → see classes inside each submodule, including 
-app.services.base.ServiceBase
+Step 1: search_code("base service class shared functionality") → hits app.services.base.ServiceBase
+Step 2: list_children("app.services") → see the service classes that must inherit it
 
 Result:
 [{{"subject": "app.services.*", "object": "app.services.base.ServiceBase", "predicate": "requires_implementation", "justification": "ADR states all service classes must inherit from the shared base service class to standardize transaction handling", "adr_id": "{adr_id}", "adr_path": "{adr_path}"}}]
@@ -413,12 +472,15 @@ def resolve_adr_constraints(
     adr_path: str,
     adg: ADG,
     config: LangExtractConfig,
+    search_backend,
 ) -> list[ConstraintEdge]:
     """Resolve a single ADR's full text to ConstraintEdge objects.
 
-    One LLM session per ADR. The agent reads the complete ADR, uses list_modules
-    and dive tools to map prose concepts to FQN patterns, and outputs constraint
-    edges directly. No SymbolicConstraint intermediate.
+    One LLM session per ADR. The agent reads the complete ADR, uses the
+    search_code / list_children / list_dependencies / list_dependents tools to
+    map prose concepts to FQN patterns, and outputs constraint edges directly.
+    `search_backend` is the injected semble callable from build_search_backend
+    (ADR 017 decision 6; unit tests inject a stub).
     """
     api_key = config.api_key
     if not api_key:
@@ -426,17 +488,13 @@ def resolve_adr_constraints(
 
     client = OpenAI(api_key=api_key, base_url=config.model_url)
 
-    modules = list_modules(adg)
-    module_hint = ", ".join(f"{m['fqn']}({m['kind']})" for m in modules[:20])
-    if len(modules) > 20:
-        module_hint += ", ..."
-
+    root_packages = ", ".join(sorted(_root_segments(adg))) or "(none)"
     external_packages = _external_packages(adg)
     external_packages_hint = ", ".join(sorted(external_packages)) if external_packages else "(none)"
 
     system_prompt = _SYSTEM_PROMPT_TEMPLATE.format(
         adr_text=adr_text, adr_id=adr_id, adr_path=adr_path,
-        module_hint=module_hint, external_packages_hint=external_packages_hint,
+        root_packages=root_packages, external_packages_hint=external_packages_hint,
     )
 
     messages = [
@@ -502,7 +560,7 @@ def resolve_adr_constraints(
                     "content": "You just called the same function with identical arguments again. Stop repeating tool calls and produce your final answer as a JSON array now.",
                 })
             last_tool_signature = signature
-            result = _TOOL_FUNCTIONS[tc.function.name](args, adg)
+            result = _dispatch_tool(tc.function.name, args, adg, backend=search_backend)
             messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
 
     # Hit cap: request best-effort resolution

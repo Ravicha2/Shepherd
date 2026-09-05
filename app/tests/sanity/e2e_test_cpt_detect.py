@@ -172,14 +172,16 @@ def main() -> None:
     print(f"  {len(adg.nodes)} nodes, {len(adg.edges)} edges")
     print("[detect] resolve ADR constraints (unified agent)")
     from services.adg.unified_resolver import resolve_adr_constraints
+    from services.adg.search import build_search_backend
     from pathlib import Path as P
     adr_dir = repo_path / repo_cfg.adr_dir
     adr_files = sorted(adr_dir.glob("*.md"))
+    search_backend = build_search_backend(repo_path, adg)
     all_edges = []
     for adr_file in adr_files:
         adr_text = adr_file.read_text(encoding="utf-8")
         adr_id = adr_file.stem
-        edges = resolve_adr_constraints(adr_text, adr_id, str(adr_file), adg, config.langextract)
+        edges = resolve_adr_constraints(adr_text, adr_id, str(adr_file), adg, config.langextract, search_backend)
         all_edges.extend(edges)
     print(f"  {len(all_edges)} constraint edges")
 

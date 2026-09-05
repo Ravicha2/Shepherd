@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+from services.adg.search import build_search_backend
 from services.adg.treesitter import parse_repo
 from services.adg.unified_resolver import resolve_adr_constraints
 from services.extract.config import LangExtractConfig
@@ -179,6 +180,7 @@ def run_eval(
 ) -> EvalResult:
     """Run the unified resolver on every ADR fixture and score against ground truth."""
     repo_root = _repo_root(repo_id)
+    search_backend = build_search_backend(repo_root, adg)
     result = EvalResult()
 
     for fixture in ground_truth:
@@ -190,6 +192,7 @@ def run_eval(
             adr_path=fixture["adr_path"],
             adg=adg,
             config=LangExtractConfig(),
+            search_backend=search_backend,
         )
 
         expected_constraints = fixture.get("constraints", [])

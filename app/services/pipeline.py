@@ -141,6 +141,7 @@ class ADGPipeline:
 
         For cli/main.py:seed_build().
         """
+        from services.adg.search import build_search_backend
         from services.adg.unified_resolver import resolve_adr_constraints
         from services.extract.config import LangExtractConfig
 
@@ -154,13 +155,18 @@ class ADGPipeline:
             merged = add_external_nodes(adg, project_root=project_root)
             return adg_with_specificity(merged)
 
+        if project_root is None:
+            # ADR 017 decision 5: loud failure, no silent degradation of retrieval.
+            raise ValueError("project_root is required to build the search backend")
+
         log.info("build_seed: resolving %d ADR files from %s", len(adr_files), adr_path)
+        search_backend = build_search_backend(Path(project_root), adg)
 
         all_edges: list[ConstraintEdge] = []
         for adr_file in adr_files:
             adr_text = adr_file.read_text(encoding="utf-8")
             adr_id = adr_file.stem
-            edges = resolve_adr_constraints(adr_text, adr_id, str(adr_file), adg, config)
+            edges = resolve_adr_constraints(adr_text, adr_id, str(adr_file), adg, config, search_backend)
             log.info("build_seed: %s produced %d constraint edges", adr_id, len(edges))
             all_edges.extend(edges)
 
