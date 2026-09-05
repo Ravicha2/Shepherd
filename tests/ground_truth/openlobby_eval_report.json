@@ -1,33 +1,25 @@
 {
+  "_meta": {
+    "generated_at": "2026-09-05T22-31-58",
+    "git_commit": "40b1c9f"
+  },
   "exact": 2,
   "partial": 5,
   "miss": 3,
   "total": 10,
-  "false_positives": 12,
+  "false_positives": 16,
   "false_positive_edges": [
     {
-      "adr_id": "ADR-0003",
-      "subject": "openlobby.core.views.*",
-      "predicate": "prohibits_dependency",
-      "object": "openlobby.core.api.*"
-    },
-    {
       "adr_id": "ADR-0004",
-      "subject": "openlobby.core.*",
+      "subject": "openlobby.*",
       "predicate": "requires_dependency",
       "object": "graphene_django"
     },
     {
-      "adr_id": "ADR-0004",
-      "subject": "openlobby.core.*",
-      "predicate": "requires_dependency",
-      "object": "graphql_relay"
-    },
-    {
       "adr_id": "ADR-0005",
-      "subject": "openlobby.*",
-      "predicate": "requires_dependency",
-      "object": "python"
+      "subject": "manage.*",
+      "predicate": "prohibits_dependency",
+      "object": "javascript"
     },
     {
       "adr_id": "ADR-0005",
@@ -42,10 +34,10 @@
       "object": "flask"
     },
     {
-      "adr_id": "ADR-0007",
-      "subject": "openlobby.core.api.*",
+      "adr_id": "ADR-0008",
+      "subject": "manage.*",
       "predicate": "requires_dependency",
-      "object": "graphene_django"
+      "object": "pytest"
     },
     {
       "adr_id": "ADR-0008",
@@ -55,13 +47,55 @@
     },
     {
       "adr_id": "ADR-0008",
+      "subject": "setup.*",
+      "predicate": "requires_dependency",
+      "object": "pytest"
+    },
+    {
+      "adr_id": "ADR-0008",
+      "subject": "manage.*",
+      "predicate": "prohibits_dependency",
+      "object": "unittest"
+    },
+    {
+      "adr_id": "ADR-0008",
       "subject": "openlobby.*",
       "predicate": "prohibits_dependency",
       "object": "unittest"
     },
     {
+      "adr_id": "ADR-0008",
+      "subject": "setup.*",
+      "predicate": "prohibits_dependency",
+      "object": "unittest"
+    },
+    {
+      "adr_id": "ADR-0010",
+      "subject": "manage.*",
+      "predicate": "requires_dependency",
+      "object": "django"
+    },
+    {
+      "adr_id": "ADR-0010",
+      "subject": "setup.*",
+      "predicate": "requires_dependency",
+      "object": "django"
+    },
+    {
+      "adr_id": "ADR-0010",
+      "subject": "manage.*",
+      "predicate": "prohibits_dependency",
+      "object": "flask"
+    },
+    {
+      "adr_id": "ADR-0010",
+      "subject": "setup.*",
+      "predicate": "prohibits_dependency",
+      "object": "flask"
+    },
+    {
       "adr_id": "ADR-0011",
-      "subject": "openlobby.core.*",
+      "subject": "openlobby.*",
       "predicate": "requires_dependency",
       "object": "django.db"
     },
@@ -70,12 +104,6 @@
       "subject": "openlobby.*",
       "predicate": "requires_dependency",
       "object": "django.db"
-    },
-    {
-      "adr_id": "ADR-0013",
-      "subject": "openlobby.*",
-      "predicate": "requires_dependency",
-      "object": "black"
     }
   ],
   "accuracy": 0.45,
@@ -89,7 +117,7 @@
         "justification": "ADR-0002: 'We will use Elasticsearch. It's well known database with great fulltext search capabilities based on Apache Lucene.' The 'database for all data' clause is content-superseded by ADR-0011: 'Elasticsearch will be used for denormalized reports and related data intended for fulltext search.' Post-resolution, ADR-0002's live mandate is Elasticsearch for fulltext search, whose locus is the search code (#125: post-resolution gold reading)."
       },
       "score": "partial_match",
-      "resolved_subject": "openlobby.core.*",
+      "resolved_subject": "openlobby.*",
       "resolved_object": "elasticsearch"
     },
     {
@@ -101,7 +129,7 @@
         "justification": "ADR-0004 mandates GraphQL as the API standard, implemented via Graphene library"
       },
       "score": "partial_match",
-      "resolved_subject": "openlobby.core.*",
+      "resolved_subject": "openlobby.*",
       "resolved_object": "graphene"
     },
     {
@@ -137,8 +165,8 @@
         "justification": "ADR-0007 mandates adopting GraphQL Relay specification for pagination and Node interface via Graphene Relay"
       },
       "score": "miss",
-      "resolved_subject": "openlobby.core.api.*",
-      "resolved_object": "graphql_relay"
+      "resolved_subject": null,
+      "resolved_object": null
     },
     {
       "adr_id": "ADR-0009",
@@ -149,7 +177,7 @@
         "justification": "ADR-0009 mandates OpenID Connect for user authentication; openlobby/core/openid.py imports the oic package"
       },
       "score": "partial_match",
-      "resolved_subject": "openlobby.core.*",
+      "resolved_subject": "openlobby.*",
       "resolved_object": "oic"
     },
     {
@@ -185,7 +213,7 @@
         "justification": "ADR-0011 relegates Elasticsearch to denormalized reports and fulltext search, not as primary database"
       },
       "score": "partial_match",
-      "resolved_subject": "openlobby.core.*",
+      "resolved_subject": "openlobby.*",
       "resolved_object": "elasticsearch"
     },
     {

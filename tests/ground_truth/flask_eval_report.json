@@ -1,18 +1,22 @@
 {
-  "exact": 2,
-  "partial": 1,
-  "miss": 1,
+  "_meta": {
+    "generated_at": "2026-09-05T22-31-58",
+    "git_commit": "40b1c9f"
+  },
+  "exact": 1,
+  "partial": 0,
+  "miss": 3,
   "total": 4,
   "false_positives": 1,
   "false_positive_edges": [
     {
       "adr_id": "ADR-002",
-      "subject": "app.routes.auth.*",
-      "predicate": "prohibits_dependency",
+      "subject": "app.routes.*",
+      "predicate": "requires_implementation",
       "object": "app.middleware.auth.require_auth"
     }
   ],
-  "accuracy": 0.625,
+  "accuracy": 0.25,
   "per_constraint": [
     {
       "adr_id": "ADR-001",
@@ -34,9 +38,9 @@
         "object": "app.services.*",
         "justification": "If a route needs data, it calls the corresponding service function; routes depend on services for data access"
       },
-      "score": "exact_match",
-      "resolved_subject": "app.routes.*",
-      "resolved_object": "app.services.*"
+      "score": "miss",
+      "resolved_subject": null,
+      "resolved_object": null
     },
     {
       "adr_id": "ADR-001",
@@ -47,8 +51,8 @@
         "justification": "Only the service layer may import from the data model module"
       },
       "score": "miss",
-      "resolved_subject": "app.routes.*",
-      "resolved_object": "app.services.*"
+      "resolved_subject": null,
+      "resolved_object": null
     },
     {
       "adr_id": "ADR-002",
@@ -58,9 +62,9 @@
         "object": "app.middleware.auth.*",
         "justification": "Every API endpoint requires authentication enforced through the centralized auth middleware"
       },
-      "score": "partial_match",
-      "resolved_subject": "app.routes.*",
-      "resolved_object": "app.middleware.auth.require_auth"
+      "score": "miss",
+      "resolved_subject": null,
+      "resolved_object": null
     }
   ]
 }

@@ -1,30 +1,34 @@
 {
-  "exact": 4,
+  "_meta": {
+    "generated_at": "2026-09-05T22-31-58",
+    "git_commit": "40b1c9f"
+  },
+  "exact": 3,
   "partial": 0,
-  "miss": 0,
+  "miss": 1,
   "total": 4,
   "false_positives": 3,
   "false_positive_edges": [
     {
       "adr_id": "ADR-0004",
-      "subject": "tuf.api._payload.*",
+      "subject": "tuf.api.*",
       "predicate": "prohibits_dependency",
       "object": "securesystemslib"
     },
     {
       "adr_id": "ADR-0006",
-      "subject": "tuf.api.metadata.Metadata",
+      "subject": "tuf.api.serialization.*",
       "predicate": "requires_implementation",
-      "object": "tuf.api.metadata.Metadata.to_dict"
+      "object": "tuf.api.serialization.MetadataSerializer"
     },
     {
       "adr_id": "ADR-0008",
-      "subject": "tuf.api.metadata.*",
+      "subject": "tuf.api.*",
       "predicate": "requires_implementation",
       "object": "tuf.api.metadata.Metadata"
     }
   ],
-  "accuracy": 1.0,
+  "accuracy": 0.75,
   "per_constraint": [
     {
       "adr_id": "ADR-0001",
@@ -58,9 +62,9 @@
         "object": "tuf.api.serialization.*",
         "justification": "ADR-0006 separates serialization from the metadata class model; metadata classes depend on the serialization package (tuf.api.serialization), not the other way around"
       },
-      "score": "exact_match",
-      "resolved_subject": "tuf.api.metadata.*",
-      "resolved_object": "tuf.api.serialization.*"
+      "score": "miss",
+      "resolved_subject": null,
+      "resolved_object": null
     },
     {
       "adr_id": "ADR-0010",

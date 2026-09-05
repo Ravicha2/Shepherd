@@ -1,10 +1,20 @@
 {
+  "_meta": {
+    "generated_at": "2026-09-05T22-31-58",
+    "git_commit": "40b1c9f"
+  },
   "exact": 3,
   "partial": 0,
   "miss": 1,
   "total": 4,
-  "false_positives": 2,
+  "false_positives": 3,
   "false_positive_edges": [
+    {
+      "adr_id": "ADR-001",
+      "subject": "project.*",
+      "predicate": "prohibits_dependency",
+      "object": "users.models.*"
+    },
     {
       "adr_id": "ADR-002",
       "subject": "manage.*",
@@ -40,9 +50,9 @@
         "object": "users.services.*",
         "justification": "All data access must go through service functions; the service layer (users.services) is the sole gateway to the data layer"
       },
-      "score": "exact_match",
-      "resolved_subject": "users.views.*",
-      "resolved_object": "users.services.*"
+      "score": "miss",
+      "resolved_subject": "users.services.*",
+      "resolved_object": "users.models.*"
     },
     {
       "adr_id": "ADR-001",
@@ -52,9 +62,9 @@
         "object": "users.models.*",
         "justification": "Only the service layer may import from the data model module"
       },
-      "score": "miss",
-      "resolved_subject": "users.views.*",
-      "resolved_object": "users.services.*"
+      "score": "exact_match",
+      "resolved_subject": "users.services.*",
+      "resolved_object": "users.models.*"
     },
     {
       "adr_id": "ADR-002",
