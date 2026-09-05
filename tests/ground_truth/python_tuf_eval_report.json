@@ -4,6 +4,26 @@
   "miss": 0,
   "total": 4,
   "false_positives": 3,
+  "false_positive_edges": [
+    {
+      "adr_id": "ADR-0004",
+      "subject": "tuf.api._payload.*",
+      "predicate": "prohibits_dependency",
+      "object": "securesystemslib"
+    },
+    {
+      "adr_id": "ADR-0006",
+      "subject": "tuf.api.metadata.Metadata",
+      "predicate": "requires_implementation",
+      "object": "tuf.api.metadata.Metadata.to_dict"
+    },
+    {
+      "adr_id": "ADR-0008",
+      "subject": "tuf.api.metadata.*",
+      "predicate": "requires_implementation",
+      "object": "tuf.api.metadata.Metadata"
+    }
+  ],
   "accuracy": 1.0,
   "per_constraint": [
     {

@@ -30,3 +30,6 @@ repos.DS_Store
 repos/
 .worktrees
 .superpowers
+
+# versioned eval run artifacts (kept on disk, not in git)
+tests/ground_truth/reports/

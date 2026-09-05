@@ -4,6 +4,20 @@
   "miss": 1,
   "total": 4,
   "false_positives": 2,
+  "false_positive_edges": [
+    {
+      "adr_id": "ADR-002",
+      "subject": "manage.*",
+      "predicate": "prohibits_dependency",
+      "object": "users.models.*"
+    },
+    {
+      "adr_id": "ADR-002",
+      "subject": "users.views.*",
+      "predicate": "prohibits_dependency",
+      "object": "users.models.*"
+    }
+  ],
   "accuracy": 0.75,
   "per_constraint": [
     {

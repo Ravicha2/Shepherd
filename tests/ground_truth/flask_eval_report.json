@@ -4,6 +4,14 @@
   "miss": 1,
   "total": 4,
   "false_positives": 1,
+  "false_positive_edges": [
+    {
+      "adr_id": "ADR-002",
+      "subject": "app.routes.auth.*",
+      "predicate": "prohibits_dependency",
+      "object": "app.middleware.auth.require_auth"
+    }
+  ],
   "accuracy": 0.625,
   "per_constraint": [
     {
