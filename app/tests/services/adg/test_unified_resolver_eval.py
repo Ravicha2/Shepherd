@@ -114,6 +114,9 @@ class EvalResult:
     miss: int = 0
     total: int = 0
     false_positives: int = 0
+    # ponytail: identities, not just the count — LLM runs don't reproduce, so
+    # unmatched edges must be captured in the report to be triageable later
+    false_positive_edges: list[dict] = field(default_factory=list)
 
     @property
     def accuracy(self) -> float:
@@ -126,6 +129,7 @@ class EvalResult:
             "miss": self.miss,
             "total": self.total,
             "false_positives": self.false_positives,
+            "false_positive_edges": self.false_positive_edges,
             "accuracy": round(self.accuracy, 4),
             "per_constraint": self.results,
         }
@@ -214,6 +218,16 @@ def run_eval(
                 result.miss += 1
 
         result.false_positives += len(resolved_edges) - len(matched_edge_ids)
+        result.false_positive_edges.extend(
+            {
+                "adr_id": fixture["adr_id"],
+                "subject": edge.subject,
+                "predicate": edge.predicate.value,
+                "object": edge.object,
+            }
+            for edge in resolved_edges
+            if id(edge) not in matched_edge_ids
+        )
 
     if write_report:
         _report_path(repo_id).write_text(json.dumps(result.to_report(), indent=2))

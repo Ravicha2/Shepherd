@@ -3,7 +3,147 @@
   "partial": 0,
   "miss": 1,
   "total": 1,
-  "false_positives": 24,
+  "false_positives": 23,
+  "false_positive_edges": [
+    {
+      "adr_id": "ADR-0002",
+      "subject": "*",
+      "predicate": "requires_dependency",
+      "object": "flake8"
+    },
+    {
+      "adr_id": "ADR-0002",
+      "subject": "*",
+      "predicate": "requires_dependency",
+      "object": "flake8-import-order"
+    },
+    {
+      "adr_id": "ADR-0002",
+      "subject": "*",
+      "predicate": "requires_dependency",
+      "object": "black"
+    },
+    {
+      "adr_id": "ADR-0003",
+      "subject": "tamr_client.*",
+      "predicate": "requires_dependency",
+      "object": "nox"
+    },
+    {
+      "adr_id": "ADR-0004",
+      "subject": "docs.*",
+      "predicate": "requires_dependency",
+      "object": "sphinx"
+    },
+    {
+      "adr_id": "ADR-0004",
+      "subject": "docs.*",
+      "predicate": "requires_dependency",
+      "object": "recommonmark"
+    },
+    {
+      "adr_id": "ADR-0004",
+      "subject": "docs.*",
+      "predicate": "requires_dependency",
+      "object": "sphinx-autodoc"
+    },
+    {
+      "adr_id": "ADR-0004",
+      "subject": "docs.*",
+      "predicate": "requires_dependency",
+      "object": "sphinx-autodoc-typehints"
+    },
+    {
+      "adr_id": "ADR-0004",
+      "subject": "docs.*",
+      "predicate": "requires_dependency",
+      "object": "napoleon"
+    },
+    {
+      "adr_id": "ADR-0005",
+      "subject": "tamr_client.*",
+      "predicate": "requires_dependency",
+      "object": "dataclasses"
+    },
+    {
+      "adr_id": "ADR-0006",
+      "subject": "tamr_client.*",
+      "predicate": "requires_dependency",
+      "object": "mypy"
+    },
+    {
+      "adr_id": "ADR-0006",
+      "subject": "tamr_unify_client.*",
+      "predicate": "requires_dependency",
+      "object": "mypy"
+    },
+    {
+      "adr_id": "ADR-0007",
+      "subject": "tamr_client.*",
+      "predicate": "requires_dependency",
+      "object": "tamr_client._beta.*"
+    },
+    {
+      "adr_id": "ADR-0008",
+      "subject": "tamr_client.*",
+      "predicate": "prohibits_dependency",
+      "object": "tamr_client.*.*"
+    },
+    {
+      "adr_id": "ADR-0009",
+      "subject": "tamr_client.backup.*",
+      "predicate": "requires_dependency",
+      "object": "tamr_client._types.*"
+    },
+    {
+      "adr_id": "ADR-0009",
+      "subject": "tamr_client.categorization.*",
+      "predicate": "requires_dependency",
+      "object": "tamr_client._types.*"
+    },
+    {
+      "adr_id": "ADR-0009",
+      "subject": "tamr_client.dataset.*",
+      "predicate": "requires_dependency",
+      "object": "tamr_client._types.*"
+    },
+    {
+      "adr_id": "ADR-0009",
+      "subject": "tamr_client.golden_records.*",
+      "predicate": "requires_dependency",
+      "object": "tamr_client._types.*"
+    },
+    {
+      "adr_id": "ADR-0009",
+      "subject": "tamr_client.mastering.*",
+      "predicate": "requires_dependency",
+      "object": "tamr_client._types.*"
+    },
+    {
+      "adr_id": "ADR-0009",
+      "subject": "tamr_client.operation.*",
+      "predicate": "requires_dependency",
+      "object": "tamr_client._types.*"
+    },
+    {
+      "adr_id": "ADR-0009",
+      "subject": "tamr_client.project.*",
+      "predicate": "requires_dependency",
+      "object": "tamr_client._types.*"
+    },
+    {
+      "adr_id": "ADR-0009",
+      "subject": "tamr_client.schema_mapping.*",
+      "predicate": "requires_dependency",
+      "object": "tamr_client._types.*"
+    },
+    {
+      "adr_id": "ADR-0009",
+      "subject": "tamr_client.transformations.*",
+      "predicate": "requires_dependency",
+      "object": "tamr_client._types.*"
+    }
+  ],
   "accuracy": 0.0,
   "per_constraint": [
     {
