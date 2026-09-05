@@ -202,7 +202,77 @@ def walk_calls(node, caller_fqn: FQN, resolver: NameResolver, edges: list[Edge],
 
 
 
-def walk_inherits(node, module_fqn: FQN, resolver: NameResolver, edges: list[Edge]):
+def build_import_aliases(node, module_fqn: FQN) -> dict[str, str]:
+    """Map local names to the FQNs a module's import statements bind them to.
+
+    `from django.db import models` -> {"models": "django.db.models"},
+    `import django.db.models as dbm` -> {"dbm": "django.db.models"},
+    `import django.db.models` -> {"django": "django.db.models"}.
+    Internal imports are included too; callers only fall back to this map
+    when NameResolver fails, so internal entries are never consulted.
+    """
+    aliases: dict[str, str] = {}
+
+    def record(module_name: str, imported: str, local: str) -> None:
+        if module_name.startswith("."):
+            base = _resolve_relative_base(module_fqn, module_name)
+            if base is not None:
+                aliases[local] = f"{base}.{imported}"
+        else:
+            aliases[local] = f"{module_name}.{imported}"
+
+    def visit(current) -> None:
+        if current.type == "import_from_statement":
+            module_node = current.child_by_field_name("module_name")
+            if module_node is not None:
+                module_name = module_node.text.decode("utf-8")
+                names: list[tuple[str, str]] = []  # (imported, local)
+                for child in current.children:
+                    if child.type in ("dotted_name", "identifier") and child != module_node:
+                        name = child.text.decode("utf-8")
+                        names.append((name, name))
+                    elif child.type == "aliased_import":
+                        real = child.child_by_field_name("name")
+                        alias = child.child_by_field_name("alias")
+                        if real is not None:
+                            local = alias.text.decode("utf-8") if alias is not None else real.text.decode("utf-8")
+                            names.append((real.text.decode("utf-8"), local))
+                    elif child.type == "import_list":
+                        for name_node in child.children:
+                            if name_node.type in ("dotted_name", "identifier"):
+                                name = name_node.text.decode("utf-8")
+                                names.append((name, name))
+                            elif name_node.type == "aliased_import":
+                                real = name_node.child_by_field_name("name")
+                                alias = name_node.child_by_field_name("alias")
+                                if real is not None:
+                                    local = alias.text.decode("utf-8") if alias is not None else real.text.decode("utf-8")
+                                    names.append((real.text.decode("utf-8"), local))
+                for imported, local in names:
+                    record(module_name, imported, local)
+        elif current.type == "import_statement":
+            for child in current.children:
+                if child.type == "dotted_name":
+                    # unaliased: binds the top package, so `import django.db.models`
+                    # leaves `django.db.models.Model` already fully qualified
+                    top = child.text.decode("utf-8").split(".")[0]
+                    aliases[top] = top
+                elif child.type == "aliased_import":
+                    real = child.child_by_field_name("name")
+                    alias = child.child_by_field_name("alias")
+                    if real is not None:
+                        dotted = real.text.decode("utf-8")
+                        local = alias.text.decode("utf-8") if alias is not None else dotted.split(".")[0]
+                        aliases[local] = dotted
+        else:
+            for child in current.children:
+                visit(child)
+
+    visit(node)
+    return aliases
+
+
+def walk_inherits(node, module_fqn: FQN, resolver: NameResolver, aliases: dict[str, str], edges: list[Edge]):
     """Recursively walk AST to extract INHERITS edges from class definitions."""
     if node.type == "class_definition":
         name_node = node.child_by_field_name("name")
@@ -219,17 +289,24 @@ def walk_inherits(node, module_fqn: FQN, resolver: NameResolver, edges: list[Edg
                     resolved = resolver.resolve(base_text)
                     if resolved is not None and class_fqn in resolver:
                         edges.append(Edge(source=str(class_fqn), target=str(resolved), kind="INHERITS"))
+                    elif resolved is None and class_fqn in resolver:
+                        # external base: resolve its root through this module's
+                        # import aliases (models.Model -> django.db.models.Model)
+                        root, _, rest = base_text.partition(".")
+                        if root in aliases:
+                            suffix = f".{rest}" if rest else ""
+                            edges.append(Edge(source=str(class_fqn), target=f"{aliases[root]}{suffix}", kind="INHERITS"))
         # recurse into class body for nested classes
         for child in node.children:
-            walk_inherits(child, module_fqn, resolver, edges)
+            walk_inherits(child, module_fqn, resolver, aliases, edges)
 
     elif node.type == "decorated_definition":
         for child in node.children:
-            walk_inherits(child, module_fqn, resolver, edges)
+            walk_inherits(child, module_fqn, resolver, aliases, edges)
 
     else:
         for child in node.children:
-            walk_inherits(child, module_fqn, resolver, edges)
+            walk_inherits(child, module_fqn, resolver, aliases, edges)
 
 
 def parse_file(source: bytes, module_fqn: FQN, rel_path: str) -> tuple[list[FQNNode], list[Edge]]:
@@ -342,7 +419,7 @@ def parse_repo(repo_path: Path) -> ADG:
 
         walk_imports(root, fqn, known_fqns, edges)
         walk_calls(root, fqn, resolver, edges)
-        walk_inherits(root, fqn, resolver, edges)
+        walk_inherits(root, fqn, resolver, build_import_aliases(root, fqn), edges)
 
     return ADG(nodes=nodes, edges=edges)
 

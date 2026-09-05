@@ -175,7 +175,7 @@ def augment_adg(adg: ADG, diff: Diff) -> None:
     don't exist in the base ADG.
     """
     from tree_sitter import Parser
-    from services.adg.treesitter import PY_LANGUAGE, walk_imports, walk_calls, walk_inherits, parse_file
+    from services.adg.treesitter import PY_LANGUAGE, walk_imports, walk_calls, walk_inherits, build_import_aliases, parse_file
     from services.resolver import NameResolver
 
     existing_fqns = {n.fqn for n in adg.nodes}
@@ -249,7 +249,7 @@ def augment_adg(adg: ADG, diff: Diff) -> None:
         root = tree.root_node
         walk_imports(root, fqn, existing_fqns, new_dep_edges)
         walk_calls(root, fqn, resolver, new_dep_edges)
-        walk_inherits(root, fqn, resolver, new_dep_edges)
+        walk_inherits(root, fqn, resolver, build_import_aliases(root, fqn), new_dep_edges)
 
     for edge in new_dep_edges:
         key = (edge.source, edge.target, edge.kind)

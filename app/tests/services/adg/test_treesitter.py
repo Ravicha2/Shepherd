@@ -354,8 +354,8 @@ class TestInheritsEdges:
         adg = parse_repo(sample_repo)
         assert _find_edge(adg, "app.models.user.User", "app.models.base.BaseModel", "INHERITS") is not None
 
-    def test_no_inherits_from_external(self, sample_repo: Path) -> None:
-        """INHERITS edges only target FQNs within the repo (no external base classes)."""
+    def test_no_inherits_from_unimported_external(self, sample_repo: Path) -> None:
+        """sample_repo imports are all internal, so every INHERITS target is a repo FQN."""
         adg = parse_repo(sample_repo)
         all_fqns = {str(n.fqn) for n in adg.nodes}
         inherits_edges = _find_edges(adg, "INHERITS")
@@ -363,6 +363,77 @@ class TestInheritsEdges:
             assert edge.target in all_fqns, (
                 f"INHERITS edge targets unknown FQN: {edge.target}"
             )
+
+
+class TestExternalInheritsEdges:
+    """#123: external bases resolve through the module's import alias map."""
+
+    @staticmethod
+    def _repo_with_model(tmp_path: Path, source: str) -> Path:
+        models_dir = tmp_path / "models"
+        models_dir.mkdir()
+        (models_dir / "__init__.py").write_text("")
+        (models_dir / "user.py").write_text(source)
+        return tmp_path
+
+    def test_from_import_module_alias(self, tmp_path: Path) -> None:
+        """from django.db import models; class User(models.Model) -> INHERITS django.db.models.Model."""
+        repo = self._repo_with_model(
+            tmp_path, "from django.db import models\n\nclass User(models.Model):\n    pass\n"
+        )
+        adg = parse_repo(repo)
+        assert _find_edge(adg, "models.user.User", "django.db.models.Model", "INHERITS") is not None
+
+    def test_from_import_direct_name(self, tmp_path: Path) -> None:
+        """from django.db.models import Model; class User(Model) -> INHERITS django.db.models.Model."""
+        repo = self._repo_with_model(
+            tmp_path, "from django.db.models import Model\n\nclass User(Model):\n    pass\n"
+        )
+        adg = parse_repo(repo)
+        assert _find_edge(adg, "models.user.User", "django.db.models.Model", "INHERITS") is not None
+
+    def test_plain_import(self, tmp_path: Path) -> None:
+        """import django.db.models; class User(django.db.models.Model) -> INHERITS django.db.models.Model."""
+        repo = self._repo_with_model(
+            tmp_path, "import django.db.models\n\nclass User(django.db.models.Model):\n    pass\n"
+        )
+        adg = parse_repo(repo)
+        assert _find_edge(adg, "models.user.User", "django.db.models.Model", "INHERITS") is not None
+
+    def test_aliased_import(self, tmp_path: Path) -> None:
+        """from django.db import models as dbm; class User(dbm.Model) -> INHERITS django.db.models.Model."""
+        repo = self._repo_with_model(
+            tmp_path, "from django.db import models as dbm\n\nclass User(dbm.Model):\n    pass\n"
+        )
+        adg = parse_repo(repo)
+        assert _find_edge(adg, "models.user.User", "django.db.models.Model", "INHERITS") is not None
+
+    def test_relative_import_base(self, tmp_path: Path) -> None:
+        """from .base import BaseModel resolves through the relative-import base."""
+        repo = self._repo_with_model(
+            tmp_path, "from .base import BaseModel\n\nclass User(BaseModel):\n    pass\n"
+        )
+        (repo / "models" / "base.py").write_text("class BaseModel:\n    pass\n")
+        adg = parse_repo(repo)
+        assert _find_edge(adg, "models.user.User", "models.base.BaseModel", "INHERITS") is not None
+
+    def test_unknown_root_no_edge(self, tmp_path: Path) -> None:
+        """A base whose root is neither repo-internal nor imported produces no INHERITS edge."""
+        repo = self._repo_with_model(tmp_path, "class User(models.Model):\n    pass\n")
+        adg = parse_repo(repo)
+        assert _find_edges(adg, "INHERITS") == []
+
+    def test_internal_base_still_internal(self, tmp_path: Path) -> None:
+        """An internal base keeps its repo FQN; the alias fallback does not shadow it."""
+        models_dir = tmp_path / "models"
+        models_dir.mkdir()
+        (models_dir / "__init__.py").write_text("")
+        (models_dir / "base.py").write_text("class BaseModel:\n    pass\n")
+        (models_dir / "user.py").write_text(
+            "from models.base import BaseModel\n\nclass User(BaseModel):\n    pass\n"
+        )
+        adg = parse_repo(tmp_path)
+        assert _find_edge(adg, "models.user.User", "models.base.BaseModel", "INHERITS") is not None
 
 
 # ===========================================================================
