@@ -47,8 +47,17 @@ def _versions() -> dict:
     }
 
 
+def _ablation_arm() -> str:
+    """Issue #131 ablation arm label, from the same flags the harness reads."""
+    flags = [name for name, flag in (("search_off", "ABLATION_SEARCH_OFF"),
+                                     ("dependents_off", "ABLATION_DEPENDENTS_OFF"))
+             if os.environ.get(flag, "") not in ("", "0")]
+    return "+".join(flags) if flags else "baseline"
+
+
 def write_report(path: Path, payload: dict) -> None:
     """Write one eval report, stamped with _meta (generation time + git commit)."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {"_meta": {"generated_at": RUN_DIR.name, "git_commit": _git_commit(), **_versions()}, **payload}
+    payload = {"_meta": {"generated_at": RUN_DIR.name, "git_commit": _git_commit(),
+                         "arm": _ablation_arm(), **_versions()}, **payload}
     path.write_text(json.dumps(payload, indent=2))
