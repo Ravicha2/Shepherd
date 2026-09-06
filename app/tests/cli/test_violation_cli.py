@@ -1,6 +1,7 @@
 """Tests for violation list and dismiss CLI commands."""
 from __future__ import annotations
 
+import re
 from unittest.mock import MagicMock, patch
 from pathlib import Path
 
@@ -15,6 +16,15 @@ from services.cpt.resolution import Violation
 from services.fqn import FQN
 from services.models import ConstraintEdge, DiffResult, PredicateType
 from services.resolver import MatchStatus
+
+ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def plain(output: str) -> str:
+    """Strip ANSI styling: Rich 15 segments style spans per word, which breaks
+    raw substring asserts (e.g. 'violation(s) dismissed')."""
+    return ANSI_ESCAPE.sub("", output)
+
 
 runner = CliRunner()
 
@@ -94,7 +104,7 @@ class TestViolationList:
         result = runner.invoke(app, ["violation", "list", "--repo", "test-repo"])
         assert result.exit_code == 0
         for v in dr.cpt_result.violations:
-            assert violation_short_id(v) in result.output
+            assert violation_short_id(v) in plain(result.output)
 
     @patch("cli.main.GraphStore")
     @patch("cli.main._run_detection")
@@ -110,7 +120,7 @@ class TestViolationList:
 
         result = runner.invoke(app, ["violation", "list", "--repo", "test-repo"])
         assert result.exit_code == 0
-        assert "No active violations" in result.output
+        assert "No active violations" in plain(result.output)
 
     @patch("cli.main.GraphStore")
     @patch("cli.main._run_detection")
@@ -126,7 +136,7 @@ class TestViolationList:
         mock_store_cls.return_value = mock_store
 
         result = runner.invoke(app, ["violation", "list", "--repo", "test-repo"])
-        assert "1 violation(s) dismissed" in result.output
+        assert "1 violation(s) dismissed" in plain(result.output)
 
     @patch("cli.main.GraphStore")
     @patch("cli.main._run_detection")
@@ -139,7 +149,7 @@ class TestViolationList:
 
         result = runner.invoke(app, ["violation", "list", "--repo", "test-repo"])
         assert result.exit_code == 0
-        assert "No active violations" in result.output
+        assert "No active violations" in plain(result.output)
 
 
 class TestViolationDismiss:
@@ -160,7 +170,7 @@ class TestViolationDismiss:
         assert result.exit_code == 0
         mock_store.connect.assert_called_once()
         mock_store.store_dismissal.assert_called_once()
-        assert "Dismissed" in result.output
+        assert "Dismissed" in plain(result.output)
 
     @patch("cli.main.GraphStore")
     @patch("cli.main._run_detection")
@@ -172,7 +182,7 @@ class TestViolationDismiss:
 
         result = runner.invoke(app, ["violation", "dismiss", "zzzzz", "--repo", "test-repo"])
         assert result.exit_code == 1
-        assert "No violation" in result.output
+        assert "No violation" in plain(result.output)
 
     @patch("cli.main.GraphStore")
     @patch("cli.main._run_detection")
