@@ -278,7 +278,6 @@ class TestToolCalling:
             _make_mock_response(tool_calls=[_tool_call("tc1", "search_code", {"query": "user view"})]),
             _make_mock_response(tool_calls=[_tool_call("tc2", "list_children", {"fqn": "app.api"})]),
             _make_mock_response(tool_calls=[_tool_call("tc3", "list_dependencies", {"fqn": "app.api.users"})]),
-            _make_mock_response(tool_calls=[_tool_call("tc4", "list_dependents", {"fqn": "app.auth.middleware"})]),
             _make_mock_response(
                 content=json.dumps([{
                     "subject": "app.api.*",
@@ -842,7 +841,6 @@ class TestWorstCaseTraffic:
         for name, args in [
             ("list_children", {"fqn": "app.hub"}),
             ("list_dependencies", {"fqn": "app.hub"}),
-            ("list_dependents", {"fqn": "app.hub"}),
             ("search_code", {"query": "hub"}),
         ]:
             result = _dispatch_tool(name, args, hub_adg, backend=fat_backend)

@@ -48,16 +48,6 @@ def list_dependencies(fqn: str, adg: ADG, cap: int = NEIGHBORHOOD_CAP) -> dict:
     return _capped(entries, cap, fqn)
 
 
-def list_dependents(fqn: str, adg: ADG, cap: int = NEIGHBORHOOD_CAP) -> dict:
-    """Return who uses `fqn`: IMPORTS + INHERITS edges in, reversed, labeled with edge kind."""
-    entries = [
-        {"fqn": e.source, "edge": e.kind}
-        for e in adg.edges
-        if e.target == fqn and e.kind in ("IMPORTS", "INHERITS")
-    ]
-    return _capped(entries, cap, fqn)
-
-
 def list_inherits(fqn: str, adg: ADG) -> list[str]:
     """Return target FQNs that `fqn` inherits from (INHERITS edges)."""
     return [e.target for e in adg.edges if e.source == fqn and e.kind == "INHERITS"]
@@ -86,5 +76,4 @@ if __name__ == "__main__":
     assert list_inherits("app.mod.Foo", adg) == ["bar.Baz"]
     assert list_dependencies("app.mod", adg) == {"entries": [{"fqn": "os", "edge": "IMPORTS"}], "truncated": False}
     assert list_dependencies("app.mod.Foo", adg) == {"entries": [{"fqn": "bar.Baz", "edge": "INHERITS"}], "truncated": False}
-    assert list_dependents("os", adg) == {"entries": [{"fqn": "app.mod", "edge": "IMPORTS"}], "truncated": False}
     print("OK")

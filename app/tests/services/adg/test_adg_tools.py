@@ -1,4 +1,4 @@
-"""Tests for ADG query tools: list_children, list_imports, list_inherits, list_dependencies, list_dependents.
+"""Tests for ADG query tools: list_children, list_imports, list_inherits, list_dependencies.
 
 These tools wrap the in-memory ADG for agent tool-call consumption.
 No Neo4j dependency; pure list/set operations on ADG.nodes and ADG.edges.
@@ -10,7 +10,7 @@ import pytest
 
 from services.fqn import FQN
 from services.models import ADG, Edge, FQNKind, FQNNode
-from services.adg.adg_tools import NEIGHBORHOOD_CAP, list_children, list_dependencies, list_dependents, list_imports, list_inherits
+from services.adg.adg_tools import NEIGHBORHOOD_CAP, list_children, list_dependencies, list_imports, list_inherits
 
 
 # -- Fixtures ---------------------------------------------------------------
@@ -118,15 +118,6 @@ class TestNeighborhoodCap:
             edges=[Edge(source="app.hub", target=f"ext_{i}", kind="IMPORTS") for i in range(NEIGHBORHOOD_CAP + 10)],
         )
         result = list_dependencies("app.hub", adg)
-        assert len(result["entries"]) == NEIGHBORHOOD_CAP
-        assert result["truncated"] is True
-
-    def test_dependents_capped(self) -> None:
-        adg = ADG(
-            nodes=[FQNNode(fqn=FQN.from_dotted("app.hub"), kind=FQNKind.MODULE, file_path="app/hub.py", line_start=0, line_end=0, start_byte=0, end_byte=0)],
-            edges=[Edge(source=f"app.user_{i}", target="app.hub", kind="IMPORTS") for i in range(NEIGHBORHOOD_CAP + 10)],
-        )
-        result = list_dependents("app.hub", adg)
         assert len(result["entries"]) == NEIGHBORHOOD_CAP
         assert result["truncated"] is True
 
@@ -244,31 +235,5 @@ class TestListDependencies:
 
     def test_empty_adg(self, empty_adg: ADG) -> None:
         assert list_dependencies("app", empty_adg) == {"entries": [], "truncated": False}
-
-
-# -- list_dependents -----------------------------------------------------------
-
-class TestListDependents:
-    def test_reverses_imports_and_inherits_edges(self, sample_adg: ADG) -> None:
-        """app.auth.middleware is imported by app.api.users and its AuthMiddleware
-        inherits from app.api.users.UserView — both point back when reversed."""
-        assert list_dependents("app.auth.middleware", sample_adg) == {
-            "entries": [{"fqn": "app.api.users", "edge": "IMPORTS"}],
-            "truncated": False,
-        }
-        assert list_dependents("app.api.users.UserView", sample_adg) == {
-            "entries": [{"fqn": "app.auth.middleware.AuthMiddleware", "edge": "INHERITS"}],
-            "truncated": False,
-        }
-
-    def test_calls_edges_excluded(self) -> None:
-        result = list_dependents("app.helper", _dependency_adg())
-        assert result == {"entries": [], "truncated": False}
-
-    def test_no_dependents(self, sample_adg: ADG) -> None:
-        assert list_dependents("app.db", sample_adg) == {"entries": [], "truncated": False}
-
-    def test_empty_adg(self, empty_adg: ADG) -> None:
-        assert list_dependents("app", empty_adg) == {"entries": [], "truncated": False}
 
 

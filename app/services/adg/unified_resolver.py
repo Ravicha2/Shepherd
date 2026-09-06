@@ -2,9 +2,9 @@
 
 One LLM session per ADR. Reads full ADR text (including Decision Outcome),
 uses the search-first tool surface (search_code, list_children,
-list_dependencies, list_dependents; ADR 017) to map prose concepts to FQN
-patterns, and produces ConstraintEdge objects directly. No SymbolicConstraint
-intermediate.
+list_dependencies; ADR 017, list_dependents cut per #131/#133) to map prose
+concepts to FQN patterns, and produces ConstraintEdge objects directly. No
+SymbolicConstraint intermediate.
 """
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 
 from openai import OpenAI
 
-from services.adg.adg_tools import list_children, list_dependencies, list_dependents
+from services.adg.adg_tools import list_children, list_dependencies
 from services.extract.config import LangExtractConfig
 from services.models import ADG, ConstraintEdge, FQNKind, PredicateType
 
@@ -40,7 +40,7 @@ _TOOLS = [
                 "code snippets lifted to FQN handles: {fqn, kind, file, snippet}. "
                 "Start here with a prose query drawn from the ADR (e.g. "
                 "'passive update coordinator'), then inspect the hits with "
-                "list_children / list_dependencies / list_dependents."
+                "list_children / list_dependencies."
             ),
             "parameters": {
                 "type": "object",
@@ -81,28 +81,12 @@ _TOOLS = [
             },
         },
     },
-    {
-        "type": "function",
-        "function": {
-            "name": "list_dependents",
-            "description": (
-                "Who uses `fqn`? Same IMPORTS/INHERITS edges reversed: sources "
-                "that import or inherit from `fqn`, labeled with the edge kind."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {"fqn": _FQN_PARAM},
-                "required": ["fqn"],
-            },
-        },
-    },
 ]
 
 _TOOL_FUNCTIONS = {
     "search_code": lambda args, adg, backend: json.dumps(backend(args["query"])),
     "list_children": lambda args, adg, backend: json.dumps(list_children(args["fqn"], adg)),
     "list_dependencies": lambda args, adg, backend: json.dumps(list_dependencies(args["fqn"], adg)),
-    "list_dependents": lambda args, adg, backend: json.dumps(list_dependents(args["fqn"], adg)),
 }
 
 
@@ -157,8 +141,8 @@ decision outcome, not something to be prohibited.
 **FQNs in your output MUST come from tool results or the root package list.** Do not guess \
 FQNs from the ADR's prose alone or from what a typical project of this kind usually looks \
 like. Start with search_code to find where an ADR concept lives in the code (hits come back \
-as FQN handles with snippets), then inspect the neighborhood with list_children, \
-list_dependencies, and list_dependents to confirm the exact FQNs before writing a constraint.
+as FQN handles with snippets), then inspect the neighborhood with list_children \
+and list_dependencies to confirm the exact FQNs before writing a constraint.
 
 ## ADR Document
 
@@ -280,7 +264,6 @@ Result:
 Example 2: ADR requires every endpoint to enforce auth middleware.
 
 Step 1: search_code("authentication middleware decorator") → hits app.middleware.auth.AuthMiddleware
-Step 2: list_dependents("app.middleware.auth.AuthMiddleware") → who already uses it
 
 Result:
 [{{"subject": "app.routes.*", "object": "app.middleware.auth.*", "predicate": "requires_dependency", "justification": "ADR states every endpoint must apply the auth middleware before handling a request", "adr_id": "{adr_id}", "adr_path": "{adr_path}"}}]
@@ -477,7 +460,7 @@ def resolve_adr_constraints(
     """Resolve a single ADR's full text to ConstraintEdge objects.
 
     One LLM session per ADR. The agent reads the complete ADR, uses the
-    search_code / list_children / list_dependencies / list_dependents tools to
+    search_code / list_children / list_dependencies tools to
     map prose concepts to FQN patterns, and outputs constraint edges directly.
     `search_backend` is the injected semble callable from build_search_backend
     (ADR 017 decision 6; unit tests inject a stub).
