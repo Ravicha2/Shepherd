@@ -156,6 +156,11 @@ The codebase's root package(s): {root_packages}. Every internal FQN starts with 
 
 - subject: MUST be an internal FQN pattern grounded in tool results (or the root package
   itself). If you cannot map the ADR's subject concept to a real FQN, return an empty array.
+- Policy, tooling, and whole-codebase constraints (linters, formatters, test runners, build
+  tooling, language versions, frameworks) take the ROOT PACKAGE as subject. NEVER use
+  file-entry-point modules (`manage`, `noxfile`, `setup`, `conftest`) or documentation/example
+  roots (`docs`, `examples`) as subjects, even when search_code returns hits from those files:
+  they are scaffolding around the codebase, not architectural units inside it.
 - object: depends on predicate:
   - `requires_dependency` / `requires_implementation`: object is either (a) an
     internal FQN pattern from the module list, or (b) an external package name. Prefer
