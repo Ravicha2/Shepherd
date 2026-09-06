@@ -9,8 +9,10 @@ pre-versioning baselines; compare with
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from datetime import datetime
+from importlib.metadata import version as _package_version
 from pathlib import Path
 
 GROUND_TRUTH_DIR = Path(__file__).resolve().parents[2] / "tests" / "ground_truth"
@@ -32,8 +34,21 @@ def _git_commit() -> str:
         return "unknown"
 
 
+def _versions() -> dict:
+    """LLM stack versions (#130): runs don't reproduce, versions are the only
+    reproducibility left. Env overrides are captured, not the code defaults."""
+    from semble.utils import DEFAULT_MODEL_NAME
+    from services.extract.config import LangExtractConfig
+
+    return {
+        "semble_version": _package_version("semble"),
+        "semble_model": os.environ.get("SEMBLE_MODEL_NAME", DEFAULT_MODEL_NAME),
+        "resolver_model": LangExtractConfig().model_id,
+    }
+
+
 def write_report(path: Path, payload: dict) -> None:
     """Write one eval report, stamped with _meta (generation time + git commit)."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {"_meta": {"generated_at": RUN_DIR.name, "git_commit": _git_commit()}, **payload}
+    payload = {"_meta": {"generated_at": RUN_DIR.name, "git_commit": _git_commit(), **_versions()}, **payload}
     path.write_text(json.dumps(payload, indent=2))

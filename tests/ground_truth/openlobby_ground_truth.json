@@ -45,7 +45,7 @@
     "adr_id": "ADR-0005",
     "adr_path": "docs/architecture/decisions/0005-python.md",
     "constraints": [],
-    "note": "Language choice; trivially true for the entire codebase, no meaningful FQN-level constraint"
+    "note": "Language choice; trivially true for the entire codebase, no meaningful FQN-level constraint Known post-#128 FP class (eval.md 2026-09-05 baseline row): search_code lifts manage.py/setup.py and the resolver grounds this corpus-level policy on those entry-point FQNs (manage.*, setup.*) instead of the package root; remedy candidate is a prompt rule, not a detection bug."
   },
   {
     "adr_id": "ADR-0006",
@@ -76,7 +76,7 @@
     "adr_id": "ADR-0008",
     "adr_path": "docs/architecture/decisions/0008-pytest.md",
     "constraints": [],
-    "note": "Test files are excluded from ADG by _is_test_file in treesitter.py, so tests.* FQNs do not exist; no evaluable FQN-level constraint"
+    "note": "Test files are excluded from ADG by _is_test_file in treesitter.py, so tests.* FQNs do not exist; no evaluable FQN-level constraint Known post-#128 FP class (eval.md 2026-09-05 baseline row): search_code lifts manage.py/setup.py and the resolver grounds this corpus-level policy on those entry-point FQNs (manage.*, setup.*) instead of the package root; remedy candidate is a prompt rule, not a detection bug."
   },
   {
     "adr_id": "ADR-0009",
@@ -108,7 +108,7 @@
         "justification": "ADR-0010 mandates Django as the web framework; relational data access goes through the Django ORM (django.db). Moved from ADR-0011 since the Django ORM choice is what makes django.db the access path."
       }
     ],
-    "note": "Dropped in #125 (non-FQN-checkable, ADR-0003/0005 precedent): 'We will switch to Django.' is a framework choice with no FQN-derivable requires subject — settings.py is compliant Django-project code without importing django, so an import-level requires on openlobby.* asserts compliant modules are violating. The checkable content is carried by the flask prohibition and the models-locus django.db requires."
+    "note": "Dropped in #125 (non-FQN-checkable, ADR-0003/0005 precedent): 'We will switch to Django.' is a framework choice with no FQN-derivable requires subject — settings.py is compliant Django-project code without importing django, so an import-level requires on openlobby.* asserts compliant modules are violating. The checkable content is carried by the flask prohibition and the models-locus django.db requires. Known post-#128 FP class (eval.md 2026-09-05 baseline row): search_code lifts manage.py/setup.py and the resolver grounds this corpus-level policy on those entry-point FQNs (manage.*, setup.*) instead of the package root; remedy candidate is a prompt rule, not a detection bug."
   },
   {
     "adr_id": "ADR-0011",

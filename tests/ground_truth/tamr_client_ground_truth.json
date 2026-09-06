@@ -9,19 +9,19 @@
     "adr_id": "ADR-0002",
     "adr_path": "docs/contributor-guide/adr/0002-linting-and-formatting.md",
     "constraints": [],
-    "note": "Tooling ADR: flake8, flake8-import-order, and black are dev-time linting/formatting tools run in the noxfile lint/format sessions; no shipped module imports them, so no FQN-level dependency or implementation edge exists. Emit no edges."
+    "note": "Tooling ADR: flake8, flake8-import-order, and black are dev-time linting/formatting tools run in the noxfile lint/format sessions; no shipped module imports them, so no FQN-level dependency or implementation edge exists. Emit no edges. Known post-#128 FP class (eval.md 2026-09-05 baseline row): search_code lifts docs/, examples/, noxfile.py and the resolver grounds this corpus-level policy on those entry-point FQNs (docs.*, examples.*, noxfile.*) instead of the package root; remedy candidate is a prompt rule, not a detection bug."
   },
   {
     "adr_id": "ADR-0003",
     "adr_path": "docs/contributor-guide/adr/0003-reproducibility.md",
     "constraints": [],
-    "note": "Dev-environment/CI process ADR: pyenv, poetry, nox, and GitHub Actions govern how Python versions, dependencies, and CI tests are managed; these are workflow tools, not dependencies of the tamr_client/tamr_unify_client modules. Emit no edges."
+    "note": "Dev-environment/CI process ADR: pyenv, poetry, nox, and GitHub Actions govern how Python versions, dependencies, and CI tests are managed; these are workflow tools, not dependencies of the tamr_client/tamr_unify_client modules. Emit no edges. Known post-#128 FP class (eval.md 2026-09-05 baseline row): search_code lifts docs/, examples/, noxfile.py and the resolver grounds this corpus-level policy on those entry-point FQNs (docs.*, examples.*, noxfile.*) instead of the package root; remedy candidate is a prompt rule, not a detection bug."
   },
   {
     "adr_id": "ADR-0004",
     "adr_path": "docs/contributor-guide/adr/0004-documentation-and-docstrings.md",
     "constraints": [],
-    "note": "Documentation-process ADR: sphinx/recommonmark/sphinx-autodoc/napoleon/ReadTheDocs choices govern doc generation and docstring style; no dependency or implementation relation between code FQNs. Emit no edges."
+    "note": "Documentation-process ADR: sphinx/recommonmark/sphinx-autodoc/napoleon/ReadTheDocs choices govern doc generation and docstring style; no dependency or implementation relation between code FQNs. Emit no edges. Known post-#128 FP class (eval.md 2026-09-05 baseline row): search_code lifts docs/, examples/, noxfile.py and the resolver grounds this corpus-level policy on those entry-point FQNs (docs.*, examples.*, noxfile.*) instead of the package root; remedy candidate is a prompt rule, not a detection bug."
   },
   {
     "adr_id": "ADR-0005",

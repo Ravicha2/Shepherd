@@ -28,3 +28,18 @@ def test_write_report_stamps_meta(tmp_path: Path) -> None:
     payload = json.loads(target.read_text())
     assert payload["_meta"]["git_commit"]
     assert payload["accuracy"] == 0.5
+
+
+def test_write_report_stamps_versions(tmp_path: Path, monkeypatch) -> None:
+    """_meta records the resolver stack versions: semble package, semble model,
+    LANGEXTRACT model id (#130: LLM runs don't reproduce, versions are the only
+    reproducibility left). Env overrides are captured, not the defaults."""
+    monkeypatch.setenv("LANGEXTRACT_MODEL_ID", "vendor/model-x")
+    monkeypatch.setenv("SEMBLE_MODEL_NAME", "local/potion-y")
+    target = tmp_path / "report.json"
+    write_report(target, {})
+    import json
+    meta = json.loads(target.read_text())["_meta"]
+    assert meta["semble_version"] == "0.5.6"
+    assert meta["semble_model"] == "local/potion-y"
+    assert meta["resolver_model"] == "vendor/model-x"
