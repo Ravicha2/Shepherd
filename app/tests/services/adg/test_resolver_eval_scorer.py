@@ -3,7 +3,7 @@
 Two false-positive classes fixed harness-side in test_unified_resolver_eval:
 - Many-to-one consolidation: a resolved fragment whose subject is a child of an
   expected row's subject prefix (same predicate, object not a miss) credits that
-  row instead of counting as a false positive — tamr ADR-0009's single mandate
+  row instead of counting as a false positive: tamr ADR-0009's single mandate
   arrives as 10 per-module requires edges against one broad gold row.
 - Object-side ancestor tolerance: `X.*` (subtree wildcard) partial-matches the
   bare module `X`, mirroring the cpt engine's requires-satisfaction tolerance

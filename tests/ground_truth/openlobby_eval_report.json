@@ -1,7 +1,7 @@
 {
   "_meta": {
-    "generated_at": "2026-09-07T13-51-14",
-    "git_commit": "ac99cf6",
+    "generated_at": "2026-09-07T21-17-11",
+    "git_commit": "6ce7d1e",
     "arm": "baseline",
     "semble_version": "0.5.6",
     "semble_model": "minishlab/potion-code-16M-v2",
@@ -128,6 +128,7 @@
       "object": "black"
     }
   ],
+  "credited_fragments": [],
   "accuracy": 0.55,
   "per_constraint": [
     {

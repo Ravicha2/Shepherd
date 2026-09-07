@@ -81,8 +81,8 @@ def _score_fqn(resolved: str, expected: str) -> str:
 def _is_credited_fragment(edge: ConstraintEdge, expected_constraints: list[dict]) -> bool:
     """Many-to-one consolidation (issue #134): a resolved edge whose subject sits
     under an expected row's subject prefix (same predicate, object not a miss) is
-    that row's mandate fragmented per-module — credit the row instead of counting
-    a false positive, no double counting (the row keeps its own score). Known
+    that row's mandate fragmented per-module, so it credits the row instead of
+    counting a false positive, no double counting (the row keeps its own score). Known
     boundary: the gold prefix is kind-blind, so this also credits modules the
     ADR's mandate would exclude; a different predicate or an object miss never
     credits."""
