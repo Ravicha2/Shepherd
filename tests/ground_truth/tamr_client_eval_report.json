@@ -1,34 +1,20 @@
 {
   "_meta": {
-    "generated_at": "2026-09-05T22-31-58",
-    "git_commit": "40b1c9f"
+    "generated_at": "2026-09-07T13-51-14",
+    "git_commit": "ac99cf6",
+    "arm": "baseline",
+    "semble_version": "0.5.6",
+    "semble_model": "minishlab/potion-code-16M-v2",
+    "resolver_model": "google/gemini-3.1-flash-lite"
   },
   "exact": 0,
   "partial": 0,
   "miss": 1,
   "total": 1,
-  "false_positives": 32,
+  "false_positives": 23,
   "false_positive_edges": [
     {
       "adr_id": "ADR-0002",
-      "subject": "docs.*",
-      "predicate": "requires_dependency",
-      "object": "flake8"
-    },
-    {
-      "adr_id": "ADR-0002",
-      "subject": "examples.*",
-      "predicate": "requires_dependency",
-      "object": "flake8"
-    },
-    {
-      "adr_id": "ADR-0002",
-      "subject": "noxfile.*",
-      "predicate": "requires_dependency",
-      "object": "flake8"
-    },
-    {
-      "adr_id": "ADR-0002",
       "subject": "tamr_client.*",
       "predicate": "requires_dependency",
       "object": "flake8"
@@ -38,24 +24,6 @@
       "subject": "tamr_unify_client.*",
       "predicate": "requires_dependency",
       "object": "flake8"
-    },
-    {
-      "adr_id": "ADR-0002",
-      "subject": "docs.*",
-      "predicate": "requires_dependency",
-      "object": "flake8-import-order"
-    },
-    {
-      "adr_id": "ADR-0002",
-      "subject": "examples.*",
-      "predicate": "requires_dependency",
-      "object": "flake8-import-order"
-    },
-    {
-      "adr_id": "ADR-0002",
-      "subject": "noxfile.*",
-      "predicate": "requires_dependency",
-      "object": "flake8-import-order"
     },
     {
       "adr_id": "ADR-0002",
@@ -71,24 +39,6 @@
     },
     {
       "adr_id": "ADR-0002",
-      "subject": "docs.*",
-      "predicate": "requires_dependency",
-      "object": "black"
-    },
-    {
-      "adr_id": "ADR-0002",
-      "subject": "examples.*",
-      "predicate": "requires_dependency",
-      "object": "black"
-    },
-    {
-      "adr_id": "ADR-0002",
-      "subject": "noxfile.*",
-      "predicate": "requires_dependency",
-      "object": "black"
-    },
-    {
-      "adr_id": "ADR-0002",
       "subject": "tamr_client.*",
       "predicate": "requires_dependency",
       "object": "black"
@@ -98,48 +48,48 @@
       "subject": "tamr_unify_client.*",
       "predicate": "requires_dependency",
       "object": "black"
-    },
-    {
-      "adr_id": "ADR-0003",
-      "subject": "tamr_client.*",
-      "predicate": "requires_dependency",
-      "object": "poetry"
-    },
-    {
-      "adr_id": "ADR-0003",
-      "subject": "tamr_unify_client.*",
-      "predicate": "requires_dependency",
-      "object": "poetry"
-    },
-    {
-      "adr_id": "ADR-0003",
-      "subject": "noxfile.*",
-      "predicate": "requires_dependency",
-      "object": "nox"
     },
     {
       "adr_id": "ADR-0004",
-      "subject": "docs.*",
+      "subject": "tamr_client.*",
       "predicate": "requires_dependency",
       "object": "sphinx"
     },
     {
       "adr_id": "ADR-0004",
-      "subject": "docs.*",
+      "subject": "tamr_unify_client.*",
+      "predicate": "requires_dependency",
+      "object": "sphinx"
+    },
+    {
+      "adr_id": "ADR-0004",
+      "subject": "tamr_client.*",
       "predicate": "requires_dependency",
       "object": "recommonmark"
     },
     {
-      "adr_id": "ADR-0005",
+      "adr_id": "ADR-0004",
+      "subject": "tamr_unify_client.*",
+      "predicate": "requires_dependency",
+      "object": "recommonmark"
+    },
+    {
+      "adr_id": "ADR-0006",
       "subject": "tamr_client.*",
       "predicate": "requires_dependency",
-      "object": "dataclasses"
+      "object": "mypy"
+    },
+    {
+      "adr_id": "ADR-0006",
+      "subject": "tamr_unify_client.*",
+      "predicate": "requires_dependency",
+      "object": "mypy"
     },
     {
       "adr_id": "ADR-0007",
       "subject": "tamr_client.*",
-      "predicate": "requires_dependency",
-      "object": "tamr_client._beta.check"
+      "predicate": "prohibits_dependency",
+      "object": "tamr_unify_client.*"
     },
     {
       "adr_id": "ADR-0009",

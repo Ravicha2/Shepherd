@@ -1,14 +1,24 @@
 {
   "_meta": {
-    "generated_at": "2026-09-05T22-31-58",
-    "git_commit": "40b1c9f"
+    "generated_at": "2026-09-07T13-51-14",
+    "git_commit": "ac99cf6",
+    "arm": "baseline",
+    "semble_version": "0.5.6",
+    "semble_model": "minishlab/potion-code-16M-v2",
+    "resolver_model": "google/gemini-3.1-flash-lite"
   },
-  "exact": 3,
+  "exact": 2,
   "partial": 0,
-  "miss": 1,
+  "miss": 2,
   "total": 4,
-  "false_positives": 3,
+  "false_positives": 4,
   "false_positive_edges": [
+    {
+      "adr_id": "ADR-001",
+      "subject": "manage.*",
+      "predicate": "prohibits_dependency",
+      "object": "users.models.*"
+    },
     {
       "adr_id": "ADR-001",
       "subject": "project.*",
@@ -28,7 +38,7 @@
       "object": "users.models.*"
     }
   ],
-  "accuracy": 0.75,
+  "accuracy": 0.5,
   "per_constraint": [
     {
       "adr_id": "ADR-001",
@@ -51,8 +61,8 @@
         "justification": "All data access must go through service functions; the service layer (users.services) is the sole gateway to the data layer"
       },
       "score": "miss",
-      "resolved_subject": "users.services.*",
-      "resolved_object": "users.models.*"
+      "resolved_subject": null,
+      "resolved_object": null
     },
     {
       "adr_id": "ADR-001",
@@ -62,9 +72,9 @@
         "object": "users.models.*",
         "justification": "Only the service layer may import from the data model module"
       },
-      "score": "exact_match",
-      "resolved_subject": "users.services.*",
-      "resolved_object": "users.models.*"
+      "score": "miss",
+      "resolved_subject": null,
+      "resolved_object": null
     },
     {
       "adr_id": "ADR-002",

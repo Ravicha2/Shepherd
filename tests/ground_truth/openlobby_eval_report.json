@@ -1,19 +1,47 @@
 {
   "_meta": {
-    "generated_at": "2026-09-05T22-31-58",
-    "git_commit": "40b1c9f"
+    "generated_at": "2026-09-07T13-51-14",
+    "git_commit": "ac99cf6",
+    "arm": "baseline",
+    "semble_version": "0.5.6",
+    "semble_model": "minishlab/potion-code-16M-v2",
+    "resolver_model": "google/gemini-3.1-flash-lite"
   },
   "exact": 2,
-  "partial": 5,
-  "miss": 3,
+  "partial": 7,
+  "miss": 1,
   "total": 10,
-  "false_positives": 16,
+  "false_positives": 19,
   "false_positive_edges": [
+    {
+      "adr_id": "ADR-0002",
+      "subject": "manage.*",
+      "predicate": "requires_dependency",
+      "object": "elasticsearch"
+    },
+    {
+      "adr_id": "ADR-0002",
+      "subject": "setup.*",
+      "predicate": "requires_dependency",
+      "object": "elasticsearch"
+    },
+    {
+      "adr_id": "ADR-0003",
+      "subject": "openlobby.*",
+      "predicate": "requires_dependency",
+      "object": "openlobby.core.api.*"
+    },
     {
       "adr_id": "ADR-0004",
       "subject": "openlobby.*",
       "predicate": "requires_dependency",
       "object": "graphene_django"
+    },
+    {
+      "adr_id": "ADR-0004",
+      "subject": "openlobby.*",
+      "predicate": "requires_dependency",
+      "object": "graphql_relay"
     },
     {
       "adr_id": "ADR-0005",
@@ -24,6 +52,12 @@
     {
       "adr_id": "ADR-0005",
       "subject": "openlobby.*",
+      "predicate": "prohibits_dependency",
+      "object": "javascript"
+    },
+    {
+      "adr_id": "ADR-0005",
+      "subject": "setup.*",
       "predicate": "prohibits_dependency",
       "object": "javascript"
     },
@@ -34,22 +68,16 @@
       "object": "flask"
     },
     {
-      "adr_id": "ADR-0008",
-      "subject": "manage.*",
+      "adr_id": "ADR-0007",
+      "subject": "openlobby.core.api.*",
       "predicate": "requires_dependency",
-      "object": "pytest"
+      "object": "graphene_django"
     },
     {
-      "adr_id": "ADR-0008",
-      "subject": "openlobby.*",
+      "adr_id": "ADR-0007",
+      "subject": "openlobby.core.api.*",
       "predicate": "requires_dependency",
-      "object": "pytest"
-    },
-    {
-      "adr_id": "ADR-0008",
-      "subject": "setup.*",
-      "predicate": "requires_dependency",
-      "object": "pytest"
+      "object": "graphql_relay"
     },
     {
       "adr_id": "ADR-0008",
@@ -68,30 +96,6 @@
       "subject": "setup.*",
       "predicate": "prohibits_dependency",
       "object": "unittest"
-    },
-    {
-      "adr_id": "ADR-0010",
-      "subject": "manage.*",
-      "predicate": "requires_dependency",
-      "object": "django"
-    },
-    {
-      "adr_id": "ADR-0010",
-      "subject": "setup.*",
-      "predicate": "requires_dependency",
-      "object": "django"
-    },
-    {
-      "adr_id": "ADR-0010",
-      "subject": "manage.*",
-      "predicate": "prohibits_dependency",
-      "object": "flask"
-    },
-    {
-      "adr_id": "ADR-0010",
-      "subject": "setup.*",
-      "predicate": "prohibits_dependency",
-      "object": "flask"
     },
     {
       "adr_id": "ADR-0011",
@@ -103,10 +107,28 @@
       "adr_id": "ADR-0012",
       "subject": "openlobby.*",
       "predicate": "requires_dependency",
-      "object": "django.db"
+      "object": "django.db.backends.postgresql"
+    },
+    {
+      "adr_id": "ADR-0013",
+      "subject": "manage.*",
+      "predicate": "requires_dependency",
+      "object": "black"
+    },
+    {
+      "adr_id": "ADR-0013",
+      "subject": "openlobby.*",
+      "predicate": "requires_dependency",
+      "object": "black"
+    },
+    {
+      "adr_id": "ADR-0013",
+      "subject": "setup.*",
+      "predicate": "requires_dependency",
+      "object": "black"
     }
   ],
-  "accuracy": 0.45,
+  "accuracy": 0.55,
   "per_constraint": [
     {
       "adr_id": "ADR-0002",
@@ -140,9 +162,9 @@
         "object": "rest_framework",
         "justification": "ADR-0004 mandates GraphQL over REST; REST API frameworks should not be used"
       },
-      "score": "miss",
-      "resolved_subject": null,
-      "resolved_object": null
+      "score": "partial_match",
+      "resolved_subject": "openlobby.*",
+      "resolved_object": "rest_framework"
     },
     {
       "adr_id": "ADR-0006",
@@ -164,9 +186,9 @@
         "object": "graphene.relay",
         "justification": "ADR-0007 mandates adopting GraphQL Relay specification for pagination and Node interface via Graphene Relay"
       },
-      "score": "miss",
-      "resolved_subject": null,
-      "resolved_object": null
+      "score": "partial_match",
+      "resolved_subject": "openlobby.core.api.*",
+      "resolved_object": "graphene"
     },
     {
       "adr_id": "ADR-0009",

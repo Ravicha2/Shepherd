@@ -1,7 +1,11 @@
 {
   "_meta": {
-    "generated_at": "2026-09-05T22-31-58",
-    "git_commit": "40b1c9f"
+    "generated_at": "2026-09-07T13-51-14",
+    "git_commit": "ac99cf6",
+    "arm": "baseline",
+    "semble_version": "0.5.6",
+    "semble_model": "minishlab/potion-code-16M-v2",
+    "resolver_model": "google/gemini-3.1-flash-lite"
   },
   "exact": 3,
   "partial": 0,
@@ -16,16 +20,16 @@
       "object": "securesystemslib"
     },
     {
-      "adr_id": "ADR-0006",
-      "subject": "tuf.api.serialization.*",
+      "adr_id": "ADR-0008",
+      "subject": "tuf.api.metadata.Metadata",
       "predicate": "requires_implementation",
-      "object": "tuf.api.serialization.MetadataSerializer"
+      "object": "tuf.api._payload.Signed"
     },
     {
       "adr_id": "ADR-0008",
-      "subject": "tuf.api.*",
-      "predicate": "requires_implementation",
-      "object": "tuf.api.metadata.Metadata"
+      "subject": "tuf.api._payload.Role",
+      "predicate": "prohibits_implementation",
+      "object": "tuf.api._payload.Signed"
     }
   ],
   "accuracy": 0.75,

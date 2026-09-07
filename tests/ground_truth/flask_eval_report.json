@@ -1,7 +1,11 @@
 {
   "_meta": {
-    "generated_at": "2026-09-05T22-31-58",
-    "git_commit": "40b1c9f"
+    "generated_at": "2026-09-07T13-51-14",
+    "git_commit": "ac99cf6",
+    "arm": "baseline",
+    "semble_version": "0.5.6",
+    "semble_model": "minishlab/potion-code-16M-v2",
+    "resolver_model": "google/gemini-3.1-flash-lite"
   },
   "exact": 1,
   "partial": 0,
@@ -13,7 +17,7 @@
       "adr_id": "ADR-002",
       "subject": "app.routes.*",
       "predicate": "requires_implementation",
-      "object": "app.middleware.auth.require_auth"
+      "object": "app.middleware.auth.AuthMiddleware"
     }
   ],
   "accuracy": 0.25,
