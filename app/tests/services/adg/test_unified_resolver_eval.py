@@ -70,7 +70,34 @@ def _score_fqn(resolved: str, expected: str) -> str:
         return "exact_match"
     if _is_ancestor(expected, resolved) or _is_ancestor(resolved, expected):
         return "partial_match"
+    if resolved.rstrip(".*") == expected.rstrip(".*"):
+        # X.* vs X: same base, wildcard-granularity difference. On the object side
+        # this mirrors the cpt engine's requires tolerance (a dependency anywhere
+        # under X satisfies requires-on-X, engine.py target.startswith(object + ".")).
+        return "partial_match"
     return "miss"
+
+
+def _is_credited_fragment(edge: ConstraintEdge, expected_constraints: list[dict]) -> bool:
+    """Many-to-one consolidation (issue #134): a resolved edge whose subject sits
+    under an expected row's subject prefix (same predicate, object not a miss) is
+    that row's mandate fragmented per-module — credit the row instead of counting
+    a false positive, no double counting (the row keeps its own score). Known
+    boundary: the gold prefix is kind-blind, so this also credits modules the
+    ADR's mandate would exclude; a different predicate or an object miss never
+    credits."""
+    for expected in expected_constraints:
+        try:
+            expected_pred = PredicateType(expected["predicate"])
+        except ValueError:
+            continue
+        if edge.predicate != expected_pred:
+            continue
+        if not _is_ancestor(edge.subject, expected["subject"]):
+            continue
+        if _score_fqn(edge.object, expected["object"]) != "miss":
+            return True
+    return False
 
 
 _SCORE_RANK = {"exact_match": 2, "partial_match": 1, "miss": 0}
@@ -119,6 +146,9 @@ class EvalResult:
     # ponytail: identities, not just the count — LLM runs don't reproduce, so
     # unmatched edges must be captured in the report to be triageable later
     false_positive_edges: list[dict] = field(default_factory=list)
+    # #134 consolidation credits, itemized for the same reason: their absence
+    # from false_positive_edges must be explainable from the report alone
+    credited_fragments: list[dict] = field(default_factory=list)
 
     @property
     def accuracy(self) -> float:
@@ -132,6 +162,7 @@ class EvalResult:
             "total": self.total,
             "false_positives": self.false_positives,
             "false_positive_edges": self.false_positive_edges,
+            "credited_fragments": self.credited_fragments,
             "accuracy": round(self.accuracy, 4),
             "per_constraint": self.results,
         }
@@ -237,17 +268,20 @@ def run_eval(
             else:
                 result.miss += 1
 
-        result.false_positives += len(resolved_edges) - len(matched_edge_ids)
-        result.false_positive_edges.extend(
-            {
+        for edge in resolved_edges:
+            if id(edge) in matched_edge_ids:
+                continue
+            entry = {
                 "adr_id": fixture["adr_id"],
                 "subject": edge.subject,
                 "predicate": edge.predicate.value,
                 "object": edge.object,
             }
-            for edge in resolved_edges
-            if id(edge) not in matched_edge_ids
-        )
+            if _is_credited_fragment(edge, expected_constraints):
+                result.credited_fragments.append(entry)
+            else:
+                result.false_positives += 1
+                result.false_positive_edges.append(entry)
 
     if report_to_disk:
         write_report(report_path(repo_id), result.to_report())
