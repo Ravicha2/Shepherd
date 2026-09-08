@@ -114,13 +114,20 @@ _TOOLS = [
     },
 ]
 
-# #135: file-entry-point/doc module roots are scaffolding around the codebase,
+# #135: file-entry-point module roots are scaffolding around the codebase,
 # not architectural units inside it. Hits lifted from them (setup.py declaring
 # black in install_requires) baited the agent into grounding whole-codebase
 # constraints on `setup.*`/`manage.*`; the #133 prompt rule churned the objects
 # without killing the class, so the evidence is filtered at the source instead.
-# Same roots the prompt rule names; nested modules (app.setup) are unaffected.
-_ENTRY_POINT_ROOTS = frozenset({"manage", "setup", "noxfile", "conftest", "docs", "examples"})
+# Nested modules (app.setup) are unaffected.
+# Guard narrowing (pre-registered on the issue): docs/examples are NOT excluded.
+# The no-op guard failed on tuf with them in: its `examples/` holds the
+# reference implementation of the very ADRs being resolved (genuine evidence),
+# and hiding them deterministically starved ADR-0010 and reshaped ADR-0008.
+# Whether docs/examples roots are scaffolding or substance is repo-dependent,
+# so that judgment stays with the agent; manage/setup/noxfile/conftest are
+# file-entry-point scripts in every Python repo, so they never surface.
+_ENTRY_POINT_ROOTS = frozenset({"manage", "setup", "noxfile", "conftest"})
 
 
 def _filter_entry_point_roots(results: list[dict]) -> list[dict]:
@@ -202,9 +209,9 @@ The codebase's root package(s): {root_packages}. Every internal FQN starts with 
   itself). If you cannot map the ADR's subject concept to a real FQN, return an empty array.
 - Policy, tooling, and whole-codebase constraints (linters, formatters, test runners, build
   tooling, language versions, frameworks) take the ROOT PACKAGE as subject. NEVER use
-  file-entry-point modules (`manage`, `noxfile`, `setup`, `conftest`) or documentation/example
-  roots (`docs`, `examples`) as subjects, even when search_code returns hits from those files:
-  they are scaffolding around the codebase, not architectural units inside it.
+  file-entry-point modules (`manage`, `noxfile`, `setup`, `conftest`) as subjects, even
+  when search_code returns hits from those files: they are scaffolding around the
+  codebase, not architectural units inside it.
 - object: depends on predicate:
   - `requires_dependency` / `requires_implementation`: object is either (a) an
     internal FQN pattern from the module list, or (b) an external package name. Prefer
@@ -520,9 +527,10 @@ def resolve_adr_constraints(
 
     client = OpenAI(api_key=api_key, base_url=config.model_url)
 
-    # #135: entry-point/doc roots are also hidden from the root-packages list —
+    # #135: entry-point roots are hidden from the root-packages list too —
     # run-1 evidence: with search filtered alone, the agent grounded whole-codebase
     # constraints on every root the prompt listed (openlobby: manage, openlobby, setup).
+    # docs/examples stay listed (agent-decides, same narrowing as search).
     root_packages = ", ".join(sorted(_root_segments(adg) - _ENTRY_POINT_ROOTS)) or "(none)"
     external_packages = _external_packages(adg)
     external_packages_hint = ", ".join(sorted(external_packages)) if external_packages else "(none)"

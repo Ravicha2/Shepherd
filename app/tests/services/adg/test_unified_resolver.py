@@ -791,10 +791,14 @@ class TestSearchCodeTool:
 # -- Test: entry-point root exclusion (#135) --------------------------------------
 
 class TestEntryPointRootExclusion:
-    """#135: hits lifted from file-entry-point/doc roots never reach the agent,
+    """#135: hits lifted from file-entry-point roots never reach the agent,
     so setup.py's install_requires can no longer bait whole-codebase constraints
-    onto `setup.*`. Same roots the #133 prompt rule names; enforced on the
-    evidence instead of instruction compliance."""
+    onto `setup.*`. Enforced on the evidence instead of instruction compliance.
+    docs/examples are deliberately NOT excluded (guard narrowing): whether they
+    are scaffolding or substance is repo-dependent (tuf's examples/ is the
+    reference implementation of its own ADRs), so that judgment stays with the
+    agent; manage/setup/noxfile/conftest are entry-point scripts in every
+    Python repo, so they never surface."""
 
     @staticmethod
     def _hit(fqn: str, file: str) -> dict:
@@ -814,14 +818,26 @@ class TestEntryPointRootExclusion:
         ("setup", "setup.py"),
         ("noxfile", "noxfile.py"),
         ("conftest", "conftest.py"),
-        ("docs", "docs/conf.py"),
-        ("examples", "examples/quickstart.py"),
     ])
     def test_each_excluded_root_never_surfaces(self, sample_adg: ADG, root: str, file: str) -> None:
         from services.adg.unified_resolver import _dispatch_tool
         backend = lambda query, top_k=10: [self._hit(f"{root}.something", file)]
         result = json.loads(_dispatch_tool("search_code", {"query": "x"}, sample_adg, backend=backend))
         assert result == []
+
+    @pytest.mark.parametrize("root,file", [
+        ("docs", "docs/conf.py"),
+        ("examples", "examples/quickstart.py"),
+    ])
+    def test_doc_example_roots_still_surface(self, sample_adg: ADG, root: str, file: str) -> None:
+        """Guard narrowing: docs/examples hits reach the agent. Their
+        legitimacy is repo-dependent, so the agent decides, per the #135
+        no-op-guard evidence on tuf."""
+        from services.adg.unified_resolver import _dispatch_tool
+        hit = self._hit(f"{root}.something", file)
+        backend = lambda query, top_k=10: [hit]
+        result = json.loads(_dispatch_tool("search_code", {"query": "x"}, sample_adg, backend=backend))
+        assert result == [hit]
 
     def test_nested_setup_module_still_surfaces(self, sample_adg: ADG) -> None:
         """Exclusion is on module ROOTS only: `app.setup` is a real package
@@ -835,7 +851,8 @@ class TestEntryPointRootExclusion:
     def test_entry_point_roots_absent_from_root_packages_list(self) -> None:
         """The root-packages list is the other evidence surface: run-1 of #135
         showed the agent grounding whole-codebase constraints on every root the
-        prompt listed. Entry-point roots must not be listed."""
+        prompt listed. Entry-point roots must not be listed; docs/examples stay
+        listed (agent-visible, agent-decides, same narrowing as search)."""
         adg = ADG(
             nodes=[
                 FQNNode(fqn=FQN.from_dotted(root), kind=FQNKind.MODULE, file_path=f"{root}.py", line_start=0, line_end=0, start_byte=0, end_byte=0)
@@ -844,7 +861,7 @@ class TestEntryPointRootExclusion:
             edges=[],
         )
         prompt = _capture_system_message(adg)
-        assert "root package(s): app." in prompt
+        assert "root package(s): app, docs, examples." in prompt
 
 
 # -- Test: system prompt (ADR 017 decisions 1, 3) ---------------------------------
