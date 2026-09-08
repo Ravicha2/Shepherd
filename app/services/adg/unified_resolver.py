@@ -114,8 +114,21 @@ _TOOLS = [
     },
 ]
 
+# #135: file-entry-point/doc module roots are scaffolding around the codebase,
+# not architectural units inside it. Hits lifted from them (setup.py declaring
+# black in install_requires) baited the agent into grounding whole-codebase
+# constraints on `setup.*`/`manage.*`; the #133 prompt rule churned the objects
+# without killing the class, so the evidence is filtered at the source instead.
+# Same roots the prompt rule names; nested modules (app.setup) are unaffected.
+_ENTRY_POINT_ROOTS = frozenset({"manage", "setup", "noxfile", "conftest", "docs", "examples"})
+
+
+def _filter_entry_point_roots(results: list[dict]) -> list[dict]:
+    return [r for r in results if r["fqn"].split(".")[0] not in _ENTRY_POINT_ROOTS]
+
+
 _TOOL_FUNCTIONS = {
-    "search_code": lambda args, adg, backend: json.dumps(backend(args["query"])),
+    "search_code": lambda args, adg, backend: json.dumps(_filter_entry_point_roots(backend(args["query"]))),
     "list_children": lambda args, adg, backend: json.dumps(list_children(args["fqn"], adg)),
     "list_dependencies": lambda args, adg, backend: json.dumps(list_dependencies(args["fqn"], adg)),
 }

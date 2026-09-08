@@ -747,6 +747,51 @@ class TestSearchCodeTool:
         assert "search_code" in names
 
 
+# -- Test: entry-point root exclusion (#135) --------------------------------------
+
+class TestEntryPointRootExclusion:
+    """#135: hits lifted from file-entry-point/doc roots never reach the agent,
+    so setup.py's install_requires can no longer bait whole-codebase constraints
+    onto `setup.*`. Same roots the #133 prompt rule names; enforced on the
+    evidence instead of instruction compliance."""
+
+    @staticmethod
+    def _hit(fqn: str, file: str) -> dict:
+        return {"fqn": fqn, "kind": "module", "file": file, "snippet": "..."}
+
+    def test_setup_hit_never_surfaces_package_hit_does(self, sample_adg: ADG) -> None:
+        from services.adg.unified_resolver import _dispatch_tool
+        backend = lambda query, top_k=10: [
+            self._hit("setup", "setup.py"),
+            self._hit("app.api.users.UserView", "app/api/users.py"),
+        ]
+        result = json.loads(_dispatch_tool("search_code", {"query": "black"}, sample_adg, backend=backend))
+        assert result == [self._hit("app.api.users.UserView", "app/api/users.py")]
+
+    @pytest.mark.parametrize("root,file", [
+        ("manage", "manage.py"),
+        ("setup", "setup.py"),
+        ("noxfile", "noxfile.py"),
+        ("conftest", "conftest.py"),
+        ("docs", "docs/conf.py"),
+        ("examples", "examples/quickstart.py"),
+    ])
+    def test_each_excluded_root_never_surfaces(self, sample_adg: ADG, root: str, file: str) -> None:
+        from services.adg.unified_resolver import _dispatch_tool
+        backend = lambda query, top_k=10: [self._hit(f"{root}.something", file)]
+        result = json.loads(_dispatch_tool("search_code", {"query": "x"}, sample_adg, backend=backend))
+        assert result == []
+
+    def test_nested_setup_module_still_surfaces(self, sample_adg: ADG) -> None:
+        """Exclusion is on module ROOTS only: `app.setup` is a real package
+        module, not the repo-root entry point."""
+        from services.adg.unified_resolver import _dispatch_tool
+        hit = self._hit("app.setup", "app/setup.py")
+        backend = lambda query, top_k=10: [hit]
+        result = json.loads(_dispatch_tool("search_code", {"query": "x"}, sample_adg, backend=backend))
+        assert result == [hit]
+
+
 # -- Test: system prompt (ADR 017 decisions 1, 3) ---------------------------------
 
 def _capture_system_message(adg: ADG) -> str:
