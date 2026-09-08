@@ -791,6 +791,20 @@ class TestEntryPointRootExclusion:
         result = json.loads(_dispatch_tool("search_code", {"query": "x"}, sample_adg, backend=backend))
         assert result == [hit]
 
+    def test_entry_point_roots_absent_from_root_packages_list(self) -> None:
+        """The root-packages list is the other evidence surface: run-1 of #135
+        showed the agent grounding whole-codebase constraints on every root the
+        prompt listed. Entry-point roots must not be listed."""
+        adg = ADG(
+            nodes=[
+                FQNNode(fqn=FQN.from_dotted(root), kind=FQNKind.MODULE, file_path=f"{root}.py", line_start=0, line_end=0, start_byte=0, end_byte=0)
+                for root in ("app", "manage", "setup", "noxfile", "conftest", "docs", "examples")
+            ],
+            edges=[],
+        )
+        prompt = _capture_system_message(adg)
+        assert "root package(s): app." in prompt
+
 
 # -- Test: system prompt (ADR 017 decisions 1, 3) ---------------------------------
 

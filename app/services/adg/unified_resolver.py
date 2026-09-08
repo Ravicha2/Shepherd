@@ -520,7 +520,10 @@ def resolve_adr_constraints(
 
     client = OpenAI(api_key=api_key, base_url=config.model_url)
 
-    root_packages = ", ".join(sorted(_root_segments(adg))) or "(none)"
+    # #135: entry-point/doc roots are also hidden from the root-packages list —
+    # run-1 evidence: with search filtered alone, the agent grounded whole-codebase
+    # constraints on every root the prompt listed (openlobby: manage, openlobby, setup).
+    root_packages = ", ".join(sorted(_root_segments(adg) - _ENTRY_POINT_ROOTS)) or "(none)"
     external_packages = _external_packages(adg)
     external_packages_hint = ", ".join(sorted(external_packages)) if external_packages else "(none)"
     scope = classify_adr_scope(adr_text)
