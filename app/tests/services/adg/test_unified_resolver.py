@@ -241,6 +241,47 @@ class TestBasicResolution:
         edges = _run_unified(ADR_NO_CONSTRAINTS, "ADR-003", "docs/adr/003.md", sample_adg, responses)
         assert edges == []
 
+    def test_module_wildcard_self_loop_dropped_not_crash(self, sample_adg: ADG) -> None:
+        """#135: wildcarding both sides of `X.* requires X` yields a self-loop
+        (`X.*` -> `X.*`) that ConstraintEdge rejects; the session must drop it
+        and keep the healthy edges, not raise. Exposed by a tamr ADR-0007 run
+        where the LLM emitted `tamr_client.*` requires `tamr_client`. The raw
+        subject and object differ, so parse-time validation cannot catch this;
+        only post-wildcard comparison can."""
+        responses = [
+            _make_mock_response(
+                content=json.dumps([
+                    {
+                        "subject": "app.*",
+                        "object": "app",
+                        "predicate": "requires_dependency",
+                        "justification": "app must be a package",
+                        "adr_id": "ADR-001",
+                        "adr_path": "docs/adr/001.md",
+                    },
+                    {
+                        "subject": "app.api.*",
+                        "object": "app.db.*",
+                        "predicate": "prohibits_dependency",
+                        "justification": "API must not import DB",
+                        "adr_id": "ADR-001",
+                        "adr_path": "docs/adr/001.md",
+                    },
+                ]),
+            ),
+        ]
+        edges = _run_unified(ADR_PROHIBIT_DEP, "ADR-001", "docs/adr/001.md", sample_adg, responses)
+        assert edges == [
+            ConstraintEdge(
+                subject="app.api.*",
+                predicate=PredicateType.PROHIBITS_DEPENDENCY,
+                object="app.db.*",
+                justification="API must not import DB",
+                adr_id="ADR-001",
+                adr_path="docs/adr/001.md",
+            )
+        ]
+
     def test_multiple_constraints_from_one_adr(self, sample_adg: ADG) -> None:
         """Single ADR session produces multiple ConstraintEdges."""
         responses = [

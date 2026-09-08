@@ -555,19 +555,27 @@ def resolve_adr_constraints(
 
         if not msg.tool_calls:
             if msg.content:
-                edges = _parse_edges(msg.content, adr_id, adr_path)
-                edges = [
-                    ConstraintEdge(
-                        subject=_add_wildcard_for_modules(e.subject, adg),
-                        predicate=e.predicate,
-                        object=_add_wildcard_for_modules(e.object, adg) if _is_internal(e.object, adg) else e.object,
-                        justification=e.justification,
-                        adr_id=e.adr_id,
-                        adr_path=e.adr_path,
+                # #135: wildcarding is applied per edge with a self-loop guard —
+                # module wildcarding can equalize subject and object the LLM kept
+                # distinct (`tamr_client.*` requires `tamr_client` -> both sides
+                # `tamr_client.*`), which ConstraintEdge rejects; a self-loop
+                # carries no architectural information, so it is dropped here
+                # rather than crashing the session.
+                edges = []
+                for parsed in _parse_edges(msg.content, adr_id, adr_path):
+                    subject = _add_wildcard_for_modules(parsed.subject, adg)
+                    object_ = _add_wildcard_for_modules(parsed.object, adg) if _is_internal(parsed.object, adg) else parsed.object
+                    if subject == object_:
+                        continue
+                    edges.append(ConstraintEdge(
+                        subject=subject,
+                        predicate=parsed.predicate,
+                        object=object_,
+                        justification=parsed.justification,
+                        adr_id=parsed.adr_id,
+                        adr_path=parsed.adr_path,
                         scope=scope,
-                    )
-                    for e in edges
-                ]
+                    ))
                 valid_edges = [e for e in edges if _validate_edge(e, adg, external_packages)]
                 if len(valid_edges) < len(edges):
                     dropped = [e for e in edges if e not in valid_edges]
@@ -611,19 +619,23 @@ def resolve_adr_constraints(
         response = client.chat.completions.create(model=config.model_id, messages=messages, temperature=config.temperature)
         content = response.choices[0].message.content
         if content:
-            edges = _parse_edges(content, adr_id, adr_path)
-            edges = [
-                ConstraintEdge(
-                    subject=_add_wildcard_for_modules(e.subject, adg),
-                    predicate=e.predicate,
-                    object=_add_wildcard_for_modules(e.object, adg) if _is_internal(e.object, adg) else e.object,
-                    justification=e.justification,
-                    adr_id=e.adr_id,
-                    adr_path=e.adr_path,
+            # #135: per-edge wildcarding with self-loop guard, same as the
+            # main path (see comment there).
+            edges = []
+            for parsed in _parse_edges(content, adr_id, adr_path):
+                subject = _add_wildcard_for_modules(parsed.subject, adg)
+                object_ = _add_wildcard_for_modules(parsed.object, adg) if _is_internal(parsed.object, adg) else parsed.object
+                if subject == object_:
+                    continue
+                edges.append(ConstraintEdge(
+                    subject=subject,
+                    predicate=parsed.predicate,
+                    object=object_,
+                    justification=parsed.justification,
+                    adr_id=parsed.adr_id,
+                    adr_path=parsed.adr_path,
                     scope=scope,
-                )
-                for e in edges
-            ]
+                ))
             valid_edges = [e for e in edges if _validate_edge(e, adg, external_packages)]
             if len(valid_edges) < len(edges):
                 dropped = [e for e in edges if e not in valid_edges]
