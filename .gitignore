@@ -11,6 +11,9 @@ uv.lock
 # Environment
 .env
 
+# macOS
+.DS_Store
+
 # Neo4j
 neo4j_data/
 
@@ -26,7 +29,6 @@ resolver_traces.jsonl
 CLAUDE.md
 .context/
 # seeded repos
-repos.DS_Store
 repos/
 .worktrees
 .superpowers
