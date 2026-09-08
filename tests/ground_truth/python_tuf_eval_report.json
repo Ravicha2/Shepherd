@@ -1,7 +1,7 @@
 {
   "_meta": {
-    "generated_at": "2026-09-08T10-30-28",
-    "git_commit": "a15e60a",
+    "generated_at": "2026-09-08T13-06-27",
+    "git_commit": "8f27035",
     "arm": "baseline",
     "semble_version": "0.5.6",
     "semble_model": "minishlab/potion-code-16M-v2",
@@ -11,14 +11,8 @@
   "partial": 0,
   "miss": 1,
   "total": 4,
-  "false_positives": 3,
+  "false_positives": 4,
   "false_positive_edges": [
-    {
-      "adr_id": "ADR-0004",
-      "subject": "tuf.api.*",
-      "predicate": "prohibits_dependency",
-      "object": "securesystemslib"
-    },
     {
       "adr_id": "ADR-0008",
       "subject": "tuf.api.metadata.Metadata",
@@ -28,6 +22,18 @@
     {
       "adr_id": "ADR-0008",
       "subject": "tuf.api._payload.Role",
+      "predicate": "prohibits_implementation",
+      "object": "tuf.api._payload.Signed"
+    },
+    {
+      "adr_id": "ADR-0008",
+      "subject": "tuf.api._payload.MetaFile",
+      "predicate": "prohibits_implementation",
+      "object": "tuf.api._payload.Signed"
+    },
+    {
+      "adr_id": "ADR-0008",
+      "subject": "tuf.api._payload.Targets",
       "predicate": "prohibits_implementation",
       "object": "tuf.api._payload.Signed"
     }

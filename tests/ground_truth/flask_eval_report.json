@@ -1,15 +1,15 @@
 {
   "_meta": {
-    "generated_at": "2026-09-08T10-30-28",
-    "git_commit": "a15e60a",
+    "generated_at": "2026-09-08T13-06-27",
+    "git_commit": "8f27035",
     "arm": "baseline",
     "semble_version": "0.5.6",
     "semble_model": "minishlab/potion-code-16M-v2",
     "resolver_model": "google/gemini-3.1-flash-lite"
   },
-  "exact": 1,
+  "exact": 2,
   "partial": 0,
-  "miss": 3,
+  "miss": 2,
   "total": 4,
   "false_positives": 1,
   "false_positive_edges": [
@@ -17,12 +17,12 @@
       "adr_id": "ADR-002",
       "subject": "app.routes.*",
       "predicate": "requires_implementation",
-      "object": "app.middleware.auth.AuthMiddleware"
+      "object": "app.middleware.auth.require_auth"
     }
   ],
   "credited_fragments": [],
   "excluded_tooling_edges": [],
-  "accuracy": 0.25,
+  "accuracy": 0.5,
   "per_constraint": [
     {
       "adr_id": "ADR-001",
@@ -44,9 +44,9 @@
         "object": "app.services.*",
         "justification": "If a route needs data, it calls the corresponding service function; routes depend on services for data access"
       },
-      "score": "miss",
-      "resolved_subject": null,
-      "resolved_object": null
+      "score": "exact_match",
+      "resolved_subject": "app.routes.*",
+      "resolved_object": "app.services.*"
     },
     {
       "adr_id": "ADR-001",
@@ -57,8 +57,8 @@
         "justification": "Only the service layer may import from the data model module"
       },
       "score": "miss",
-      "resolved_subject": null,
-      "resolved_object": null
+      "resolved_subject": "app.routes.*",
+      "resolved_object": "app.services.*"
     },
     {
       "adr_id": "ADR-002",

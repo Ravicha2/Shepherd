@@ -380,6 +380,38 @@ Match tallies identical to the #134 baseline on every repo; the change is FP-onl
 
 **Comparability: NON-COMPARABLE for earlier ingestion FP counts (pre-#136 scorer scope rule).** The resolver's extraction behavior is unchanged (same prompt, same tools; only tagging was added), so resolved-edge comparisons across the boundary remain valid. New committed ingestion baselines = the 2026-09-08T10-30-28 run; retrieval group untouched (resolver_eval writes no cpt report).
 
+### 2026-09-08: issue #135 (file-entry-point roots filtered from the evidence; entry-point FP class killed)
+
+**Change:** commits b8d2326, e4887e9, 5523cb9, 8f27035. Two evidence surfaces now filter file-entry-point module roots (`manage`, `setup`, `noxfile`, `conftest`): `search_code` results (hits lifted from `setup.py`/`manage.py` never reach the agent) and the prompt's root-packages list. A third fix landed mid-protocol: module-wildcarding could equalize subject and object the LLM kept distinct (`tamr_client.*` requires `tamr_client`), crashing the session on ConstraintEdge's self-loop guard; both reconstruction paths now drop self-loops per-edge (unit-pinned, red-checked). Two fresh final runs at PYTHONHASHSEED=0, report dirs `2026-09-08T13-06-27` (committed as the new baselines) and `2026-09-08T13-10-26`, trace dirs `logs/issue-135/narrowed-run1|2`, `_meta.arm` baseline, git 8f27035.
+
+**Guard narrowing (the pre-registered no-op guard fired):** the first implementation also excluded `docs`/`examples` (the #133 prompt-rule list verbatim). Tamr held (FP 1→1, tallies identical) but tuf breached deterministically: FP 3→6, exact 3→2, identical across both runs at temperature 0, and a 3-trial causal test isolated the cause: tuf's `examples/` holds the reference implementation of the very ADRs being resolved, so hiding those hits starved ADR-0010 (emitted nothing where the baseline resolved the exact edge) and reshaped ADR-0008. `docs`/`examples` have repo-dependent semantics (scaffolding in tamr, substance in tuf), so the exclusion was narrowed to the four roots whose entry-point role is convention-fixed in every Python repo; docs/examples went back to agent judgment on both surfaces (search hits and root list). The narrowed runs restore tuf exactly (tallies identical to baseline, ADR-0010 exact back, FP 4/5 vs 3: within floor).
+
+**Numbers (ingestion)**
+
+| repo      | exact | partial | miss | FP  | acc  | vs prior |
+|-----------|-------|---------|------|-----|------|----------|
+| openlobby | 2     | 6       | 2    | 9 / 8 | 0.50 | partial 7→6, miss 1→2, FP 10→9/8 |
+| tamr      | 0     | 1       | 0    | 2   | 0.50 | FP 1→2 (within/near floor) |
+| tuf       | 3     | 0       | 1    | 4 / 5 | 0.75 | unchanged tallies, FP 3→4/5 |
+| flask     | 2     | 0       | 2    | 1   | 0.50 | miss 3→2, exact 1→2 |
+| django    | 3     | 0       | 1    | 2   | 0.75 | exact 2→3, miss 2→1, FP 4→2 |
+
+**Impact (the class is dead):** zero entry-point-root subjects in any FP edge on any repo (was: openlobby `manage.*`/`setup.*` requires elasticsearch, ADR-0013 black trio at entry-point subjects; django `manage.*` prohibits users.models.* ×2). Django's gone FPs include its whole entry-point class, and its ADR-001 miss became exact (`users.services.*` requires `users.models.*`, stable both runs). Flask's ADR-001 miss became exact too (`app.routes.*` requires `app.services.*`, stable both runs). The re-rooted openlobby policy edges landed where #136's scope rule expected: excluded_tooling shrank 9→3 (the manage/setup-rooted duplicates are gone; only root-package subjects remain, one per tooling ADR), and tamr's excluded set moved 12→22/10 with ADR-0002's tooling requires re-rooted to package roots (subject churn only, all still scope-excluded).
+
+**Honest negatives:**
+- Openlobby ADR-0007 partial→miss (both runs): the object flipped `graphene`→`graphene_django` (the #123 anchor-bait class resurfacing under the changed prompt), subject still exact.
+- Openlobby match tallies moved partial→miss on ADR-0004 in the six-root run; under narrowing ADR-0004 holds partial while ADR-0007 drops, net partial 7→6.
+- Tuf FP +1/+2 (4/5 vs baseline 3): ADR-0008's `prohibits_implementation` fragments on `_payload` classes and run-2's ADR-0006 `MetadataSerializer` edge, subject-locus/omission variance within the documented classes, beyond the stale ±2 floor only on run-2's reading.
+- Tamr FP 1→2: ADR-0005's `dataclasses` requires is the old policy class (tooling ADR, but "composable functions" language stays runtime-scope by design); ADR-0007 churned to a `TAMR_CLIENT_BETA` requires. Both are the known zero-constraint-gold policy class absorbing relocations, not new classes.
+
+**Run agreement:** match tallies identical on every repo; FP/exclusion/credit identity sets identical on flask and django; deltas elsewhere are the documented resolver variance classes: openlobby Δ1 (a run-1-only self-referential `openlobby.*` requires `openlobby.core.api.*`), tamr Δ1 subject churn + the ADR-0002 tooling-edge omission (excluded 22 vs 10), tuf Δ1 (run-2's ADR-0006 edge).
+
+**Iteration cap: partially spent.** The six-root implementation consumed the pre-registered narrowing (guard evidence was decisive, not a prompt tweak), so the landed scope is the narrowed four-root list with no further revision; ADR-0007's object flip is recorded as-is.
+
+**Baseline status:** new committed ingestion baselines = the 2026-09-08T13-06-27 run; retrieval group untouched (resolver_eval writes no cpt report).
+
+**Comparability: NON-COMPARABLE for earlier ingestion FP counts and openlobby/flask/django match tallies (pre-#135 resolver evidence surfaces).** The resolver's tool results and prompt root list changed, so resolved-edge comparisons across the boundary are only valid per-class (entry-point subjects: before/after; everything else: variance classes). New committed ingestion baselines = the 2026-09-08T13-06-27 run.
+
 ## Curation mode
 
 

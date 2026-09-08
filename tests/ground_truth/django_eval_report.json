@@ -1,33 +1,21 @@
 {
   "_meta": {
-    "generated_at": "2026-09-08T10-30-28",
-    "git_commit": "a15e60a",
+    "generated_at": "2026-09-08T13-06-27",
+    "git_commit": "8f27035",
     "arm": "baseline",
     "semble_version": "0.5.6",
     "semble_model": "minishlab/potion-code-16M-v2",
     "resolver_model": "google/gemini-3.1-flash-lite"
   },
-  "exact": 2,
+  "exact": 3,
   "partial": 0,
-  "miss": 2,
+  "miss": 1,
   "total": 4,
-  "false_positives": 4,
+  "false_positives": 2,
   "false_positive_edges": [
     {
       "adr_id": "ADR-001",
-      "subject": "manage.*",
-      "predicate": "prohibits_dependency",
-      "object": "users.models.*"
-    },
-    {
-      "adr_id": "ADR-001",
       "subject": "project.*",
-      "predicate": "prohibits_dependency",
-      "object": "users.models.*"
-    },
-    {
-      "adr_id": "ADR-002",
-      "subject": "manage.*",
       "predicate": "prohibits_dependency",
       "object": "users.models.*"
     },
@@ -40,7 +28,7 @@
   ],
   "credited_fragments": [],
   "excluded_tooling_edges": [],
-  "accuracy": 0.5,
+  "accuracy": 0.75,
   "per_constraint": [
     {
       "adr_id": "ADR-001",
@@ -63,8 +51,8 @@
         "justification": "All data access must go through service functions; the service layer (users.services) is the sole gateway to the data layer"
       },
       "score": "miss",
-      "resolved_subject": null,
-      "resolved_object": null
+      "resolved_subject": "users.services.*",
+      "resolved_object": "users.models.*"
     },
     {
       "adr_id": "ADR-001",
@@ -74,9 +62,9 @@
         "object": "users.models.*",
         "justification": "Only the service layer may import from the data model module"
       },
-      "score": "miss",
-      "resolved_subject": null,
-      "resolved_object": null
+      "score": "exact_match",
+      "resolved_subject": "users.services.*",
+      "resolved_object": "users.models.*"
     },
     {
       "adr_id": "ADR-002",
