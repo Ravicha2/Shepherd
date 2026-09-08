@@ -1,7 +1,7 @@
 {
   "_meta": {
-    "generated_at": "2026-09-07T21-17-11",
-    "git_commit": "6ce7d1e",
+    "generated_at": "2026-09-08T10-30-28",
+    "git_commit": "a15e60a",
     "arm": "baseline",
     "semble_version": "0.5.6",
     "semble_model": "minishlab/potion-code-16M-v2",
@@ -11,80 +11,8 @@
   "partial": 1,
   "miss": 0,
   "total": 1,
-  "false_positives": 13,
+  "false_positives": 1,
   "false_positive_edges": [
-    {
-      "adr_id": "ADR-0002",
-      "subject": "tamr_client.*",
-      "predicate": "requires_dependency",
-      "object": "flake8"
-    },
-    {
-      "adr_id": "ADR-0002",
-      "subject": "tamr_unify_client.*",
-      "predicate": "requires_dependency",
-      "object": "flake8"
-    },
-    {
-      "adr_id": "ADR-0002",
-      "subject": "tamr_client.*",
-      "predicate": "requires_dependency",
-      "object": "flake8-import-order"
-    },
-    {
-      "adr_id": "ADR-0002",
-      "subject": "tamr_unify_client.*",
-      "predicate": "requires_dependency",
-      "object": "flake8-import-order"
-    },
-    {
-      "adr_id": "ADR-0002",
-      "subject": "tamr_client.*",
-      "predicate": "requires_dependency",
-      "object": "black"
-    },
-    {
-      "adr_id": "ADR-0002",
-      "subject": "tamr_unify_client.*",
-      "predicate": "requires_dependency",
-      "object": "black"
-    },
-    {
-      "adr_id": "ADR-0004",
-      "subject": "tamr_client.*",
-      "predicate": "requires_dependency",
-      "object": "sphinx"
-    },
-    {
-      "adr_id": "ADR-0004",
-      "subject": "tamr_unify_client.*",
-      "predicate": "requires_dependency",
-      "object": "sphinx"
-    },
-    {
-      "adr_id": "ADR-0004",
-      "subject": "tamr_client.*",
-      "predicate": "requires_dependency",
-      "object": "recommonmark"
-    },
-    {
-      "adr_id": "ADR-0004",
-      "subject": "tamr_unify_client.*",
-      "predicate": "requires_dependency",
-      "object": "recommonmark"
-    },
-    {
-      "adr_id": "ADR-0006",
-      "subject": "tamr_client.*",
-      "predicate": "requires_dependency",
-      "object": "mypy"
-    },
-    {
-      "adr_id": "ADR-0006",
-      "subject": "tamr_unify_client.*",
-      "predicate": "requires_dependency",
-      "object": "mypy"
-    },
     {
       "adr_id": "ADR-0007",
       "subject": "tamr_client.*",
@@ -152,6 +80,80 @@
       "subject": "tamr_client.transformations.*",
       "predicate": "requires_dependency",
       "object": "tamr_client._types.*"
+    }
+  ],
+  "excluded_tooling_edges": [
+    {
+      "adr_id": "ADR-0002",
+      "subject": "tamr_client.*",
+      "predicate": "requires_dependency",
+      "object": "flake8"
+    },
+    {
+      "adr_id": "ADR-0002",
+      "subject": "tamr_unify_client.*",
+      "predicate": "requires_dependency",
+      "object": "flake8"
+    },
+    {
+      "adr_id": "ADR-0002",
+      "subject": "tamr_client.*",
+      "predicate": "requires_dependency",
+      "object": "flake8-import-order"
+    },
+    {
+      "adr_id": "ADR-0002",
+      "subject": "tamr_unify_client.*",
+      "predicate": "requires_dependency",
+      "object": "flake8-import-order"
+    },
+    {
+      "adr_id": "ADR-0002",
+      "subject": "tamr_client.*",
+      "predicate": "requires_dependency",
+      "object": "black"
+    },
+    {
+      "adr_id": "ADR-0002",
+      "subject": "tamr_unify_client.*",
+      "predicate": "requires_dependency",
+      "object": "black"
+    },
+    {
+      "adr_id": "ADR-0004",
+      "subject": "tamr_client.*",
+      "predicate": "requires_dependency",
+      "object": "sphinx"
+    },
+    {
+      "adr_id": "ADR-0004",
+      "subject": "tamr_unify_client.*",
+      "predicate": "requires_dependency",
+      "object": "sphinx"
+    },
+    {
+      "adr_id": "ADR-0004",
+      "subject": "tamr_client.*",
+      "predicate": "requires_dependency",
+      "object": "recommonmark"
+    },
+    {
+      "adr_id": "ADR-0004",
+      "subject": "tamr_unify_client.*",
+      "predicate": "requires_dependency",
+      "object": "recommonmark"
+    },
+    {
+      "adr_id": "ADR-0006",
+      "subject": "tamr_client.*",
+      "predicate": "requires_dependency",
+      "object": "mypy"
+    },
+    {
+      "adr_id": "ADR-0006",
+      "subject": "tamr_unify_client.*",
+      "predicate": "requires_dependency",
+      "object": "mypy"
     }
   ],
   "accuracy": 0.5,
