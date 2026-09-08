@@ -28,6 +28,17 @@ class ADRStatus(Enum):
     REJECTED = "rejected"
 
 
+class ConstraintScope(Enum):
+    """#136 decision (a): runtime constraints govern the import graph;
+    tooling/CI constraints (linters, formatters, type checkers, doc tooling,
+    test frameworks, language choice) live in pyproject/setup.cfg/noxfile and
+    are out of the import graph's declared scope. Tagged, never silently
+    dropped: scoring/reporting excludes them by declared scope."""
+
+    RUNTIME = "runtime"
+    TOOLING = "tooling"
+
+
 @dataclass
 class FQNNode:
     fqn: FQN
@@ -112,6 +123,7 @@ class ConstraintEdge:
     adr_id: str
     adr_path: str
     specificity: float = 0.0
+    scope: ConstraintScope = ConstraintScope.RUNTIME
 
     def __post_init__(self) -> None:
         if not self.subject:

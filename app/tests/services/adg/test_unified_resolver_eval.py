@@ -20,7 +20,7 @@ from services.adg.search import build_search_backend
 from services.adg.treesitter import parse_repo
 from services.adg.unified_resolver import resolve_adr_constraints
 from services.extract.config import LangExtractConfig
-from services.models import ConstraintEdge, PredicateType
+from services.models import ConstraintEdge, ConstraintScope, PredicateType
 from tests.eval_paths import report_path, write_report
 
 
@@ -149,6 +149,10 @@ class EvalResult:
     # #134 consolidation credits, itemized for the same reason: their absence
     # from false_positive_edges must be explainable from the report alone
     credited_fragments: list[dict] = field(default_factory=list)
+    # #136 tooling-scope exclusions: edges held out of the FP count by declared
+    # scope (tooling deps live in pyproject/setup.cfg/noxfile, not the import
+    # graph), itemized so the exclusion stays reversible and auditable
+    excluded_tooling_edges: list[dict] = field(default_factory=list)
 
     @property
     def accuracy(self) -> float:
@@ -163,6 +167,7 @@ class EvalResult:
             "false_positives": self.false_positives,
             "false_positive_edges": self.false_positive_edges,
             "credited_fragments": self.credited_fragments,
+            "excluded_tooling_edges": self.excluded_tooling_edges,
             "accuracy": round(self.accuracy, 4),
             "per_constraint": self.results,
         }
@@ -279,6 +284,8 @@ def run_eval(
             }
             if _is_credited_fragment(edge, expected_constraints):
                 result.credited_fragments.append(entry)
+            elif edge.scope is ConstraintScope.TOOLING:
+                result.excluded_tooling_edges.append(entry)
             else:
                 result.false_positives += 1
                 result.false_positive_edges.append(entry)

@@ -18,11 +18,42 @@ from openai import OpenAI
 
 from services.adg.adg_tools import list_children, list_dependencies
 from services.extract.config import LangExtractConfig
-from services.models import ADG, ConstraintEdge, FQNKind, PredicateType
+from services.models import ADG, ConstraintEdge, ConstraintScope, FQNKind, PredicateType
 
 log = logging.getLogger(__name__)
 
 TOOL_CALL_CAP = 20
+
+# #136 decision (a): tooling/CI constraints are classified by ROLE language in
+# the ADR text, never by package name, so an unseen toolchain ("adopt ruff for
+# linting") still classifies. `formatt` matches formatter/formatting but not
+# runtime "wire formats"; bare "documentation"/"test" are deliberately absent
+# (passing mentions in runtime ADRs: openlobby ADR-0004 "writing API
+# documentation"). ponytail: whole-ADR classification, per-edge justification
+# wording is LLM variance; a mixed ADR tags wholesale (accepted ceiling).
+_TOOLING_ROLE_PATTERN = re.compile(
+    r"\blint"
+    r"|formatt"
+    r"|type[ -]?check"
+    r"|docstring"
+    r"|doc compilation"
+    r"|framework for tests"
+    r"|test framework"
+    r"|programming language"
+    r"|\bci\b"
+    r"|continuous integration",
+    re.IGNORECASE,
+)
+
+
+def classify_adr_scope(adr_text: str) -> ConstraintScope:
+    """Classify an ADR's constraints as runtime (import-graph) or tooling/CI.
+
+    Reads the full ADR text; one scope per ADR.
+    """
+    if _TOOLING_ROLE_PATTERN.search(adr_text):
+        return ConstraintScope.TOOLING
+    return ConstraintScope.RUNTIME
 
 # ADR 017 decision 4: serialized-length ceiling on every tool result (~4K tokens
 # at 4 chars/token; 20 calls x 4K tokens = 80K tokens worst case).
@@ -444,7 +475,7 @@ def _log_trace(
         "adr_id": adr_id,
         "adr_path": adr_path,
         "num_edges": len(edges),
-        "edges": [{"subject": e.subject, "object": e.object, "predicate": e.predicate.value} for e in edges],
+        "edges": [{"subject": e.subject, "object": e.object, "predicate": e.predicate.value, "scope": e.scope.value} for e in edges],
         "pre_validation_edges": trace.pre_validation_edges,
         "hit_cap": trace.hit_cap,
         "parse_failed": trace.parse_failed,
@@ -479,6 +510,7 @@ def resolve_adr_constraints(
     root_packages = ", ".join(sorted(_root_segments(adg))) or "(none)"
     external_packages = _external_packages(adg)
     external_packages_hint = ", ".join(sorted(external_packages)) if external_packages else "(none)"
+    scope = classify_adr_scope(adr_text)
 
     system_prompt = _SYSTEM_PROMPT_TEMPLATE.format(
         adr_text=adr_text, adr_id=adr_id, adr_path=adr_path,
@@ -516,6 +548,7 @@ def resolve_adr_constraints(
                         justification=e.justification,
                         adr_id=e.adr_id,
                         adr_path=e.adr_path,
+                        scope=scope,
                     )
                     for e in edges
                 ]
@@ -571,6 +604,7 @@ def resolve_adr_constraints(
                     justification=e.justification,
                     adr_id=e.adr_id,
                     adr_path=e.adr_path,
+                    scope=scope,
                 )
                 for e in edges
             ]
