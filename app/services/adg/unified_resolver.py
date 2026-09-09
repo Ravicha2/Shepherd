@@ -172,6 +172,32 @@ class ResolutionTrace:
     pre_validation_edges: list[dict] = field(default_factory=list)
 
 
+# #137 attribution instrument: the trace records what each tool call returned
+# (result_fqns) so resolved edges can be attributed to the tool whose result
+# grounded them. Traces previously logged calls only, never results, so edge
+# provenance was indistinguishable (24/84 baseline edge FQNs unaccounted).
+def _covers(result_fqn: str, edge_fqn: str) -> bool:
+    """Prefix-tolerant coverage: a result FQN grounds an edge FQN if either is
+    a dotted-prefix of the other (mirrors the eval scorer's ancestor tolerance,
+    including X vs X.* wildcard-base equality)."""
+    result_base = result_fqn.rstrip(".*")
+    edge_base = edge_fqn.rstrip(".*")
+    return result_base == edge_base or result_base.startswith(edge_base + ".") or edge_base.startswith(result_base + ".")
+
+
+def _extract_result_fqns(name: str, result: str) -> list[str]:
+    """FQNs visible in one tool result payload, deduplicated, order preserved.
+    search_code: a JSON array of {fqn, ...} hits; list_children /
+    list_dependencies: a JSON object {entries: [{fqn, ...}], truncated}.
+    Unknown payloads (errors, truncation notices) yield []."""
+    try:
+        payload = json.loads(result)
+    except (json.JSONDecodeError, TypeError):
+        return []
+    entries = payload if isinstance(payload, list) else payload.get("entries", []) if isinstance(payload, dict) else []
+    return list(dict.fromkeys(str(entry["fqn"]) for entry in entries if isinstance(entry, dict) and "fqn" in entry))
+
+
 _SYSTEM_PROMPT_TEMPLATE = """
 You are an architectural decision resolver. Given a full ADR document, identify 
 architectural constraints and map them to FQN patterns in the codebase graph.
@@ -490,12 +516,34 @@ def _log_trace(
     trace_dir.mkdir(parents=True, exist_ok=True)
     trace_path = trace_dir / "resolver_traces.jsonl"
 
+    def _edge_provenance(subject: str, object_: str) -> dict[str, list[str]]:
+        """Per edge side, the tool names whose results covered it (#137)."""
+        covering = {"subject": [], "object": []}
+        for call in trace.tool_calls:
+            for result_fqn in call.get("result_fqns", []):
+                if call["name"] in covering["subject"] and call["name"] in covering["object"]:
+                    break
+                if call["name"] not in covering["subject"] and _covers(result_fqn, subject):
+                    covering["subject"].append(call["name"])
+                if call["name"] not in covering["object"] and _covers(result_fqn, object_):
+                    covering["object"].append(call["name"])
+        return covering
+
     record = {
         "resolver": "unified",
         "adr_id": adr_id,
         "adr_path": adr_path,
         "num_edges": len(edges),
-        "edges": [{"subject": e.subject, "object": e.object, "predicate": e.predicate.value, "scope": e.scope.value} for e in edges],
+        "edges": [
+            {
+                "subject": e.subject,
+                "object": e.object,
+                "predicate": e.predicate.value,
+                "scope": e.scope.value,
+                "provenance": _edge_provenance(e.subject, e.object),
+            }
+            for e in edges
+        ],
         "pre_validation_edges": trace.pre_validation_edges,
         "hit_cap": trace.hit_cap,
         "parse_failed": trace.parse_failed,
@@ -614,6 +662,7 @@ def resolve_adr_constraints(
                 })
             last_tool_signature = signature
             result = _dispatch_tool(tc.function.name, args, adg, backend=search_backend)
+            tool_call_trace[-1]["result_fqns"] = _extract_result_fqns(tc.function.name, result)
             messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
 
     # Hit cap: request best-effort resolution

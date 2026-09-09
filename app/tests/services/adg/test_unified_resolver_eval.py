@@ -173,9 +173,7 @@ class EvalResult:
         }
 
 
-# -- Ablation toggle (issue #131; dependents arm deleted with the tool in #133) --
-# One env flag, read at call time so an unset flag leaves this module and
-# everything else in the process untouched.
+# -- Ablation toggles (issue #131 search_off; #137 children_off/dependencies_off) --
 
 def _flag_on(name: str) -> bool:
     return os.environ.get(name, "") not in ("", "0")
@@ -191,6 +189,101 @@ def _select_search_backend(repo_root: Path, adg):
     if _flag_on("ABLATION_SEARCH_OFF"):
         return _empty_search_backend
     return build_search_backend(repo_root, adg)
+
+
+# -- #137 neighborhood-tool arms: five-surface scrubs (the #131 dependents_off
+# lesson: removing only _TOOLS contaminates the arm, because a hallucinated call
+# still hits _TOOL_FUNCTIONS and returns REAL data; the handler must go too, so a
+# hallucination lands on the unknown-tool error branch instead).
+
+from unittest.mock import patch
+from contextlib import contextmanager
+
+import services.adg.unified_resolver as unified_resolver
+
+_NEIGHBORHOOD_SENTENCE_FULL = (
+    "then inspect the neighborhood with list_children "
+    "and list_dependencies to confirm the exact FQNs before writing a constraint."
+)
+_NEIGHBORHOOD_SENTENCE_WITHOUT_CHILDREN = (
+    "then inspect the neighborhood with list_dependencies to confirm the exact FQNs before writing a constraint."
+)
+_NEIGHBORHOOD_SENTENCE_WITHOUT_DEPENDENCIES = (
+    "then inspect the neighborhood with list_children "
+    "to confirm the exact FQNs before writing a constraint."
+)
+_SEARCH_DESCRIPTION_FULL = "then inspect the hits with list_children / list_dependencies."
+_SEARCH_DESCRIPTION_WITHOUT_CHILDREN = "then inspect the hits with list_dependencies."
+_SEARCH_DESCRIPTION_WITHOUT_DEPENDENCIES = "then inspect the hits with list_children."
+_EXAMPLE_ONE_STEP_THREE = 'Step 3: list_children("app.routes") \u2192 confirm the handler population'
+_EXAMPLE_THREE_STEP_TWO = 'Step 2: list_children("app.services") \u2192 see the service classes that must inherit it'
+
+
+def _scrubbed_tool_surface(removed_tool: str) -> tuple[list[dict], dict, str]:
+    """Build the children_off/dependencies_off tool surface: scrub the removed
+    tool's schema entry, dispatch handler, search_code description sentence,
+    Required-exploration sentence, and (children only) both example steps.
+    Returns (tools, handlers, prompt_template). Drift-asserts on every old string
+    (#131 lesson: a silent no-op str.replace runs a contaminated arm)."""
+    prompt_template = unified_resolver._SYSTEM_PROMPT_TEMPLATE
+
+    if removed_tool == "list_children":
+        replacements = [
+            (_NEIGHBORHOOD_SENTENCE_FULL, _NEIGHBORHOOD_SENTENCE_WITHOUT_CHILDREN),
+            (_EXAMPLE_ONE_STEP_THREE, ""),
+            (_EXAMPLE_THREE_STEP_TWO, ""),
+        ]
+        search_description_pair = (_SEARCH_DESCRIPTION_FULL, _SEARCH_DESCRIPTION_WITHOUT_CHILDREN)
+        example_step_deleted = True
+    elif removed_tool == "list_dependencies":
+        replacements = [(_NEIGHBORHOOD_SENTENCE_FULL, _NEIGHBORHOOD_SENTENCE_WITHOUT_DEPENDENCIES)]
+        search_description_pair = (_SEARCH_DESCRIPTION_FULL, _SEARCH_DESCRIPTION_WITHOUT_DEPENDENCIES)
+        example_step_deleted = False
+    else:
+        raise ValueError(f"unknown removed tool: {removed_tool}")
+
+    for old_text, new_text in replacements:
+        assert old_text in prompt_template, f"prompt drift, scrub no longer matches: {old_text!r}"
+        prompt_template = prompt_template.replace(old_text, new_text)
+    assert removed_tool not in prompt_template, "prompt scrub incomplete"
+
+    tools = []
+    for tool in unified_resolver._TOOLS:
+        name = tool["function"]["name"]
+        if name == removed_tool:
+            continue
+        description = tool["function"]["description"]
+        if search_description_pair[0] in description:
+            assert name == "search_code", "description scrub target is not search_code"
+            description = description.replace(*search_description_pair)
+        assert removed_tool not in description, "tool description scrub incomplete"
+        tools.append({**tool, "function": {**tool["function"], "description": description}})
+    assert len(tools) == 2, f"expected 2 tools after scrub, got {len(tools)}"
+
+    handlers = {
+        handler_name: handler
+        for handler_name, handler in unified_resolver._TOOL_FUNCTIONS.items()
+        if handler_name != removed_tool
+    }
+    assert removed_tool not in handlers, "handler scrub incomplete"
+    assert example_step_deleted or removed_tool != "list_children"
+    return tools, handlers, prompt_template
+
+
+@contextmanager
+def _neighborhood_tool_surface(removed_tool: str):
+    """Apply the arm's five-surface edits for the duration of the eval loop only."""
+    if not (_flag_on("ABLATION_CHILDREN_OFF") or _flag_on("ABLATION_DEPENDENCIES_OFF")):
+        yield
+        return
+    if _flag_on("ABLATION_CHILDREN_OFF") and _flag_on("ABLATION_DEPENDENCIES_OFF"):
+        raise RuntimeError("combined children_off+dependencies_off arm is out of scope (#137: one variable per arm)")
+    removed_tool = "list_children" if _flag_on("ABLATION_CHILDREN_OFF") else "list_dependencies"
+    tools, handlers, prompt_template = _scrubbed_tool_surface(removed_tool)
+    with patch.object(unified_resolver, "_TOOLS", tools), \
+         patch.object(unified_resolver, "_TOOL_FUNCTIONS", handlers), \
+         patch.object(unified_resolver, "_SYSTEM_PROMPT_TEMPLATE", prompt_template):
+        yield
 
 
 # -- Fixtures ---------------------------------------------------------------
@@ -239,56 +332,59 @@ def run_eval(
     search_backend = _select_search_backend(repo_root, adg)
     result = EvalResult()
 
-    for fixture in ground_truth:
-        adr_text = (repo_root / fixture["adr_path"]).read_text()
+    with _neighborhood_tool_surface(
+        removed_tool="list_children" if _flag_on("ABLATION_CHILDREN_OFF") else "list_dependencies"
+    ):
+        for fixture in ground_truth:
+            adr_text = (repo_root / fixture["adr_path"]).read_text()
 
-        resolved_edges = resolve_adr_constraints(
-            adr_text=adr_text,
-            adr_id=fixture["adr_id"],
-            adr_path=fixture["adr_path"],
-            adg=adg,
-            config=LangExtractConfig(),
-            search_backend=search_backend,
-        )
+            resolved_edges = resolve_adr_constraints(
+                adr_text=adr_text,
+                adr_id=fixture["adr_id"],
+                adr_path=fixture["adr_path"],
+                adg=adg,
+                config=LangExtractConfig(),
+                search_backend=search_backend,
+            )
 
-        expected_constraints = fixture.get("constraints", [])
-        matched_edge_ids: set[int] = set()
+            expected_constraints = fixture.get("constraints", [])
+            matched_edge_ids: set[int] = set()
 
-        for expected in expected_constraints:
-            score, matched = _score_constraint(expected, resolved_edges)
-            if matched is not None:
-                matched_edge_ids.add(id(matched))
-            result.results.append({
-                "adr_id": fixture["adr_id"],
-                "expected": expected,
-                "score": score,
-                "resolved_subject": matched.subject if matched else None,
-                "resolved_object": matched.object if matched else None,
-            })
-            result.total += 1
-            if score == "exact_match":
-                result.exact += 1
-            elif score == "partial_match":
-                result.partial += 1
-            else:
-                result.miss += 1
+            for expected in expected_constraints:
+                score, matched = _score_constraint(expected, resolved_edges)
+                if matched is not None:
+                    matched_edge_ids.add(id(matched))
+                result.results.append({
+                    "adr_id": fixture["adr_id"],
+                    "expected": expected,
+                    "score": score,
+                    "resolved_subject": matched.subject if matched else None,
+                    "resolved_object": matched.object if matched else None,
+                })
+                result.total += 1
+                if score == "exact_match":
+                    result.exact += 1
+                elif score == "partial_match":
+                    result.partial += 1
+                else:
+                    result.miss += 1
 
-        for edge in resolved_edges:
-            if id(edge) in matched_edge_ids:
-                continue
-            entry = {
-                "adr_id": fixture["adr_id"],
-                "subject": edge.subject,
-                "predicate": edge.predicate.value,
-                "object": edge.object,
-            }
-            if _is_credited_fragment(edge, expected_constraints):
-                result.credited_fragments.append(entry)
-            elif edge.scope is ConstraintScope.TOOLING:
-                result.excluded_tooling_edges.append(entry)
-            else:
-                result.false_positives += 1
-                result.false_positive_edges.append(entry)
+            for edge in resolved_edges:
+                if id(edge) in matched_edge_ids:
+                    continue
+                entry = {
+                    "adr_id": fixture["adr_id"],
+                    "subject": edge.subject,
+                    "predicate": edge.predicate.value,
+                    "object": edge.object,
+                }
+                if _is_credited_fragment(edge, expected_constraints):
+                    result.credited_fragments.append(entry)
+                elif edge.scope is ConstraintScope.TOOLING:
+                    result.excluded_tooling_edges.append(entry)
+                else:
+                    result.false_positives += 1
+                    result.false_positive_edges.append(entry)
 
     if report_to_disk:
         write_report(report_path(repo_id), result.to_report())

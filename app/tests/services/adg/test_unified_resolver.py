@@ -560,6 +560,107 @@ class TestLogTrace:
         assert record["hit_cap"] is True
 
 
+# -- Test: tool-result provenance (#137 attribution instrument) ----------------
+
+class TestToolResultProvenance:
+    """One #137 instrument: the trace records what each tool call RETURNED, and
+    each edge records which tools' results covered its subject and object.
+    Prefix-tolerant (a result FQN covers the edge FQN if one is a prefix of the
+    other, mirroring the eval scorer's ancestor tolerance), not per-token."""
+
+    def test_result_fqns_extracted_per_tool_call(self, sample_adg: ADG, tmp_path) -> None:
+        """A session with one search_code call and one list_children call logs
+        each call's result FQNs in tool_calls[].result_fqns."""
+        responses = [
+            _make_mock_response(
+                tool_calls=[
+                    _tool_call("call-1", "search_code", {"query": "user view"}),
+                    _tool_call("call-2", "list_children", {"fqn": "app.api"}),
+                ]
+            ),
+            _make_mock_response(
+                content=json.dumps([{
+                    "subject": "app.api.*",
+                    "object": "app.db.*",
+                    "predicate": "prohibits_dependency",
+                    "justification": "API must not import DB modules directly",
+                    "adr_id": "ADR-001",
+                    "adr_path": "docs/adr/001.md",
+                }]),
+            ),
+        ]
+        with patch.dict("os.environ", {"RESOLVER_TRACE_DIR": str(tmp_path)}):
+            _run_unified(ADR_PROHIBIT_DEP, "ADR-001", "docs/adr/001.md", sample_adg, responses)
+        record = json.loads((tmp_path / "resolver_traces.jsonl").read_text().strip())
+        by_name = {tc["name"]: tc for tc in record["tool_calls"]}
+        # search stub lifts {app.api.users, app.api.users.UserView}
+        assert "app.api.users" in by_name["search_code"]["result_fqns"]
+        assert "app.api.users.UserView" in by_name["search_code"]["result_fqns"]
+        # list_children("app.api") returns {entries: [{fqn: app.api.users, kind: module}], truncated: false}
+        assert by_name["list_children"]["result_fqns"] == ["app.api.users"]
+
+    def test_edge_provenance_lists_covering_tools(self, sample_adg: ADG, tmp_path) -> None:
+        """edges[].provenance lists, per side, the tools whose results covered
+        the subject/object. Subject app.api.* is covered by both search hits and
+        the list_children entry; object app.db.* by neither (prompt-only)."""
+        responses = [
+            _make_mock_response(
+                tool_calls=[_tool_call("call-1", "list_children", {"fqn": "app.api"})]
+            ),
+            _make_mock_response(
+                content=json.dumps([{
+                    "subject": "app.api.*",
+                    "object": "app.db.*",
+                    "predicate": "prohibits_dependency",
+                    "justification": "API must not import DB modules directly",
+                    "adr_id": "ADR-001",
+                    "adr_path": "docs/adr/001.md",
+                }]),
+            ),
+        ]
+        with patch.dict("os.environ", {"RESOLVER_TRACE_DIR": str(tmp_path)}):
+            _run_unified(ADR_PROHIBIT_DEP, "ADR-001", "docs/adr/001.md", sample_adg, responses)
+        record = json.loads((tmp_path / "resolver_traces.jsonl").read_text().strip())
+        provenance = record["edges"][0]["provenance"]
+        assert provenance["subject"] == ["list_children"]
+        assert provenance["object"] == []
+
+    def test_external_object_provenance_empty(self, sample_adg: ADG, tmp_path) -> None:
+        """External objects (no dot / not internal) are never covered by tool
+        results; provenance.object stays [] — the class-A signature."""
+        responses = [
+            _make_mock_response(
+                tool_calls=[_tool_call("call-1", "search_code", {"query": "user view"})]
+            ),
+            _make_mock_response(
+                content=json.dumps([{
+                    "subject": "app.api.*",
+                    "object": "elasticsearch",
+                    "predicate": "requires_dependency",
+                    "justification": "fulltext search",
+                    "adr_id": "ADR-001",
+                    "adr_path": "docs/adr/001.md",
+                }]),
+            ),
+        ]
+        with patch.dict("os.environ", {"RESOLVER_TRACE_DIR": str(tmp_path)}):
+            _run_unified(ADR_PROHIBIT_DEP, "ADR-001", "docs/adr/001.md", sample_adg, responses)
+        record = json.loads((tmp_path / "resolver_traces.jsonl").read_text().strip())
+        provenance = record["edges"][0]["provenance"]
+        assert "search_code" in provenance["subject"]
+        assert provenance["object"] == []
+
+    def test_prefix_tolerance_ancestor_result_covers_descendant_edge(self, tmp_path) -> None:
+        """A result FQN that is an ANCESTOR of the edge FQN covers it: the agent
+        saw app.api.users (module) and wrote a constraint on
+        app.api.users.UserView (class). Same tolerance as the eval scorer."""
+        from services.adg.unified_resolver import _covers
+        assert _covers("app.api.users", "app.api.users.UserView.*") is True
+        assert _covers("app.api.users.UserView", "app.api.users") is True
+        assert _covers("app.api.users", "app.db.*") is False
+        assert _covers("app", "app.api.*") is True
+
+
 # -- Test: _add_wildcard_for_modules -----------------------------------------
 
 class TestAddWildcardForModules:
