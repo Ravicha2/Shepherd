@@ -28,6 +28,7 @@ resolver_traces.jsonl
 .claude
 CLAUDE.md
 .context/
+.pi-subagents/
 # seeded repos
 repos/
 .worktrees
