@@ -237,3 +237,148 @@ class TestListDependencies:
         assert list_dependencies("app", empty_adg) == {"entries": [], "truncated": False}
 
 
+
+
+# -- node_search (#143: FQN existence-check + import-target index) -------------
+
+from services.adg.adg_tools import NODE_SEARCH_CAP, node_search
+
+
+@pytest.fixture
+def node_search_adg() -> ADG:
+    """Anchor-bait microcosm: internal openlobby nodes, the dotted import path
+    graphene.relay, the pip-name decoy graphql_relay, plus an internal IMPORTS
+    edge (must be labeled by its node kind, not external_import)."""
+    nodes = [
+        FQNNode(fqn=FQN.from_dotted("openlobby"), kind=FQNKind.MODULE, file_path="openlobby/__init__.py", line_start=0, line_end=0, start_byte=0, end_byte=0),
+        FQNNode(fqn=FQN.from_dotted("openlobby.core"), kind=FQNKind.MODULE, file_path="openlobby/core/__init__.py", line_start=0, line_end=0, start_byte=0, end_byte=0),
+        FQNNode(fqn=FQN.from_dotted("openlobby.core.api"), kind=FQNKind.MODULE, file_path="openlobby/core/api/__init__.py", line_start=0, line_end=0, start_byte=0, end_byte=0),
+        FQNNode(fqn=FQN.from_dotted("openlobby.core.api.paginator"), kind=FQNKind.MODULE, file_path="openlobby/core/api/paginator.py", line_start=0, line_end=40, start_byte=0, end_byte=0),
+        FQNNode(fqn=FQN.from_dotted("openlobby.core.api.types.Author"), kind=FQNKind.CLASS, file_path="openlobby/core/api/types.py", line_start=5, line_end=35, start_byte=0, end_byte=0),
+        FQNNode(fqn=FQN.from_dotted("openlobby.core.api.mutations"), kind=FQNKind.MODULE, file_path="openlobby/core/api/mutations.py", line_start=0, line_end=40, start_byte=0, end_byte=0),
+        FQNNode(fqn=FQN.from_dotted("app.auth.middleware"), kind=FQNKind.MODULE, file_path="app/auth/middleware.py", line_start=0, line_end=60, start_byte=0, end_byte=0),
+    ]
+    edges = [
+        Edge(source="openlobby", target="openlobby.core", kind="CONTAINS"),
+        Edge(source="openlobby.core", target="openlobby.core.api", kind="CONTAINS"),
+        Edge(source="openlobby.core.api", target="openlobby.core.api.paginator", kind="CONTAINS"),
+        Edge(source="openlobby.core.api", target="openlobby.core.api.mutations", kind="CONTAINS"),
+        Edge(source="openlobby.core.api.paginator", target="graphene.relay", kind="IMPORTS"),
+        Edge(source="openlobby.core.api.types", target="graphene", kind="IMPORTS"),
+        Edge(source="openlobby.core.api.mutations", target="graphql_relay", kind="IMPORTS"),
+        Edge(source="openlobby.core.api.users", target="app.auth.middleware", kind="IMPORTS"),
+    ]
+    return ADG(nodes=nodes, edges=edges)
+
+
+class TestNodeSearch:
+    def test_exact_match_kind_labeled(self, node_search_adg: ADG) -> None:
+        result = node_search("openlobby.core.api.types.Author", node_search_adg)
+        assert result["entries"][0] == {"fqn": "openlobby.core.api.types.Author", "kind": "class"}
+        assert result["counts"]["exact"] == 1
+        assert result["truncated"] is False
+
+    def test_prefix_tier_surfaces_descendants(self, node_search_adg: ADG) -> None:
+        result = node_search("openlobby.core.api.pag", node_search_adg)
+        fqns = [e["fqn"] for e in result["entries"]]
+        assert "openlobby.core.api.paginator" in fqns
+        assert result["counts"]["prefix"] >= 1
+
+    def test_dotted_prefix_tier_enumerates_family(self, node_search_adg: ADG) -> None:
+        result = node_search("openlobby.core.api", node_search_adg)
+        fqns = [e["fqn"] for e in result["entries"]]
+        assert "openlobby.core.api.paginator" in fqns
+        assert "openlobby.core.api.mutations" in fqns
+
+    def test_imports_targets_indexed_and_labeled_external_import(self, node_search_adg: ADG) -> None:
+        """THE #143 anchor-bait killer: dotted import-path targets that are not
+        ADG nodes (graphene.relay) surface with kind external_import."""
+        result = node_search("graphene", node_search_adg)
+        by_fqn = {e["fqn"]: e["kind"] for e in result["entries"]}
+        assert by_fqn.get("graphene.relay") == "external_import"
+        # pip-name decoy (not a graphene substring) surfaces on its own query
+        result2 = node_search("graphql", node_search_adg)
+        by_fqn2 = {e["fqn"]: e["kind"] for e in result2["entries"]}
+        assert by_fqn2.get("graphql_relay") == "external_import"
+
+    def test_substring_tier(self, node_search_adg: ADG) -> None:
+        result = node_search("relay", node_search_adg)
+        fqns = [e["fqn"] for e in result["entries"]]
+        assert "graphene.relay" in fqns
+        assert "graphql_relay" in fqns
+
+    def test_relaxed_subsequence_fallback(self, node_search_adg: ADG) -> None:
+        """LSP-3.18-style relaxed tier: query chars in order, case-insensitive,
+        only when exact/prefix/substring all miss."""
+        result = node_search("gphnrl", node_search_adg)
+        fqns = [e["fqn"] for e in result["entries"]]
+        assert "graphene.relay" in fqns
+
+    def test_tier_ordering_exact_before_prefix_before_substring(self, node_search_adg: ADG) -> None:
+        result = node_search("openlobby.core", node_search_adg)
+        fqns = [e["fqn"] for e in result["entries"]]
+        # exact tier first: openlobby.core itself; then prefix descendants
+        assert fqns[0] == "openlobby.core"
+        assert "openlobby.core.api" in fqns
+
+    def test_internal_imports_target_labeled_by_node_kind(self, node_search_adg: ADG) -> None:
+        """An IMPORTS target that IS an ADG node (app.auth.middleware) is
+        labeled by its node kind, not external_import."""
+        result = node_search("app.auth.middleware", node_search_adg)
+        by_fqn = {e["fqn"]: e["kind"] for e in result["entries"]}
+        assert by_fqn.get("app.auth.middleware") == "module"
+
+    def test_dedup_node_wins_over_imports_label(self, node_search_adg: ADG) -> None:
+        """A FQN present both as node and as IMPORTS target appears once,
+        labeled by its real node kind."""
+        result = node_search("app.auth", node_search_adg)
+        entries = [e for e in result["entries"] if e["fqn"] == "app.auth.middleware"]
+        assert len(entries) == 1
+
+    def test_case_insensitive(self, node_search_adg: ADG) -> None:
+        result = node_search("GRAPHENE", node_search_adg)
+        fqns = [e["fqn"] for e in result["entries"]]
+        assert "graphene.relay" in fqns
+
+    def test_no_match_shape(self, node_search_adg: ADG) -> None:
+        result = node_search("left_pad", node_search_adg)
+        assert result["entries"] == []
+        assert result["counts"] == {"exact": 0, "prefix": 0, "substring": 0, "relaxed": 0}
+
+    def test_empty_query_refused(self, node_search_adg: ADG) -> None:
+        """Empty/generic queries refuse; never the repo dump (#141 contract)."""
+        result = node_search("", node_search_adg)
+        assert result["entries"] == []
+        assert "narrow" in result["note"]
+
+    def test_cap_and_overbroad_refusal(self, node_search_adg: ADG) -> None:
+        # 'obby' substring-matches the openlobby family (6 nodes) > cap 3, no exact/prefix tier
+        result = node_search("obby", node_search_adg, cap=3)
+        assert result["truncated"] is True
+        assert result["entries"] == []
+        assert "narrow" in result["note"]
+        assert result["counts"]["substring"] == 6
+
+    def test_prefix_tier_not_refused_when_over_cap(self, node_search_adg: ADG) -> None:
+        """A tiered match (exact/prefix) is returned truncated rather than
+        refused: the query was already specific."""
+        adg = ADG(
+            nodes=[
+                FQNNode(fqn=FQN.from_dotted("app.mod"), kind=FQNKind.MODULE, file_path="app/mod.py", line_start=0, line_end=0, start_byte=0, end_byte=0),
+                *[
+                    FQNNode(fqn=FQN.from_dotted(f"app.mod.child_{i}"), kind=FQNKind.FUNCTION, file_path="app/mod.py", line_start=0, line_end=0, start_byte=0, end_byte=0)
+                    for i in range(NODE_SEARCH_CAP + 5)
+                ],
+            ],
+            edges=[Edge(source="app.mod", target=f"app.mod.child_{i}", kind="CONTAINS") for i in range(NODE_SEARCH_CAP + 5)],
+        )
+        result = node_search("app.mod", adg)
+        assert len(result["entries"]) == NODE_SEARCH_CAP
+        assert result["truncated"] is True
+        assert "narrow" in result["note"]
+
+    def test_empty_adg(self, node_search_adg: ADG) -> None:
+        empty = ADG(nodes=[], edges=[])
+        result = node_search("app", empty)
+        assert result["entries"] == []
+        assert result["truncated"] is False

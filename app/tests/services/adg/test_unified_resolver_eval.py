@@ -173,7 +173,7 @@ class EvalResult:
         }
 
 
-# -- Ablation toggles (issue #131 search_off; #137 children_off/dependencies_off) --
+# -- Ablation toggles (issue #131 search_off; #137 children_off; #143 node_search_off) --
 
 def _flag_on(name: str) -> bool:
     return os.environ.get(name, "") not in ("", "0")
@@ -191,10 +191,11 @@ def _select_search_backend(repo_root: Path, adg):
     return build_search_backend(repo_root, adg)
 
 
-# -- #137 neighborhood-tool arms: five-surface scrubs (the #131 dependents_off
+# -- #137/#143 neighborhood-tool arms: five-surface scrubs (the #131 dependents_off
 # lesson: removing only _TOOLS contaminates the arm, because a hallucinated call
 # still hits _TOOL_FUNCTIONS and returns REAL data; the handler must go too, so a
-# hallucination lands on the unknown-tool error branch instead).
+# hallucination lands on the unknown-tool error branch instead). #143: the
+# removed neighborhood tool is now node_search (list_dependencies was replaced).
 
 from unittest.mock import patch
 from contextlib import contextmanager
@@ -203,24 +204,24 @@ import services.adg.unified_resolver as unified_resolver
 
 _NEIGHBORHOOD_SENTENCE_FULL = (
     "then inspect the neighborhood with list_children "
-    "and list_dependencies to confirm the exact FQNs before writing a constraint."
+    "and node_search to confirm the exact FQNs before writing a constraint."
 )
 _NEIGHBORHOOD_SENTENCE_WITHOUT_CHILDREN = (
-    "then inspect the neighborhood with list_dependencies to confirm the exact FQNs before writing a constraint."
+    "then inspect the neighborhood with node_search to confirm the exact FQNs before writing a constraint."
 )
-_NEIGHBORHOOD_SENTENCE_WITHOUT_DEPENDENCIES = (
+_NEIGHBORHOOD_SENTENCE_WITHOUT_NODE_SEARCH = (
     "then inspect the neighborhood with list_children "
     "to confirm the exact FQNs before writing a constraint."
 )
-_SEARCH_DESCRIPTION_FULL = "then inspect the hits with list_children / list_dependencies."
-_SEARCH_DESCRIPTION_WITHOUT_CHILDREN = "then inspect the hits with list_dependencies."
-_SEARCH_DESCRIPTION_WITHOUT_DEPENDENCIES = "then inspect the hits with list_children."
+_SEARCH_DESCRIPTION_FULL = "then inspect the hits with list_children / node_search."
+_SEARCH_DESCRIPTION_WITHOUT_CHILDREN = "then inspect the hits with node_search."
+_SEARCH_DESCRIPTION_WITHOUT_NODE_SEARCH = "then inspect the hits with list_children."
 _EXAMPLE_ONE_STEP_THREE = 'Step 3: list_children("app.routes") \u2192 confirm the handler population'
 _EXAMPLE_THREE_STEP_TWO = 'Step 2: list_children("app.services") \u2192 see the service classes that must inherit it'
 
 
 def _scrubbed_tool_surface(removed_tool: str) -> tuple[list[dict], dict, str]:
-    """Build the children_off/dependencies_off tool surface: scrub the removed
+    """Build the children_off/node_search_off tool surface: scrub the removed
     tool's schema entry, dispatch handler, search_code description sentence,
     Required-exploration sentence, and (children only) both example steps.
     Returns (tools, handlers, prompt_template). Drift-asserts on every old string
@@ -235,9 +236,22 @@ def _scrubbed_tool_surface(removed_tool: str) -> tuple[list[dict], dict, str]:
         ]
         search_description_pair = (_SEARCH_DESCRIPTION_FULL, _SEARCH_DESCRIPTION_WITHOUT_CHILDREN)
         example_step_deleted = True
-    elif removed_tool == "list_dependencies":
-        replacements = [(_NEIGHBORHOOD_SENTENCE_FULL, _NEIGHBORHOOD_SENTENCE_WITHOUT_DEPENDENCIES)]
-        search_description_pair = (_SEARCH_DESCRIPTION_FULL, _SEARCH_DESCRIPTION_WITHOUT_DEPENDENCIES)
+    elif removed_tool == "node_search":
+        replacements = [
+            (_NEIGHBORHOOD_SENTENCE_FULL, _NEIGHBORHOOD_SENTENCE_WITHOUT_NODE_SEARCH),
+            # the #142 steering rule names the tool; the whole rule goes with it
+            ("**External objects MUST be verified with node_search.** Pip/package names are NOT import \
+paths: a dependency the codebase imports as `pkg.sub` (e.g. `graphene.relay`, the subpath \
+actually imported) surfaces in node_search with kind `external_import`; the bare pip name \
+alone (`graphene`) is often just the root form. For any requires/prohibits edge whose \
+object is an external package, you MUST call node_search on the package name and ground \
+the object on the result: prefer the most specific import path the tool shows (e.g. \
+`graphene.relay` over `graphql_relay` or the bare `graphene`) — the import path the \
+codebase actually imports, not the pip distribution name. If node_search shows the pip \
+name only with no dotted import path under it, the bare name is the correct object.",
+             ""),
+        ]
+        search_description_pair = (_SEARCH_DESCRIPTION_FULL, _SEARCH_DESCRIPTION_WITHOUT_NODE_SEARCH)
         example_step_deleted = False
     else:
         raise ValueError(f"unknown removed tool: {removed_tool}")
@@ -273,12 +287,12 @@ def _scrubbed_tool_surface(removed_tool: str) -> tuple[list[dict], dict, str]:
 @contextmanager
 def _neighborhood_tool_surface(removed_tool: str):
     """Apply the arm's five-surface edits for the duration of the eval loop only."""
-    if not (_flag_on("ABLATION_CHILDREN_OFF") or _flag_on("ABLATION_DEPENDENCIES_OFF")):
+    if not (_flag_on("ABLATION_CHILDREN_OFF") or _flag_on("ABLATION_NODE_SEARCH_OFF")):
         yield
         return
-    if _flag_on("ABLATION_CHILDREN_OFF") and _flag_on("ABLATION_DEPENDENCIES_OFF"):
-        raise RuntimeError("combined children_off+dependencies_off arm is out of scope (#137: one variable per arm)")
-    removed_tool = "list_children" if _flag_on("ABLATION_CHILDREN_OFF") else "list_dependencies"
+    if _flag_on("ABLATION_CHILDREN_OFF") and _flag_on("ABLATION_NODE_SEARCH_OFF"):
+        raise RuntimeError("combined children_off+node_search_off arm is out of scope (#137: one variable per arm)")
+    removed_tool = "list_children" if _flag_on("ABLATION_CHILDREN_OFF") else "node_search"
     tools, handlers, prompt_template = _scrubbed_tool_surface(removed_tool)
     with patch.object(unified_resolver, "_TOOLS", tools), \
          patch.object(unified_resolver, "_TOOL_FUNCTIONS", handlers), \
@@ -333,7 +347,7 @@ def run_eval(
     result = EvalResult()
 
     with _neighborhood_tool_surface(
-        removed_tool="list_children" if _flag_on("ABLATION_CHILDREN_OFF") else "list_dependencies"
+        removed_tool="list_children" if _flag_on("ABLATION_CHILDREN_OFF") else "node_search"
     ):
         for fixture in ground_truth:
             adr_text = (repo_root / fixture["adr_path"]).read_text()

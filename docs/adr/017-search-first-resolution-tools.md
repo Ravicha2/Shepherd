@@ -4,7 +4,7 @@ Date: 2026-09-05
 
 ## Status
 
-Accepted (supersedes the ADR 14/15 tool surface: `list_modules` and `dive`; retains ADR 15's one-session-per-ADR unified agent and ADR 14's provenance/trace approach)
+Accepted (supersedes the ADR 14/15 tool surface: `list_modules` and `dive`; retains ADR 15's one-session-per-ADR unified agent and ADR 14's provenance/trace approach). Amendment 2026-09-09 (#143): `list_dependencies` is removed from the LLM tool surface and replaced by `node_search` — the #140 ablation measured it as near-dead surface (0.09 calls/session) whose one consistent effect was misdirection (the tuf ADR-0006 drill correlated with the wrong predicate), while the #142 spike confirmed a name/prefix existence-check surface over ADG nodes + IMPORTS targets fixes the anchor-bait object class (`graphene.relay` vs `graphql_relay`, emitted 5/5 only with the tool call + prompt grounding rule). Contract details: `docs/node-search-response-contracts.md` (#141).
 
 ## Context
 

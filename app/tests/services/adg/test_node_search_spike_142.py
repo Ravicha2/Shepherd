@@ -1,28 +1,25 @@
-"""#142 spike: anchor-bait mechanism check for the proposed node_search tool.
+"""#142 spike, landed as #143 pins: anchor-bait mechanism tests for node_search.
 
-Question (issue #142): does a name/prefix existence-check surface over ADG
+Original question (issue #142): does a name/prefix existence-check surface over ADG
 nodes + IMPORTS targets make the resolver pick the right object FQN on the
 anchor-bait class (openlobby ADR-0007: codebase imports `graphene.relay`,
 gold expects `graphene.relay`, resolver stably emits `graphql_relay` /
 `graphene_django` — the pip-name vs import-path confusion)?
 
-Method:
-- Minimal stub node_search(name/prefix) over the ADG: internal node FQNs +
-  IMPORTS edge targets, kind-labeled, capped. No embedding index, no final
-  contract (#141 owns the contract; #143 owns the tool).
-- Mocked LLM session per the established pattern in test_unified_resolver
-  (_run_unified with a stub backend seam), openlobby ADR-0007 text.
-- The mocked session is CAUSAL: the scripted agent's final emission is a
-  decision rule applied to the REAL stub result it received, not hardcoded.
-  If the stub surfaces a dotted import-path hit (graphene.relay) alongside
-  the pip-name decoy (graphql_relay), the emulated resolver emits the import
-  path the ADR's codebase actually imports; if the surface shows only the
-  decoy, the emulated resolver reproduces the baseline miss.
-- Negative control for free: ADR-0007 miss across all 5 #140 arms = the
-  without-tool behavior (search_code-only surface never shows
-  `graphene.relay`, verified by the surface-visibility test below).
+Result: mechanism CONFIRMED (spike runs logs/issue-142/spike-run{1,2,3}; the
+import path was emitted only in sessions that called the tool and saw it on
+the surface, 5/5 in the MUST-verify arm). #143 landed the production tool, so
+these tests now pin the REAL tool (services.adg.adg_tools.node_search) instead
+of the throwaway stub:
 
-This is a spike, not a feature pin: throwaway stub, no production change.
+- The surface itself: exact/prefix/substring tiers, kind labels (external_import
+  for IMPORTS targets), cap + refusal shape (TestNodeSearch covers the unit
+  shape in test_adg_tools.py; these cover the anchor-bait fixtures).
+- The causal link: the emulated resolver's emission is a decision rule applied
+  to the REAL tool result; strip IMPORTS targets and the emission falls back to
+  the pip-name miss.
+- The negative control: search_code's lift returns ADG nodes only, so the
+  dotted import path was never on any pre-#143 surface.
 """
 from __future__ import annotations
 
@@ -32,6 +29,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from services.adg.adg_tools import node_search
 from services.fqn import FQN
 from services.models import ADG, ConstraintEdge, Edge, FQNKind, FQNNode, PredicateType
 from services.adg.unified_resolver import (
@@ -77,59 +75,17 @@ Graphene lib has good support for creating API following Relay specifications.
 """
 
 
-# -- The throwaway stub tool ---------------------------------------------------
-
-NODE_SEARCH_CAP = 20
+# -- The production tool under test ----------------------------------------------
 
 
-def node_search_stub(query: str, adg: ADG, cap: int = NODE_SEARCH_CAP) -> dict:
-    """Minimal node_search: name/prefix existence check over ADG nodes +
-    IMPORTS edge targets. Tiers: exact > dotted-prefix > substring, all
-    case-insensitive. Kind-labeled; IMPORTS targets carry kind
-    `external_import` (no ADG node behind them). Capped at `cap` entries with
-    per-tier hit counts, over-broad queries refused (the #141 contract shape,
-    minimally rendered for the spike)."""
-    query = query.strip().lower()
-    candidates: list[tuple[str, str]] = [
-        (str(n.fqn), n.kind.value) for n in adg.nodes
-    ]
-    candidates += [
-        (e.target, "external_import")
-        for e in adg.edges
-        if e.kind == "IMPORTS"
-    ]
-    # dedup, order preserved
-    seen: set[str] = set()
-    unique = [c for c in candidates if not (c[0] in seen or seen.add(c[0]))]
+def node_search_stub(query: str, adg: ADG, cap: int = 20) -> dict:
+    """Back-compat alias: the spike's stub name now calls the production tool.
 
-    if not query:
-        return {"entries": [], "truncated": False, "counts": {}, "note": "empty query"}
-
-    exact = [c for c in unique if c[0].lower() == query]
-    prefix = [c for c in unique if (c[0].lower().startswith(query) or c[0].lower().startswith(query + "."))]
-    prefix = [c for c in prefix if c[0].lower() != query]  # exact tiered above
-    substring = [c for c in unique if not exact and not prefix and query in c[0].lower()]
-
-    total = len(exact) + len(prefix) + len(substring)
-    if total == 0:
-        return {"entries": [], "truncated": False, "counts": {}, "note": "no match"}
-    if total > cap and not (exact or prefix):
-        # generic/over-broad query: refusal shape, never the repo dump
-        return {
-            "entries": [],
-            "truncated": True,
-            "counts": {"exact": len(exact), "prefix": len(prefix), "substring": len(substring)},
-            "note": f"{total} nodes match; narrow by prefix or kind",
-        }
-    tier = exact + prefix + substring
-    payload = {
-        "entries": [{"fqn": f, "kind": k} for f, k in tier[:cap]],
-        "truncated": len(tier) > cap,
-        "counts": {"exact": len(exact), "prefix": len(prefix), "substring": len(substring)},
-    }
-    if payload["truncated"]:
-        payload["note"] = f"{len(tier)} nodes match; narrow by prefix or kind"
-    return payload
+    The #142 spike validated the mechanism with a throwaway stub
+    (capped at 20); #143 landed it as services.adg.adg_tools.node_search with
+    the same tiered shape. The mechanism tests below run against the real
+    tool via this alias, so the causal pins keep their names."""
+    return node_search(query, adg, cap=cap)
 
 
 # -- Stub ADG: the anchor-bait microcosm ----------------------------------------
@@ -361,8 +317,8 @@ class TestNodeSearchStub:
     def test_no_match_note(self):
         result = node_search_stub("left_pad", self.adg)
         assert result["entries"] == []
-        assert result["counts"] == {"exact": 0, "prefix": 0, "substring": 0} if result["counts"] else True
-        # no-match note is present either way
+        # the real tool adds the relaxed tier to the counts shape
+        assert result["counts"] == {"exact": 0, "prefix": 0, "substring": 0, "relaxed": 0}
         assert result.get("note") == "no match"
 
     def test_cap_and_overbroad_refusal(self):

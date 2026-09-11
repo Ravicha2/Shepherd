@@ -1,4 +1,4 @@
-from services.adg.adg_tools import list_children, list_dependencies, list_imports, list_inherits
+from services.adg.adg_tools import list_children, list_imports, list_inherits, node_search
 from services.adg.merge import add_external_nodes, merge_constraint_edges
 from services.adg.search import build_search_backend
 from services.adg.treesitter import parse_file, parse_repo
@@ -16,7 +16,7 @@ __all__ = [
     "resolve_adr_constraints",
     "fqn_matches_pattern",
     "list_children",
-    "list_dependencies",
+    "node_search",
     "list_imports",
     "list_inherits",
 ]
