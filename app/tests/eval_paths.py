@@ -48,9 +48,13 @@ def _versions() -> dict:
 
 
 def _ablation_arm() -> str:
-    """Issue #131 ablation arm label, from the same flags the harness reads."""
-    flags = [name for name, flag in (("search_off", "ABLATION_SEARCH_OFF"),)
-             if os.environ.get(flag, "") not in ("", "0")]
+    """Ablation arm label (#131 search_off; #137 children_off; #143
+    node_search_off), from the same flags the harness reads."""
+    flags = [name for name, flag in (
+        ("search_off", "ABLATION_SEARCH_OFF"),
+        ("children_off", "ABLATION_CHILDREN_OFF"),
+        ("node_search_off", "ABLATION_NODE_SEARCH_OFF"),
+    ) if os.environ.get(flag, "") not in ("", "0")]
     return "+".join(flags) if flags else "baseline"
 
 

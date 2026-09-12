@@ -1,10 +1,10 @@
 """Unified ADR-to-ConstraintEdge resolver.
 
 One LLM session per ADR. Reads full ADR text (including Decision Outcome),
-uses the search-first tool surface (search_code, list_children,
-list_dependencies; ADR 017, list_dependents cut per #131/#133) to map prose
-concepts to FQN patterns, and produces ConstraintEdge objects directly. No
-SymbolicConstraint intermediate.
+uses the search-first tool surface (search_code, list_children, node_search;
+ADR 017, list_dependents cut per #131/#133, list_dependencies replaced by
+node_search per #143) to map prose concepts to FQN patterns, and produces
+ConstraintEdge objects directly. No SymbolicConstraint intermediate.
 """
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 
 from openai import OpenAI
 
-from services.adg.adg_tools import list_children, list_dependencies
+from services.adg.adg_tools import list_children, node_search
 from services.extract.config import LangExtractConfig
 from services.models import ADG, ConstraintEdge, ConstraintScope, FQNKind, PredicateType
 
@@ -71,7 +71,7 @@ _TOOLS = [
                 "code snippets lifted to FQN handles: {fqn, kind, file, snippet}. "
                 "Start here with a prose query drawn from the ADR (e.g. "
                 "'passive update coordinator'), then inspect the hits with "
-                "list_children / list_dependencies."
+                "list_children / node_search."
             ),
             "parameters": {
                 "type": "object",
@@ -100,15 +100,22 @@ _TOOLS = [
     {
         "type": "function",
         "function": {
-            "name": "list_dependencies",
+            "name": "node_search",
             "description": (
-                "What does `fqn` use? Returns IMPORTS and INHERITS edges out of "
-                "`fqn`, labeled with the edge kind. CALLS edges are not included."
+                "Name/prefix existence check over the codebase graph. Returns "
+                "{fqn, kind} entries: kind-labeled ADG nodes (module/class/"
+                "function/method) PLUS external import targets (kind "
+                "external_import) — the exact import paths the codebase "
+                "imports, which search_code cannot show. Tiers: exact > "
+                "prefix > substring, case-insensitive. Capped at 20 with "
+                "per-tier counts and a narrow hint on overflow."
             ),
             "parameters": {
                 "type": "object",
-                "properties": {"fqn": _FQN_PARAM},
-                "required": ["fqn"],
+                "properties": {
+                    "query": {"type": "string", "description": "Name or dotted prefix, e.g. 'relay', 'graphene', 'openlobby.core.api'"},
+                },
+                "required": ["query"],
             },
         },
     },
@@ -137,7 +144,7 @@ def _filter_entry_point_roots(results: list[dict]) -> list[dict]:
 _TOOL_FUNCTIONS = {
     "search_code": lambda args, adg, backend: json.dumps(_filter_entry_point_roots(backend(args["query"]))),
     "list_children": lambda args, adg, backend: json.dumps(list_children(args["fqn"], adg)),
-    "list_dependencies": lambda args, adg, backend: json.dumps(list_dependencies(args["fqn"], adg)),
+    "node_search": lambda args, adg, backend: json.dumps(node_search(args["query"], adg)),
 }
 
 
@@ -172,6 +179,32 @@ class ResolutionTrace:
     pre_validation_edges: list[dict] = field(default_factory=list)
 
 
+# #137 attribution instrument: the trace records what each tool call returned
+# (result_fqns) so resolved edges can be attributed to the tool whose result
+# grounded them. Traces previously logged calls only, never results, so edge
+# provenance was indistinguishable (24/84 baseline edge FQNs unaccounted).
+def _covers(result_fqn: str, edge_fqn: str) -> bool:
+    """Prefix-tolerant coverage: a result FQN grounds an edge FQN if either is
+    a dotted-prefix of the other (mirrors the eval scorer's ancestor tolerance,
+    including X vs X.* wildcard-base equality)."""
+    result_base = result_fqn.rstrip(".*")
+    edge_base = edge_fqn.rstrip(".*")
+    return result_base == edge_base or result_base.startswith(edge_base + ".") or edge_base.startswith(result_base + ".")
+
+
+def _extract_result_fqns(name: str, result: str) -> list[str]:
+    """FQNs visible in one tool result payload, deduplicated, order preserved.
+    search_code: a JSON array of {fqn, ...} hits; list_children /
+    node_search: a JSON object {entries: [{fqn, ...}], truncated}.
+    Unknown payloads (errors, truncation notices) yield []."""
+    try:
+        payload = json.loads(result)
+    except (json.JSONDecodeError, TypeError):
+        return []
+    entries = payload if isinstance(payload, list) else payload.get("entries", []) if isinstance(payload, dict) else []
+    return list(dict.fromkeys(str(entry["fqn"]) for entry in entries if isinstance(entry, dict) and "fqn" in entry))
+
+
 _SYSTEM_PROMPT_TEMPLATE = """
 You are an architectural decision resolver. Given a full ADR document, identify 
 architectural constraints and map them to FQN patterns in the codebase graph.
@@ -193,7 +226,17 @@ decision outcome, not something to be prohibited.
 FQNs from the ADR's prose alone or from what a typical project of this kind usually looks \
 like. Start with search_code to find where an ADR concept lives in the code (hits come back \
 as FQN handles with snippets), then inspect the neighborhood with list_children \
-and list_dependencies to confirm the exact FQNs before writing a constraint.
+and node_search to confirm the exact FQNs before writing a constraint.
+
+**External objects MUST be verified with node_search.** Pip/package names are NOT import \
+paths: a dependency the codebase imports as `pkg.sub` (e.g. `graphene.relay`, the subpath \
+actually imported) surfaces in node_search with kind `external_import`; the bare pip name \
+alone (`graphene`) is often just the root form. For any requires/prohibits edge whose \
+object is an external package, you MUST call node_search on the package name and ground \
+the object on the result: prefer the most specific import path the tool shows (e.g. \
+`graphene.relay` over `graphql_relay` or the bare `graphene`) — the import path the \
+codebase actually imports, not the pip distribution name. If node_search shows the pip \
+name only with no dotted import path under it, the bare name is the correct object.
 
 ## ADR Document
 
@@ -490,12 +533,34 @@ def _log_trace(
     trace_dir.mkdir(parents=True, exist_ok=True)
     trace_path = trace_dir / "resolver_traces.jsonl"
 
+    def _edge_provenance(subject: str, object_: str) -> dict[str, list[str]]:
+        """Per edge side, the tool names whose results covered it (#137)."""
+        covering = {"subject": [], "object": []}
+        for call in trace.tool_calls:
+            for result_fqn in call.get("result_fqns", []):
+                if call["name"] in covering["subject"] and call["name"] in covering["object"]:
+                    break
+                if call["name"] not in covering["subject"] and _covers(result_fqn, subject):
+                    covering["subject"].append(call["name"])
+                if call["name"] not in covering["object"] and _covers(result_fqn, object_):
+                    covering["object"].append(call["name"])
+        return covering
+
     record = {
         "resolver": "unified",
         "adr_id": adr_id,
         "adr_path": adr_path,
         "num_edges": len(edges),
-        "edges": [{"subject": e.subject, "object": e.object, "predicate": e.predicate.value, "scope": e.scope.value} for e in edges],
+        "edges": [
+            {
+                "subject": e.subject,
+                "object": e.object,
+                "predicate": e.predicate.value,
+                "scope": e.scope.value,
+                "provenance": _edge_provenance(e.subject, e.object),
+            }
+            for e in edges
+        ],
         "pre_validation_edges": trace.pre_validation_edges,
         "hit_cap": trace.hit_cap,
         "parse_failed": trace.parse_failed,
@@ -516,7 +581,7 @@ def resolve_adr_constraints(
     """Resolve a single ADR's full text to ConstraintEdge objects.
 
     One LLM session per ADR. The agent reads the complete ADR, uses the
-    search_code / list_children / list_dependencies tools to
+    search_code / list_children / node_search tools to
     map prose concepts to FQN patterns, and outputs constraint edges directly.
     `search_backend` is the injected semble callable from build_search_backend
     (ADR 017 decision 6; unit tests inject a stub).
@@ -614,6 +679,7 @@ def resolve_adr_constraints(
                 })
             last_tool_signature = signature
             result = _dispatch_tool(tc.function.name, args, adg, backend=search_backend)
+            tool_call_trace[-1]["result_fqns"] = _extract_result_fqns(tc.function.name, result)
             messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
 
     # Hit cap: request best-effort resolution
