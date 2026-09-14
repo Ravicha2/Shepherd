@@ -237,6 +237,56 @@ class TestCheckStructuralPredicates:
             Edge(source="app.auth.middleware", target="app.models.user", kind="IMPORTS"),
         ]
 
+    def test_reachable_paths_namespace_import_does_not_descend_package(self) -> None:
+        """issue 150: an IMPORTS edge onto a package node (namespace-import
+        fallback) is a dependency on the package's interface, not on every
+        module inside it: CONTAINS must not expand once a dependency edge
+        has been traversed."""
+        from services.cpt.engine import _reachable_paths, _build_adjacency
+        from services.models import Edge
+
+        adjacency = _build_adjacency({
+            Edge(source="pkg", target="pkg.helper", kind="CONTAINS"),
+            Edge(source="pkg", target="pkg.gpio_driver", kind="CONTAINS"),
+            Edge(source="importer", target="pkg", kind="IMPORTS"),
+            Edge(source="pkg.gpio_driver", target="gpiozero", kind="IMPORTS"),
+        })
+        kinds = {"CONTAINS", "IMPORTS", "CALLS", "INHERITS"}
+        paths = _reachable_paths("importer", adjacency, kinds)
+        assert "gpiozero" not in paths
+
+    def test_reachable_paths_start_descent_still_reaches_object(self) -> None:
+        """issue 150 preserved: pure descent from the subject's own scope
+        (package node CONTAINS child, child IMPORTS object) still reaches the
+        object: load-bearing for package-level requires satisfaction."""
+        from services.cpt.engine import _reachable_paths, _build_adjacency
+        from services.models import Edge
+
+        adjacency = _build_adjacency({
+            Edge(source="pkg", target="pkg.gpio_driver", kind="CONTAINS"),
+            Edge(source="pkg.gpio_driver", target="gpiozero", kind="IMPORTS"),
+        })
+        kinds = {"CONTAINS", "IMPORTS", "CALLS", "INHERITS"}
+        paths = _reachable_paths("pkg", adjacency, kinds)
+        assert paths["gpiozero"] == [
+            Edge(source="pkg", target="pkg.gpio_driver", kind="CONTAINS"),
+            Edge(source="pkg.gpio_driver", target="gpiozero", kind="IMPORTS"),
+        ]
+
+    def test_reachable_paths_transitive_dependency_chain_still_traverses(self) -> None:
+        """issue 150 preserved: module -> module -> module dependency chains
+        (the #138 door_status -> pin_tools -> gpiozero shape)."""
+        from services.cpt.engine import _reachable_paths, _build_adjacency
+        from services.models import Edge
+
+        adjacency = _build_adjacency({
+            Edge(source="door_status", target="pin_tools", kind="IMPORTS"),
+            Edge(source="pin_tools", target="gpiozero", kind="IMPORTS"),
+        })
+        kinds = {"CONTAINS", "IMPORTS", "CALLS", "INHERITS"}
+        paths = _reachable_paths("door_status", adjacency, kinds)
+        assert "gpiozero" in paths
+
     def test_prohibits_dependency_violated(self) -> None:
         from services.cpt.engine import MatchedConstraint, check_structural_predicates, _build_adjacency
         from services.resolver import MatchStatus
@@ -262,6 +312,42 @@ class TestCheckStructuralPredicates:
         violations = check_structural_predicates(matched, adjacency)
         assert len(violations) == 1
         assert violations[0].constraint.adr_id == "ADR-003"
+
+    def test_prohibits_namespace_import_cascade_single_violation(self) -> None:
+        """issue 150: `pkg.* prohibits gpiozero` on a package whose sibling
+        module namespace-imports the package itself fires exactly once, at the
+        module that genuinely imports the object. Pre-fix this fired at
+        pkg.helper too (IMPORTS pkg -> CONTAINS subtree cascade)."""
+        from services.cpt.engine import MatchedConstraint, check_structural_predicates, _build_adjacency
+        from services.resolver import MatchStatus
+
+        constraint = ConstraintEdge(
+            subject="pkg.*",
+            predicate=PredicateType.PROHIBITS_DEPENDENCY,
+            object="gpiozero",
+            justification="test",
+            adr_id="ADR-019",
+            adr_path="docs/adr/019.md",
+        )
+        adjacency = _build_adjacency({
+            Edge(source="pkg", target="pkg.helper", kind="CONTAINS"),
+            Edge(source="pkg", target="pkg.gpio_driver", kind="CONTAINS"),
+            Edge(source="pkg.helper", target="pkg", kind="IMPORTS"),
+            Edge(source="pkg.gpio_driver", target="gpiozero", kind="IMPORTS"),
+        })
+        matched = {
+            id(constraint): MatchedConstraint(
+                constraint=constraint,
+                subject_matches=[
+                    (FQN.from_dotted("pkg.helper"), MatchStatus.WILDCARD),
+                    (FQN.from_dotted("pkg.gpio_driver"), MatchStatus.WILDCARD),
+                ],
+                object_matches=[(FQN.from_dotted("gpiozero"), MatchStatus.EXACT)],
+            ),
+        }
+        violations = check_structural_predicates(matched, adjacency)
+        assert len(violations) == 1
+        assert str(violations[0].matched_fqn) == "pkg.gpio_driver"
 
     def test_prohibits_dependency_not_violated(self) -> None:
         from services.cpt.engine import MatchedConstraint, check_structural_predicates, _build_adjacency

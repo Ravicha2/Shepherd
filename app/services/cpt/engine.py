@@ -78,9 +78,16 @@ def _reachable_paths(
     seed_module: module whose module-level edges (all kinds except CONTAINS) are
     visible from start's function scope: a function inherits its module's imports,
     not its siblings' bodies.
+    Issue 150: CONTAINS is a scoping relation, expandable only while the path is
+    pure descent from start. Once any dependency edge (IMPORTS/CALLS/INHERITS) is
+    traversed, CONTAINS no longer expands: a namespace import onto a package node
+    is a dependency on the package's interface, not on every module inside it.
+    Visited is keyed by (node, still-descending) so a scope node first reached
+    via a dependency path still opens for its own CONTAINS descent.
     # ponytail: only the shortest path per target is kept; a longer alternate path is never reported."""
     paths: dict[str, list[Edge]] = {}
-    queue: deque[str] = deque([start])
+    seen: set[tuple[str, bool]] = {(start, True)}
+    queue: deque[tuple[str, list[Edge], bool]] = deque([(start, [], True)])
 
     if seed_module:
         for edge in adjacency.get(seed_module, ()):
@@ -94,21 +101,27 @@ def _reachable_paths(
                 continue
             if edge.target not in paths:
                 paths[edge.target] = [edge]
-                queue.append(edge.target)
+                queue.append((edge.target, [edge], False))
 
     while queue:
-        current = queue.popleft()
+        current, current_path, descending = queue.popleft()
         for edge in adjacency.get(current, ()):
             if edge.kind not in kinds:
+                continue
+            if edge.kind == "CONTAINS" and not descending:
                 continue
             if node_roles and skip_roles:
                 target_role = node_roles.get(edge.target)
                 if target_role and target_role in skip_roles:
                     continue
-            if edge.target in paths:
+            target_descending = descending and edge.kind == "CONTAINS"
+            if (edge.target, target_descending) in seen:
                 continue
-            paths[edge.target] = paths.get(current, []) + [edge]
-            queue.append(edge.target)
+            seen.add((edge.target, target_descending))
+            path = current_path + [edge]
+            if edge.target not in paths:
+                paths[edge.target] = path
+            queue.append((edge.target, path, target_descending))
 
     return paths
 
