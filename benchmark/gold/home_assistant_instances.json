@@ -1,0 +1,407 @@
+{
+  "version": 1,
+  "created": "2026-09-14",
+  "repo_id": "home-assistant",
+  "pin_commit": "e4b01b65d306cf4ffcd692b9eb7c7d2ce4f794e4",
+  "pin_date": "2026-09-01",
+  "adr_dir": "adr",
+  "adr_repo": "../../dataset-Shepherd/large/home-assistant-architecture",
+  "adr_repo_pin": "0c4f7dbf21c9e1279bea23a1eb2f9ab295d0e9e9",
+  "verification": "VERIFICATION RUN 2026-09-14 (pruned staged tree: remote_rpi_gpio, scrape, rest, alpha_vantage, acomax, mirroring test_cpt_detect_eval run_case): 13/14 cases FAIL, and the failures are an ENGINE SEMANTICS BLOCKER, not authoring errors. Root cause: any import statement that resolves to a PACKAGE node ('from homeassistant.components import persistent_notification' — 534 modules in the real tree do this — or fallbacks landing on 'homeassistant' itself) records an IMPORTS edge onto the package, and the prohibits BFS traverses CONTAINS from there, descending into the whole subtree. Observed paths (staged tree): alpha_vantage.sensor -> IMPORTS homeassistant.components -> CONTAINS remote_rpi_gpio -> IMPORTS gpiozero; scrape.config_flow -> IMPORTS homeassistant -> CONTAINS homeassistant.components -> CONTAINS remote_rpi_gpio -> IMPORTS gpiozero; scrape.sensor -> IMPORTS scrape-pkg -> CONTAINS config_flow -> IMPORTS homeassistant -> ... -> gpiozero. Consequence: the pin baseline is 4 fires on a 5-component tree (hundreds on the real tree, 1 genuine), and any added selenium module detonates the same cascade for ADR-0004. BOTH CONSTRAINTS ARE UNENCODABLE UNDER CURRENT SEMANTICS; every case expectation below is VOID-UNTIL-FIX and encodes the INTENDED semantics (CONTAINS traversable only during pure descent from the start/seed, never after a dependency edge). Only ha-bench-gpio-removal passes today (deleting remote_rpi_gpio removes every path to the object). GOLD IS PARKED: do not score until the engine issue is fixed and this file is re-verified; sequencing per the user decision 2026-09-14 = the fix lands after the #149/#148 baseline records (ADR 018 stated-before-data protocol). Full-graph detect on the 88k-node ADG additionally remains the known >60min CPU hazard (deferred separately). BASELINE-IS-NON-ZERO design note stands: once unblocked, every case's expected_violations include the standing remote_rpi_gpio fire; probes are 'no fire beyond the baseline', not 'zero'.",
+  "historical_pins": [
+    {
+      "commit": "6e1728542ef22ef48a7cb03542004e0ef3cee9b5",
+      "date": "2019-05-26",
+      "reason": "Commit that added remote_rpi_gpio ('Add Remote RPi Component (#23518)'). Era context only, NOT a case pin: ADR-0019 is dated 2021-12-20, so gpiozero usage at any pre-2021-12 pin predates the decision and is not a violation instance (same anachronism rule as structurizr's 6af4134 pre-pydantic skeleton)."
+    }
+  ],
+  "cases": [
+    {
+      "case_id": "ha-bench-pin-baseline",
+      "type": "historical",
+      "commit": "e4b01b65d306cf4ffcd692b9eb7c7d2ce4f794e4",
+      "description": "Pin baseline with no diff: the only genuine live violation in the tree at 2026-09-01 is the legacy remote_rpi_gpio integration importing gpiozero against ADR-0019 (first benchmark repo whose pin baseline is non-zero; the held-out generalization evidence is exactly this number plus the resolver-side report-only run)",
+      "diff": [],
+      "expected_violations": [
+        {
+          "adr_id": "ADR-0019",
+          "predicate": "prohibits_dependency",
+          "subject": "homeassistant.components.*",
+          "object": "gpiozero",
+          "matched_fqn": "homeassistant.components.remote_rpi_gpio",
+          "justification": "ADR-0019 removes GPIO integrations from core; remote_rpi_gpio/__init__.py:3-4 imports gpiozero and gpiozero.pins.pigpio at module level (binary_sensor.py:5 and switch.py:5 repeat the import in sibling modules). Module-level dedup collapses the three files and all ancestor CONTAINS-descents (issue 126 reports package-level subjects at the decisive-edge owner) into a single report at the package module."
+        }
+      ],
+      "grading_note": "Exactly one violation expected. Any additional fire at baseline is either subject-overreach (a constraint matching outside the gpiozero/selenium objects) or a transitive path from a component importing remote_rpi_gpio internals (greps at the pin found none; the full-graph confirmation is the gated report-only run). A missing fire means the gpiozero object resolution or the module-level dedup regressed."
+    },
+    {
+      "case_id": "ha-bench-webscrape-selenium-module",
+      "type": "injected",
+      "description": "New integration module scrapes a price page with selenium at module level, violating ADR-0004's webscraping ban (added file, mirrors scrape's own module-level import style)",
+      "diff": [
+        {
+          "path": "homeassistant/components/price_scraper/__init__.py",
+          "status": "added",
+          "append": "\"\"\"Support for scraping a price page with a headless browser (new code).\"\"\"\nfrom selenium import webdriver\n\n\ndef _fetch_price(url):\n    \"\"\"Load a page in a headless browser and read the price (new code).\"\"\"\n    driver = webdriver.Chrome()\n    driver.get(url)\n    price = driver.find_element(\"id\", \"price\").text\n    driver.quit()\n    return price\n"
+        }
+      ],
+      "expected_violations": [
+        {
+          "adr_id": "ADR-0004",
+          "predicate": "prohibits_dependency",
+          "subject": "homeassistant.components.*",
+          "object": "selenium",
+          "matched_fqn": "homeassistant.components.price_scraper",
+          "justification": "ADR-0004 bans integrations that rely on webscraping, with headless browsers named in the Context as a webscraping mechanism; the added integration module imports selenium at module level, so the IMPORTS edge from the module FQN to the selenium external node fires the prohibits. Neither exception (generic HTML parsing; auth-phase form fields) covers browser automation."
+        },
+        {
+          "adr_id": "ADR-0019",
+          "predicate": "prohibits_dependency",
+          "subject": "homeassistant.components.*",
+          "object": "gpiozero",
+          "matched_fqn": "homeassistant.components.remote_rpi_gpio",
+          "justification": "The pin-baseline live violation (see ha-bench-pin-baseline) is structural, so it fires in every case's detect output and is carried in every expectation."
+        }
+      ],
+      "grading_note": "Two violations expected: the new selenium fire at the added module plus the standing baseline fire. The selenium report lands at the module (package node homeassistant.components.price_scraper IS the __init__ module here; the implicit parent has no file of its own). Instance-disjoint from every other case (only case binding price_scraper)."
+    },
+    {
+      "case_id": "ha-bench-webscrape-selenium-setup-local",
+      "type": "injected",
+      "description": "New integration imports selenium inside the async_setup_entry function only, the idiom HA's real integrations use for optional dependencies; tests that function-local imports still bind the module FQN on IMPORTS edges",
+      "diff": [
+        {
+          "path": "homeassistant/components/auth_headless/__init__.py",
+          "status": "added",
+          "append": "\"\"\"Support for logging into a vendor portal with a browser (new code).\"\"\"\nfrom __future__ import annotations\n\n\nasync def async_setup_entry(hass, entry) -> None:\n    \"\"\"Set up the integration, scraping the portal behind login (new code).\"\"\"\n    from selenium import webdriver\n\n    driver = webdriver.Chrome()\n    driver.get(entry.data[\"portal_url\"])\n    entry.runtime_data = driver.find_element(\"id\", \"session\").text\n    driver.quit()\n"
+        }
+      ],
+      "expected_violations": [
+        {
+          "adr_id": "ADR-0004",
+          "predicate": "prohibits_dependency",
+          "subject": "homeassistant.components.*",
+          "object": "selenium",
+          "matched_fqn": "homeassistant.components.auth_headless",
+          "justification": "Same ADR-0004 mandate as the module-level sibling case; the import statement lives inside async_setup_entry, but walk_imports attaches IMPORTS edges to the enclosing module FQN regardless of statement scope, so the module still has a dependency path to selenium and the prohibits fires at the module."
+        },
+        {
+          "adr_id": "ADR-0019",
+          "predicate": "prohibits_dependency",
+          "subject": "homeassistant.components.*",
+          "object": "gpiozero",
+          "matched_fqn": "homeassistant.components.remote_rpi_gpio",
+          "justification": "Standing pin-baseline violation (see ha-bench-pin-baseline)."
+        }
+      ],
+      "grading_note": "Two violations expected. Discriminating counterpart to ha-bench-webscrape-selenium-module: identical ban, import scope moved into the function body. If a future change made IMPORTS extraction module-statement-only, this probe-style injected case would flip to a miss while its module-level sibling still fires, isolating the scope-regression."
+    },
+    {
+      "case_id": "ha-bench-webscrape-selenium-in-existing",
+      "type": "injected",
+      "description": "Selenium-based fallback appended to the committed rest component's sensor module: a modified-file violation inside an existing, otherwise-clean integration",
+      "diff": [
+        {
+          "path": "homeassistant/components/rest/sensor.py",
+          "status": "modified",
+          "append": "\n\ndef _scrape_fallback(resource):\n    \"\"\"Headless-browser fallback for endpoints without an API (new helper).\"\"\"\n    from selenium import webdriver\n\n    driver = webdriver.Chrome()\n    driver.get(resource)\n    body = driver.page_source\n    driver.quit()\n    return body\n"
+        }
+      ],
+      "expected_violations": [
+        {
+          "adr_id": "ADR-0004",
+          "predicate": "prohibits_dependency",
+          "subject": "homeassistant.components.*",
+          "object": "selenium",
+          "matched_fqn": "homeassistant.components.rest.sensor",
+          "justification": "ADR-0004's webscraping ban applied to an existing integration's module: the appended helper's function-local selenium import binds an IMPORTS edge on homeassistant.components.rest.sensor, firing the prohibits at that module. rest is the natural host (it is the generic REST/scraping integration scrape declares as after_dependency)."
+        },
+        {
+          "adr_id": "ADR-0019",
+          "predicate": "prohibits_dependency",
+          "subject": "homeassistant.components.*",
+          "object": "gpiozero",
+          "matched_fqn": "homeassistant.components.remote_rpi_gpio",
+          "justification": "Standing pin-baseline violation (see ha-bench-pin-baseline)."
+        }
+      ],
+      "grading_note": "Two violations expected. Exercises the modified-file path (old bytes + append) rather than an added file; the report lands on the existing module FQN, not a new one. Instance-disjoint from the other selenium cases by module."
+    },
+    {
+      "case_id": "ha-bench-gpio-new-integration",
+      "type": "injected",
+      "description": "New integration reads a sensor pin with gpiozero imported inside async_setup (added file; the HA-idiom shape of the ADR-0019 violation remote_rpi_gpio already embodies at the pin)",
+      "diff": [
+        {
+          "path": "homeassistant/components/gpio_status_reader/__init__.py",
+          "status": "added",
+          "append": "\"\"\"Support for reading a status pin as a binary sensor (new code).\"\"\"\nfrom __future__ import annotations\n\n\nasync def async_setup_entry(hass, entry, async_add_entities) -> None:\n    \"\"\"Set up pin reading directly on the local board (new code).\"\"\"\n    import gpiozero\n\n    reader = gpiozero.Button(entry.data[\"pin\"])\n    async_add_entities([_PinSensor(reader)], update_before_add=True)\n\n\nclass _PinSensor:\n    \"\"\"Entity wrapper around the gpiozero reader (new code).\"\"\"\n\n    def __init__(self, reader) -> None:\n        self._reader = reader\n"
+        }
+      ],
+      "expected_violations": [
+        {
+          "adr_id": "ADR-0019",
+          "predicate": "prohibits_dependency",
+          "subject": "homeassistant.components.*",
+          "object": "gpiozero",
+          "matched_fqn": "homeassistant.components.gpio_status_reader",
+          "justification": "ADR-0019 bans core integrations interfacing with GPIO pins; the added integration imports gpiozero inside async_setup_entry, and the function-local import still binds the module FQN, firing the prohibits at the added module (its _PinSensor class dedups beneath the module report)."
+        },
+        {
+          "adr_id": "ADR-0019",
+          "predicate": "prohibits_dependency",
+          "subject": "homeassistant.components.*",
+          "object": "gpiozero",
+          "matched_fqn": "homeassistant.components.remote_rpi_gpio",
+          "justification": "Standing pin-baseline violation (see ha-bench-pin-baseline)."
+        }
+      ],
+      "grading_note": "Two violations expected, both ADR-0019 (new + baseline), distinct matched_fqns so neither dedups the other. Mirrors remote_rpi_gpio's own shape at a different FQN, keeping instance-disjointness (only case binding gpio_status_reader)."
+    },
+    {
+      "case_id": "ha-bench-gpio-deep-import",
+      "type": "injected",
+      "description": "New helper module drives a remote Pi's pins via the deep import 'from gpiozero.pins.pigpio import PiGPIOFactory', replicating remote_rpi_gpio/__init__.py:4 exactly; tests that the exact object 'gpiozero' catches deep edge targets through the startswith(object + '.') reachability rule",
+      "diff": [
+        {
+          "path": "homeassistant/components/pi_pin_dashboard/__init__.py",
+          "status": "added",
+          "append": "\"\"\"Support for dashboarding pins on a remote Raspberry Pi (new code).\"\"\"\nfrom gpiozero.pins.pigpio import PiGPIOFactory\n\n\ndef _connect(host):\n    \"\"\"Open a pin factory against a remote pigpio daemon (new code).\"\"\"\n    return PiGPIOFactory(host=host)\n"
+        }
+      ],
+      "expected_violations": [
+        {
+          "adr_id": "ADR-0019",
+          "predicate": "prohibits_dependency",
+          "subject": "homeassistant.components.*",
+          "object": "gpiozero",
+          "matched_fqn": "homeassistant.components.pi_pin_dashboard",
+          "justification": "ADR-0019 bans GPIO integrations in core; the module's IMPORTS edge target is the literal deep dotted import gpiozero.pins.pigpio, and the exact object 'gpiozero' matches it via the target.startswith(object + '.') rule in the reachability check, so the prohibits fires without needing a wildcard object (which would orphan: no node exists strictly under gpiozero.*)."
+        },
+        {
+          "adr_id": "ADR-0019",
+          "predicate": "prohibits_dependency",
+          "subject": "homeassistant.components.*",
+          "object": "gpiozero",
+          "matched_fqn": "homeassistant.components.remote_rpi_gpio",
+          "justification": "Standing pin-baseline violation (see ha-bench-pin-baseline)."
+        }
+      ],
+      "grading_note": "Two violations expected. The deep-import arm is the regression guard for the exact-object prefix rule; a change to suffix-only object matching would flip this case to a miss while the shallow-import sibling cases still fire."
+    },
+    {
+      "case_id": "ha-bench-probe-http-client",
+      "type": "compliant_probe",
+      "description": "New integration fetches over HTTP with aiohttp, HA's sanctioned client library: an added integration with no banned-library dependency",
+      "diff": [
+        {
+          "path": "homeassistant/components/webhook_status/__init__.py",
+          "status": "added",
+          "append": "\"\"\"Support for polling a webhook status endpoint (new code).\"\"\"\nfrom __future__ import annotations\n\n\nasync def async_setup_entry(hass, entry) -> None:\n    \"\"\"Set up polling of the status endpoint (new code).\"\"\"\n    import aiohttp\n\n    session = aiohttp.ClientSession()\n    entry.runtime_data = await session.get(entry.data[\"status_url\"])\n"
+        }
+      ],
+      "expected_violations": [
+        {
+          "adr_id": "ADR-0019",
+          "predicate": "prohibits_dependency",
+          "subject": "homeassistant.components.*",
+          "object": "gpiozero",
+          "matched_fqn": "homeassistant.components.remote_rpi_gpio",
+          "justification": "Standing pin-baseline violation (see ha-bench-pin-baseline)."
+        }
+      ],
+      "grading_note": "No fire beyond the baseline: aiohttp is neither gold object (selenium, gpiozero), so the added module triggers nothing. Any ADR-0004 fire here means the selenium object resolution over-broadened; any additional ADR-0019 fire means subject-overreach. Discriminating counterpart to the selenium/gpiozero added-file cases: same shape, banned-library-free content."
+    },
+    {
+      "case_id": "ha-bench-probe-serial-exempt",
+      "type": "compliant_probe",
+      "description": "New integration reads a GPIO-attached sensor exposed as a regular serial device via pyserial, the class ADR-0019 explicitly exempts; documents that the exemption needs no negative-space encoding because exempted integrations use pyserial, not gpiozero",
+      "diff": [
+        {
+          "path": "homeassistant/components/serial_counter/__init__.py",
+          "status": "added",
+          "append": "\"\"\"Support for a GPIO-attached counter exposed as a serial device (new code).\"\"\"\nfrom __future__ import annotations\n\n\nasync def async_setup_entry(hass, entry) -> None:\n    \"\"\"Set up reading counts from the serial device (new code).\"\"\"\n    import serial\n\n    reader = serial.Serial(entry.data[\"port\"])\n    entry.runtime_data = reader.readline()\n"
+        }
+      ],
+      "expected_violations": [
+        {
+          "adr_id": "ADR-0019",
+          "predicate": "prohibits_dependency",
+          "subject": "homeassistant.components.*",
+          "object": "gpiozero",
+          "matched_fqn": "homeassistant.components.remote_rpi_gpio",
+          "justification": "Standing pin-baseline violation (see ha-bench-pin-baseline)."
+        }
+      ],
+      "grading_note": "No fire beyond the baseline: the serial exemption is encoded by object choice (gpiozero) rather than by a subject exclusion the pattern grammar cannot express. An ADR-0019 fire on serial_counter would mean the gpiozero object started matching pyserial imports (suffix/wildcard drift); this probe is the guard for exactly that."
+    },
+    {
+      "case_id": "ha-bench-probe-edit-remote-gpio",
+      "type": "compliant_probe",
+      "description": "Ordinary edit inside the violating integration itself (a docstring-adjacent helper appended to remote_rpi_gpio/switch.py, no new imports): the baseline violation must survive an unrelated modification unchanged, with no new fires",
+      "diff": [
+        {
+          "path": "homeassistant/components/remote_rpi_gpio/switch.py",
+          "status": "modified",
+          "append": "\n\ndef _describe(device):\n    \"\"\"Human-readable label for a switched device (new helper, no new imports).\"\"\"\n    return f\"remote pin {device.pin}\"\n"
+        }
+      ],
+      "expected_violations": [
+        {
+          "adr_id": "ADR-0019",
+          "predicate": "prohibits_dependency",
+          "subject": "homeassistant.components.*",
+          "object": "gpiozero",
+          "matched_fqn": "homeassistant.components.remote_rpi_gpio",
+          "justification": "Standing pin-baseline violation (see ha-bench-pin-baseline): the structural prohibits is diff-independent, and the appended helper adds no dependency, so the fire set is identical to the pin baseline."
+        }
+      ],
+      "grading_note": "Exactly the baseline violation, no more: probes stability-under-edit (structural fires do not duplicate when their subject module is touched; the appended helper's changed FQNs dedup under the module report). A second ADR-0019 fire at homeassistant.components.remote_rpi_gpio.switch would mean the parent-covers-child dedup regressed."
+    },
+    {
+      "case_id": "ha-bench-gpio-transitive-import",
+      "type": "injected",
+      "description": "Two-file case: a helper integration uses gpiozero, and a second integration depends on the helper via a module-level from-import ('from homeassistant.components import pin_tools'), so the second reaches gpiozero only through a 2-hop IMPORTS chain (transitive prohibits over IMPORTS, the counterpart of flowkit's transitive CALLS case)",
+      "diff": [
+        {
+          "path": "homeassistant/components/pin_tools/__init__.py",
+          "status": "added",
+          "append": "\"\"\"Shared pin-reading helpers for local boards (new code).\"\"\"\nfrom gpiozero import Button\n\n\ndef read_pin(number):\n    \"\"\"Read a GPIO pin number through gpiozero (new code).\"\"\"\n    return Button(number).value\n"
+        },
+        {
+          "path": "homeassistant/components/door_status/__init__.py",
+          "status": "added",
+          "append": "\"\"\"Support for reporting a door pin state (new code).\"\"\"\nfrom homeassistant.components import pin_tools\n\n\ndef _door_state(pin_number):\n    \"\"\"Read the door state through the shared helper (new code).\"\"\"\n    return \"open\" if pin_tools.read_pin(pin_number) else \"closed\"\n"
+        }
+      ],
+      "expected_violations": [
+        {
+          "adr_id": "ADR-0019",
+          "predicate": "prohibits_dependency",
+          "subject": "homeassistant.components.*",
+          "object": "gpiozero",
+          "matched_fqn": "homeassistant.components.pin_tools",
+          "justification": "Direct arm: the added helper module imports gpiozero at module level, firing the prohibits at its module FQN."
+        },
+        {
+          "adr_id": "ADR-0019",
+          "predicate": "prohibits_dependency",
+          "subject": "homeassistant.components.*",
+          "object": "gpiozero",
+          "matched_fqn": "homeassistant.components.door_status",
+          "justification": "Transitive arm: door_status has no gpiozero import of its own, but its from-import binds an IMPORTS edge to the pin_tools module node, and BFS over {CONTAINS, IMPORTS, CALLS, INHERITS} continues from pin_tools to gpiozero, so door_status has a dependency path to a banned object. The path's first edge is IMPORTS (not CONTAINS), so the report stays at door_status's own module scope rather than relocating to the decisive-edge owner."
+        },
+        {
+          "adr_id": "ADR-0019",
+          "predicate": "prohibits_dependency",
+          "subject": "homeassistant.components.*",
+          "object": "gpiozero",
+          "matched_fqn": "homeassistant.components.remote_rpi_gpio",
+          "justification": "Standing pin-baseline violation (see ha-bench-pin-baseline)."
+        }
+      ],
+      "grading_note": "Three violations expected; neither new fire dedups against the other (sibling modules, no prefix relation) or against the baseline. The import FORM is load-bearing: 'from homeassistant.components import pin_tools' targets the module node (BFS continues through it), whereas importing a function ('from ...pin_tools import read_pin') would dead-end at the function node, which has no path back up to its module's IMPORTS edge; that contrast is the documented reason this case uses the module form. A miss on the door_status arm means transitive IMPORTS reachability or from-import module-target resolution regressed."
+    },
+    {
+      "case_id": "ha-bench-webscrape-selenium-alias",
+      "type": "injected",
+      "description": "Aliased import 'import selenium as browser_driver' in a new integration: the IMPORTS edge must record the real name (selenium), not the local alias",
+      "diff": [
+        {
+          "path": "homeassistant/components/vendor_portal/__init__.py",
+          "status": "added",
+          "append": "\"\"\"Support for screen-scraping a vendor portal (new code).\"\"\"\nimport selenium as browser_driver\n\n\ndef _login_and_read(url, credentials):\n    \"\"\"Drive the portal through the aliased browser module (new code).\"\"\"\n    driver = browser_driver.Chrome()\n    driver.get(url)\n    body = driver.page_source\n    driver.quit()\n    return body\n"
+        }
+      ],
+      "expected_violations": [
+        {
+          "adr_id": "ADR-0004",
+          "predicate": "prohibits_dependency",
+          "subject": "homeassistant.components.*",
+          "object": "selenium",
+          "matched_fqn": "homeassistant.components.vendor_portal",
+          "justification": "ADR-0004's webscraping ban; walk_imports resolves aliased_import nodes via child_by_field_name('name') (the real module name), so the IMPORTS edge target is selenium regardless of the local binding, and the prohibits fires at the module."
+        },
+        {
+          "adr_id": "ADR-0019",
+          "predicate": "prohibits_dependency",
+          "subject": "homeassistant.components.*",
+          "object": "gpiozero",
+          "matched_fqn": "homeassistant.components.remote_rpi_gpio",
+          "justification": "Standing pin-baseline violation (see ha-bench-pin-baseline)."
+        }
+      ],
+      "grading_note": "Two violations expected. The alias arm guards the aliased_import resolution path: an edge recorded against 'browser_driver' (the alias) would orphan the object match and flip this to a miss."
+    },
+    {
+      "case_id": "ha-bench-gpio-removal",
+      "type": "injected",
+      "description": "The ADR-0019-mandated remediation executed: delete all three remote_rpi_gpio module files, taking the tree to the compliant end state (the only case whose expectation is zero)",
+      "diff": [
+        {
+          "path": "homeassistant/components/remote_rpi_gpio/__init__.py",
+          "status": "deleted",
+          "append": ""
+        },
+        {
+          "path": "homeassistant/components/remote_rpi_gpio/binary_sensor.py",
+          "status": "deleted",
+          "append": ""
+        },
+        {
+          "path": "homeassistant/components/remote_rpi_gpio/switch.py",
+          "status": "deleted",
+          "append": ""
+        }
+      ],
+      "expected_violations": [],
+      "grading_note": "Zero violations expected: removing every gpiozero-importing module removes every subject with a dependency path to the object (structural prohibits is evidence-driven; there is no residual state). This is the strongest subject-overreach guard in the set, stronger than the pin baseline alone: any fire at all after the deletion means a constraint is matching something it should not (object suffix drift, transitive path from an unrelated module, or a leftover node from the deleted files). RUN SHAPE: the deletion must be applied to the parsed tree itself (stage a copy of the pin tree minus the three files, then run detect with an empty diff) — augment_adg only ADDS nodes for added/modified files and cannot remove deleted files' nodes, so a diff-driven run on the pin tree would carry stale remote_rpi_gpio nodes and keep firing. This mirrors the real pipeline, where the ADG is re-parsed from the post-change tree; the diff entries above document the remediation shape for that run."
+    },
+    {
+      "case_id": "ha-bench-gpio-wildcard-limitation",
+      "type": "known_limitation",
+      "description": "Wildcard import 'from gpiozero import *' in a new integration: an ADR-violating shape the engine structurally cannot see (wildcard_import handling requires the target to be a known repo FQN; external packages never are), recorded as a documented gap, not a compliance claim",
+      "diff": [
+        {
+          "path": "homeassistant/components/pin_wildcard/__init__.py",
+          "status": "added",
+          "append": "\"\"\"Support for wildcard-driven pin access (new code, ADR-violating shape).\"\"\"\nfrom gpiozero import *  # noqa: F403\n\n\ndef _read(number):\n    \"\"\"Read a pin through wildcard-imported names (new code).\"\"\"\n    return Button(number).value\n"
+        }
+      ],
+      "expected_violations": [
+        {
+          "adr_id": "ADR-0019",
+          "predicate": "prohibits_dependency",
+          "subject": "homeassistant.components.*",
+          "object": "gpiozero",
+          "matched_fqn": "homeassistant.components.remote_rpi_gpio",
+          "justification": "Standing pin-baseline violation only (see ha-bench-pin-baseline). The wildcard-importing module itself does NOT fire: walk_imports emits no IMPORTS edge for a wildcard import whose target is absent from known_fqns, and external packages are never in known_fqns."
+        }
+      ],
+      "grading_note": "Expected outcome is the baseline fire and NO fire on pin_wildcard, even though the ADR is violated in spirit. This case type records engine limitations for the benchmark report: if wildcard-import handling for external targets lands later (for example by recording the module target unconditionally, as plain import_statement already does for dotted names), this expectation flips to a pin_wildcard fire and the case must be re-authored as type injected with two expected violations."
+    },
+    {
+      "case_id": "ha-bench-gpio-dynamic-import-limitation",
+      "type": "known_limitation",
+      "description": "Dynamic import via importlib.import_module('gpiozero') in a new integration: the dependency exists only as a runtime string, invisible to static IMPORTS extraction; recorded as a documented gap",
+      "diff": [
+        {
+          "path": "homeassistant/components/pin_dynamic/__init__.py",
+          "status": "added",
+          "append": "\"\"\"Support for dynamically loaded pin backends (new code, ADR-violating shape).\"\"\"\nfrom importlib import import_module\n\n\ndef _load_backend():\n    \"\"\"Load the gpiozero backend at runtime (new code).\"\"\"\n    return import_module(\"gpiozero\")\n"
+        }
+      ],
+      "expected_violations": [
+        {
+          "adr_id": "ADR-0019",
+          "predicate": "prohibits_dependency",
+          "subject": "homeassistant.components.*",
+          "object": "gpiozero",
+          "matched_fqn": "homeassistant.components.remote_rpi_gpio",
+          "justification": "Standing pin-baseline violation only (see ha-bench-pin-baseline). The dynamically-importing module does NOT fire: 'gpiozero' appears only as a string argument to import_module, never in an import statement, so no IMPORTS edge exists. The from-import of importlib itself binds homeassistant-external importlib, unrelated to either gold object."
+        }
+      ],
+      "grading_note": "Expected outcome is the baseline fire and NO fire on pin_dynamic. Documents the static-analysis boundary the benchmark reports as a recall ceiling for dynamic-dependency ADRs (also the mechanism real HA core uses to load integrations themselves, which is why component-to-component edges only exist where explicit imports appear). If string-argument import detection ever lands, re-author as type injected with two expected violations."
+    }
+  ]
+}

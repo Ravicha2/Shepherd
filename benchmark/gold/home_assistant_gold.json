@@ -1,0 +1,148 @@
+[
+  {
+    "adr_id": "ADR-0001",
+    "adr_path": "adr/0001-record-architecture-decisions.md",
+    "constraints": [],
+    "note": "Meta-ADR: adopting ADR recording governs documentation process, not code structure. adr_path is relative to the home-assistant-architecture repo (ADRs live in a separate repository from the code; pins for both are recorded in home_assistant_instances.json). Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0002",
+    "adr_path": "adr/0002-minimum-supported-python-version.md",
+    "constraints": [],
+    "note": "Interpreter-floor policy ('support the latest two released minor upstream Python versions'), superseded by ADR-0020 (natural supersession pair #2 of the benchmark set, after experimenter ADR-0002/0008; counted once under supersession). Not import-encodable: same family as structurizr ADR-0003 (no interpreter version named as rejected in the Decision), and the python-tuf census already recommended never-fire EOL-python prohibitions not be carried into benchmark gold. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0003",
+    "adr_path": "adr/0003-monitor-condition-and-data-selectors.md",
+    "constraints": [],
+    "note": "Process policy about monitor condition and data selector YAML options ('We don't merge PRs that add data selectors'): a PR-acceptance rule, not a dependency or implementation edge between FQNs. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0004",
+    "adr_path": "adr/0004-webscraping.md",
+    "constraints": [
+      {
+        "subject": "homeassistant.components.*",
+        "predicate": "prohibits_dependency",
+        "object": "selenium",
+        "justification": "ADR-0004: 'We no longer accept any new integration that relies on webscraping', with the Context naming 'PhantomJS or other headless browsers' as webscraping mechanisms; selenium (browser automation for scraping) is reliance on webscraping inside a core integration, and neither exception clause (generic HTML-parsing integrations; extracting fields from forms during authentication) covers browser automation"
+      }
+    ],
+    "note": "Constraint evidence (webscraping ban, headless-browser arm): ADR-0004 Proposal line 1 bans webscraping-reliant integrations; Context bullet 3 names headless browsers as a webscraping mechanism; at the pin zero selenium imports exist anywhere under homeassistant/ (grep 'from selenium|import selenium' empty), so the constraint baseline is clean. Object is the bare top-level import target 'selenium' (IMPORTS edge targets record the literal dotted import); exact object 'gpiozero'-style prefix rule also catches deep targets like selenium.webdriver via the startswith(object + '.') reachability check. Deliberately NOT encoded: (a) 'homeassistant.components.* prohibits bs4' — the Exceptions section carves out generic HTML-parsing integrations, and scrape IS that sanctioned generic integration (homeassistant/components/scrape/coordinator.py:7 'from bs4 import BeautifulSoup', manifest requirements beautifulsoup4==4.13.3), so a bs4 prohibition false-positives on the ADR's own exception at baseline; the pattern grammar (exact or prefix.* only, no negation) cannot express 'all components except scrape', so the bs4 arm is dropped rather than encoded dirty. (b) The auth-phase exception ('An integration is allowed to extract fields from forms') is narrower than selenium automation; any auth-phase selenium usage surfacing later is a dismissal-review case, not a gold change. Custom integrations are outside the subject (they do not live under homeassistant.components).*"
+  },
+  {
+    "adr_id": "ADR-0005",
+    "adr_path": "adr/0005-code-formatting.md",
+    "constraints": [],
+    "note": "Tooling ADR: Black formatting is a style choice; linter edges are TOOLING-scope, not dependency/implementation edges between FQNs. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0006",
+    "adr_path": "adr/0006-docker-images.md",
+    "constraints": [],
+    "note": "Packaging/deployment ADR about official Docker images; infrastructure, not code structure. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0007",
+    "adr_path": "adr/0007-integration-config-yaml-structure.md",
+    "constraints": [],
+    "note": "Config-file placement policy: 'all YAML configuration, if present, for an integration to be located under the integration domain key'. Governs configuration YAML structure (where config keys live), not import/inheritance/call edges between FQNs; the checkable residue (platform keys in YAML files) is config data, not Python topology. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0008",
+    "adr_path": "adr/0008-code-owners.md",
+    "constraints": [],
+    "note": "Governance ADR about CODEOWNERS conventions. Not a code relation. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0009",
+    "adr_path": "adr/0009-translations-2.0.md",
+    "constraints": [],
+    "note": "i18n process ADR (translation platform, strings workflow). Process, not code structure; translation-file layout is not a dependency edge between FQNs. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0010",
+    "adr_path": "adr/0010-integration-configuration.md",
+    "constraints": [],
+    "note": "Config-UX architecture for how integrations are configured (YAML import via config flow, config entries). The checkable residue (config_flow flags in manifests) is manifest data, not Python FQN edges; same classification as eq-questionnaire-runner's UI/domain ADRs. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0011",
+    "adr_path": "adr/0011-discovery-requires-unique-id.md",
+    "constraints": [],
+    "note": "Deliberately NOT encoded: 'Integrations that are discoverable must provide a unique id (via async_set_unique_id)'. The mandate applies only to discoverable integrations' discovery steps — an inexpressible subject restriction (pattern grammar has no way to select 'integrations whose config_flow does discovery'); encoding 'homeassistant.components.*.config_flow requires async_set_unique_id' would fire on every changed FQN in every config_flow module that does not call async_set_unique_id in that change, manufacturing a mandate the ADR scopes to discovery flows (the openlobby class-A over-trigger failure mode at benchmark scale: ~2000 config_flow modules). Call-shaped and exception-heavy per the census preview; revisit only if a call-predicate with subject restriction lands in the ontology (docs/adr/004). Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0012",
+    "adr_path": "adr/0012-define-supported-installation-method.md",
+    "constraints": [],
+    "note": "Support-policy definition (which installation methods are supported). Documentation stance, not code structure. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0013",
+    "adr_path": "adr/0013-home-assistant-container.md",
+    "constraints": [],
+    "note": "Installation-method definition (Container). Not a code relation. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0014",
+    "adr_path": "adr/0014-home-assistant-supervised.md",
+    "constraints": [],
+    "note": "Installation-method definition (Supervised). Not a code relation. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0015",
+    "adr_path": "adr/0015-home-assistant-os.md",
+    "constraints": [],
+    "note": "Installation-method definition (OS). Not a code relation. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0016",
+    "adr_path": "adr/0016-home-assistant-core.md",
+    "constraints": [],
+    "note": "Installation-method definition (Core). Not a code relation. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0017",
+    "adr_path": "adr/0017-hardware-screening-os.md",
+    "constraints": [],
+    "note": "Hardware-policy ADR for OS hardware screening. Support policy, not code structure. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0018",
+    "adr_path": "adr/0018-supported-databases.md",
+    "constraints": [],
+    "note": "Runtime version policy: 'Limit DB support to MariaDB >= 10.3, MySQL >= 8.0, PostgreSQL >= 12, SQLite >= 3.40.1'. Enforced by dialect/version gates in homeassistant/components/recorder/util.py (string-level dialect instance checks), not import topology; a version floor has no FQN-edge encoding, and a prohibits on other DB client libraries (pymysql etc.) would be a never-fire constraint of the python-tuf EOL-python family the census recommended against carrying. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0019",
+    "adr_path": "adr/0019-GPIO.md",
+    "constraints": [
+      {
+        "subject": "homeassistant.components.*",
+        "predicate": "prohibits_dependency",
+        "object": "gpiozero",
+        "justification": "ADR-0019: 'We no longer accept integrations that integrate with devices over GPIO' and 'We identify, deprecate and remove integrations that use GPIO'; gpiozero is the GPIO access library, so a core integration importing it is a GPIO integration pending removal, and only custom integrations (outside homeassistant.components) may keep using GPIO"
+      }
+    ],
+    "note": "Constraint evidence (GPIO ban, gpiozero arm): ADR-0019 Decision bullets 1-3; at the pin the only gpiozero consumer in the tree is the legacy remote_rpi_gpio integration — module-level 'from gpiozero import LED, DigitalInputDevice' (homeassistant/components/remote_rpi_gpio/__init__.py:3), 'from gpiozero.pins.pigpio import PiGPIOFactory' (homeassistant/components/remote_rpi_gpio/__init__.py:4), 'from gpiozero import DigitalInputDevice' (binary_sensor.py:5), 'from gpiozero import LED' (switch.py:5); manifest quality_scale 'legacy', requirements gpiozero==1.6.2 + pigpio==1.78, codeowners empty — exactly the deprecate-and-remove state the ADR mandates, so the constraint has a GENUINE live violation at the pin (module-level dedup collapses the three files into one report at the package module homeassistant.components.remote_rpi_gpio). Object is the exact bare 'gpiozero' import target: the reachability check's startswith(object + '.') rule also catches the deep edge target gpiozero.pins.pigpio, so no gpiozero.* wildcard is needed (a wildcard object pattern would orphan: the object NODE bucket would need a node strictly under gpiozero.*, which merge_constraint_edges does not create). Scope notes: no RPi.GPIO-proper, spidev, or smbus2 imports exist at the pin (greps empty), so those arms are not encoded (never-fire family); the serial-device exemption needs no encoding because exempted integrations use pyserial, not gpiozero. Reading addressed: the Definition sentence qualifies GPIO as pins 'on the board running Home Assistant' while remote_rpi_gpio drives a remote Pi's pins via the pigpio daemon — under the Decision's unqualified removal mandate ('integrations that use GPIO') and the exemption list (only serial-exposed devices), remote_rpi_gpio remains a violation; flagged for the delayed blind self-review."
+  },
+  {
+    "adr_id": "ADR-0020",
+    "adr_path": "adr/0020-minimum-supported-python-version.md",
+    "constraints": [],
+    "note": "Interpreter-floor policy ('supports a single minor version of Python at a time'), superseding ADR-0002 (the pair counts once as natural conflict #2). Same non-encodable family as ADR-0002: no interpreter version is named as rejected, and version floors live in the version-check code, not in dependency edges. Only one of the supersession pair could ever be active; neither encodes. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0021",
+    "adr_path": "adr/0021-YAML-integration-configuration-deprecation-policy.md",
+    "constraints": [],
+    "note": "Deprecation-period process for YAML integration configuration (how long old config shapes stay supported). Process policy, not code structure. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0022",
+    "adr_path": "adr/0022-integration-quality-scale.md",
+    "constraints": [],
+    "note": "Grading framework (the quality scale itself: internal/gold/platinum). A rubric, not a code relation; quality_scale values in manifests are metadata, not FQN edges. Emit no edges."
+  }
+]

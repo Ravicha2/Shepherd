@@ -336,6 +336,7 @@ code location) where the pin demonstrably violates.
 | flowkit | 12 | 4 | 6 | 0 | 6 |
 | experimenter | 16 | 3 | 4 | 0 (+1 historical at `a2de3aeb`) | 4 |
 | eq-questionnaire-runner | 10 | 1 (weak) | 0–1 (0 recommended) | 1 mild, non-encodable | 0–1 |
+| home-assistant (held-out; gold authored 2026-09-14, §7, PARKED on engine fix) | 22 | 2 | 2 (void-until-fix) | **1 (genuine: ADR-0019 legacy `remote_rpi_gpio`)** | 0 scorable today (see §7 blocker) |
 | **Grand total (active 1–4)** | 48 | 11 | **14–15** | **0 at HEAD** (1–2 historical/weak) | **14–15** |
 
 **Against the target (50+ violation instances, ~100 scoring units): SHORT.**
@@ -360,8 +361,8 @@ Gap analysis:
      instance-disjoint violation snapshot.
   3. **Add repos**: a fifth/sixth repo with dense checkable constraints would
      add 5–15 units each (see §3 for candidate names from the ADR-Study-Dataset).
-  4. **home-assistant** (held-out) has 2–3 checkable ADRs (§7) worth ~4–6 units
-     if it is ever promoted to gold authoring.
+  4. **home-assistant** (held-out) — **authored 2026-09-14** (§7 full census):
+     2 constraints, 14 cases / 21 units, one genuine live violation at pin.
 
 ---
 
@@ -453,14 +454,17 @@ Pairs of ADRs within the same repo whose encodable constraints contradict:
 | python-tuf | ADR-0003 (subdirectory development plan: "flesh out tuf/api/*, implement tuf/repository/*") vs ADR-0010 (minimal repository abstraction, "does not implement all repository actions itself") | Both constrain `tuf.repository.*`'s relationship to the metadata/application code, but neither yields contradicting *predicates* in the four-predicate grammar (one is a plan, the other a dependency direction). Not a constraint clash. |
 | flowkit | ADR-0003 (HTTP API single access point: `flowapi prohibits flowmachine`) vs ADR-0005 (zmq API-backend communication) | Not a contradiction: zmq is the sanctioned channel; the prohibition targets direct imports. No clash. |
 | experimenter | ADR-0002 (GQL for Nimbus UI) vs ADR-0008 (HTMX for new pages) | **Near-conflict**: ADR-0002 mandates GraphQL/apollo for the Nimbus front-end; ADR-0008 moves new pages to HTMX and deprecates the GraphQL path ("eventually moving to HTMX"). In constraint form: ADR-0002 requires `nimbus_ui.*` → graphql stack; ADR-0008 prohibits `nimbus_ui.*` (new pages) → graphene. These genuinely clash on `experimenter.nimbus_ui.*` → graphene/graphql — a textbook supersession pair (0008 later-in-time supersedes 0002's GraphQL mandate for pages). |
+| home-assistant | ADR-0002 (support latest two Python minors) vs ADR-0020 (single Python minor) | **Supersession pair** (0020 explicitly replaces 0002): both are interpreter-floor policies that cannot both be active. Neither encodes in the four-predicate grammar (interpreter versions are not FQN edges), so this is a counted supersession, not an encodable clash. (Added 2026-09-14 with the §7 full census; the preview-era count of 1 scanned only the four active repos' 58 ADRs.) |
 
-**Count: 1 genuine natural conflict pair** (experimenter ADR-0002 vs ADR-0008),
-plus 2 structural near-pairs that do not encode as contradicting constraints.
+**Count: 2 genuine natural supersession/conflict pairs** (experimenter
+ADR-0002 vs ADR-0008; home-assistant ADR-0002 vs ADR-0020), plus 2 structural
+near-pairs that do not encode as contradicting constraints.
 
-**Decision rule triggered: fewer than ~10 natural conflicts total ⇒ synthetic
-conflict-ADR injection will be needed later (per issue #74).** The experimenter
-pair is the only organic supersession pair found across all 58 ADRs scanned; the
-benchmark's conflict-detection cases will be synthetic.
+**Decision rule outcome:** fewer than ~10 natural conflicts ⇒ per #74 synthetic
+injection would trigger; the recorded decision (2026-09-14, substrate commit
+a733cc4) is to DROP synthetic conflict injection and run with the natural
+count. The home-assistant pair was found after that decision and does not
+change it.
 
 ---
 
@@ -472,7 +476,7 @@ benchmark's conflict-detection cases will be synthetic.
 | flowkit | `24d88247d57987fe33f6b8915540d7bf09b58033` | 2026-05-28 | violations found: none at pin (compliant); injected-diff cases recommended |
 | mozilla-experimenter | `d61a2b8efcb7fd77a849c9f9dc163130473b7f16` | 2026-08-31 | violations found: none at pin (compliant); historical violation pin `a2de3aeb` (2023-06-09) identified |
 | eq-questionnaire-runner | `da90adfdc4390c0fd1d33dbc896adc38d6ca2022` | 2026-08-26 | violations found: 1 mild non-encodable (ADR-0010 cookie remnants); verdict SWAP |
-| home-assistant (held-out, report-only) | `e4b01b65d306cf4ffcd692b9eb7c7d2ce4f794e4` | 2026-09-01 | code repo; ADRs in separate repo `home-assistant-architecture` @ `0c4f7dbf21c9e1279bea23a1eb2f9ab295d0e9e9`; no deep violation scan (report-only) |
+| home-assistant (held-out, report-only) | `e4b01b65d306cf4ffcd692b9eb7c7d2ce4f794e4` | 2026-09-01 | code repo; ADRs in separate repo `home-assistant-architecture` @ `0c4f7dbf21c9e1279bea23a1eb2f9ab295d0e9e9`; **gold authored 2026-09-14 (§7 full census) but PARKED: 2 constraints unencodable under current engine semantics (namespace-import CONTAINS-descent artifact, engine issue filed); 1 genuine live violation at pin** (ADR-0019, legacy `remote_rpi_gpio` importing gpiozero); full-graph detect also deferred (>60 min CPU hazard) |
 
 ---
 
@@ -524,6 +528,14 @@ plus zero-expectation probes in `tuf/api/serialization/*`, `tuf/repository/_repo
 
 ## 7. home-assistant held-out preview (report-only)
 
+> **2026-09-14 UPDATE: GOLD AUTHORED.** The full census walk (all 22 ADRs against
+> the code at the pin) is recorded below the preview table; gold lives in
+> `home_assistant_gold.json` / `home_assistant_instances.json`. Strict #120-grammar
+> triage collapses the preview's 5–7 candidate estimate to **2 encodable
+> constraints** (same estimate→strict collapse as structurizr's 3–4→2). The
+> preview table below is kept as the classification record; the constraint
+> decisions supersede its candidate counts.
+
 Code @ `e4b01b65d306cf4ffcd692b9eb7c7d2ce4f794e4` (2026-09-01); ADRs @
 `home-assistant-architecture` `0c4f7dbf21c9e1279bea23a1eb2f9ab295d0e9e9`, `adr/`
 (0001–0022). **Classification + candidate constraint counts only — no deep
@@ -561,6 +573,103 @@ integration using gpiozero/pigpio against the prohibition). Good candidate for a
 future report-only pipeline run; the ADR-0004/0019 exception clauses make
 constraint authoring FP-prone and would need careful negative-space encoding.
 
+### home-assistant full census (2026-09-14)
+
+All 22 ADRs walked against the code at the pin (preview classifications
+re-checked; ADR-0007 and 0011 read in full for the first time). **2 encodable
+constraints, 1 genuine live violation at the pin** — the first benchmark repo
+whose pin baseline is non-zero:
+
+| ADR | verdict |
+|-----|---------|
+| 0001 record-decisions, 0003 monitor-condition, 0005 black, 0006 docker, 0008 code-owners, 0009 translations, 0010 integration-configuration, 0012–0017 installation methods, 0021 yaml-deprecation, 0022 quality scale | zero-constraint (meta / process / tooling / governance / config-UX / support policy) |
+| 0002 + 0020 minimum-supported-python (supersession pair) | zero-constraint. Interpreter floor, no version named as rejected in either Decision (structurizr ADR-0003 family); counted as natural conflict #2 (§4) |
+| 0004 webscraping | **1 constraint: `homeassistant.components.*` prohibits_dependency `selenium`** (webscraping ban, headless-browser arm; Context names "PhantomJS or other headless browsers"; zero selenium imports at pin ⇒ clean baseline). NOT encoded: the bs4 arm — the Exceptions section sanctions the generic HTML-parsing integration, and scrape IS it (`scrape/coordinator.py:7` module-level `from bs4 import BeautifulSoup`, manifest `beautifulsoup4==4.13.3`); the pattern grammar (exact or `prefix.*`, no negation, `fqn_matches_pattern`) cannot express "all components except scrape", so a bs4 prohibition would fire on the ADR's own exception at baseline. Object-choice encodes the auth-phase exception residual as dismissal-review territory |
+| 0011 discovery-requires-unique-id | zero-constraint, deliberately. The mandate is call-based (`async_set_unique_id`) and scoped to *discoverable* integrations' discovery steps — an inexpressible subject restriction; a blanket `config_flow requires async_set_unique_id` would fire on ~2000 config_flow modules (manufactured mandate, openlobby class-A failure mode at benchmark scale) |
+| 0018 supported-databases | zero-constraint. Runtime dialect/version gates in `recorder/util.py` (string-level), not import topology; prohibits on other DB client libs = never-fire family (python-tuf EOL-python precedent) |
+| 0019 GPIO | **1 constraint: `homeassistant.components.*` prohibits_dependency `gpiozero`** — with a **genuine live violation at pin**: legacy `remote_rpi_gpio` (module-level gpiozero + `gpiozero.pins.pigpio` imports across `__init__.py:3-4`, `binary_sensor.py:5`, `switch.py:5`; manifest `quality_scale: legacy`, requirements `gpiozero==1.6.2`+`pigpio==1.78`, codeowners empty — exactly the ADR's deprecate-and-remove state). Module-level dedup collapses the three files to ONE baseline report at `homeassistant.components.remote_rpi_gpio`. NOT encoded: RPi.GPIO/spidev/smbus2 arms (zero imports at pin, never-fire family); the serial-device exemption needs no negative-space encoding because exempted integrations use pyserial, not gpiozero. Reading addressed in the gold note: remote_rpi_gpio drives a *remote* Pi's pins (pigpio daemon) while the Definition sentence says "on the board running Home Assistant" — under the Decision's unqualified removal mandate ("integrations that use GPIO") and the exemption list (serial-exposed only) it stays a violation; flagged for the delayed blind self-review |
+
+**Repo-wide evidence at pin** (greps over `homeassistant/`): selenium = 0 hits;
+gpiozero = only remote_rpi_gpio; RPi.GPIO-proper / spidev / smbus = 0 hits; no
+component outside remote_rpi_gpio references it (no transitive fires from other
+subjects); bs4 = only scrape/coordinator.py:7 (the sanctioned exception).
+
+**Engine mechanics this repo depends on** (verified against source before
+authoring; see also the BLOCKER bullet):
+
+- `walk_imports` attaches IMPORTS edges to the **module FQN regardless of
+  statement scope** — HA's function-local import idiom (`import gpiozero` inside
+  `async_setup_entry`) records exactly like a module-level import. This is what
+  makes ADR-0004/0019 encodable at all.
+- `merge_constraint_edges` adds the EXTERNAL object node; the exact object
+  `gpiozero` catches deep edge targets (`gpiozero.pins.pigpio`) via the
+  reachability rule `target.startswith(object + ".")` — a `gpiozero.*` wildcard
+  object would ORPHAN (object node bucket needs a node strictly under the
+  pattern; none exists).
+- `resolve()` dedups by matched_fqn with **parent-module-covers-child**: the
+  three remote_rpi_gpio files + all ancestor CONTAINS-descents (issue 126
+  reports package subjects at the decisive-edge owner) collapse to one
+  violation.
+- **BLOCKER (discovered empirically 2026-09-14, pruned verification run):
+  namespace-import CONTAINS-descent artifact.** An IMPORTS edge that resolves
+  to a package node (`from homeassistant.components import X`, 534 modules in
+  the real tree; also fallbacks onto `homeassistant` itself) lets the prohibits
+  BFS traverse CONTAINS from the package into its whole subtree, so
+  `homeassistant.components.* prohibits gpiozero` fires at every namespace
+  importer (observed: `alpha_vantage.sensor -> IMPORTS homeassistant.components
+  -> CONTAINS remote_rpi_gpio -> IMPORTS gpiozero`; `scrape.config_flow ->
+  IMPORTS homeassistant -> CONTAINS homeassistant.components -> CONTAINS
+  remote_rpi_gpio -> IMPORTS gpiozero`; `scrape.sensor` chains through the
+  scrape package into the same bomb). Pin baseline on a 5-component staged
+  tree = 4 fires (1 genuine); estimated hundreds on the real tree; any added
+  selenium module detonates the same cascade for ADR-0004. Both HA constraints
+  are therefore UNENCODABLE under current semantics. Proposed fix (engine
+  issue filed 2026-09-14): allow CONTAINS traversal only during pure descent
+  from the start/seed, never after a dependency edge — this preserves
+  package-level requires (start-descent then IMPORTS) and module→module
+  transitive paths while killing the cascade. HA gold is PARKED pending that
+  fix; do not score.
+- Known engine gaps recorded as `known_limitation` cases: wildcard
+  `from gpiozero import *` records no edge for external targets;
+  `importlib.import_module("gpiozero")` is invisible to static extraction (also
+  the mechanism HA core itself uses to load integrations — the static recall
+  ceiling for this ADR family).
+
+**Cases (14):** pin-baseline (the live violation, empty diff) · selenium
+module-level / function-local / appended-to-existing (rest/sensor.py) · gpiozero
+new-integration / deep-import (`gpiozero.pins.pigpio`, replicating
+`remote_rpi_gpio/__init__.py:4`) · transitive IMPORTS 2-hop (door_status →
+pin_tools → gpiozero; flowkit's transitive case was CALLS-based) · aliased
+import (`import selenium as browser_driver`) · **removal** (delete all three
+remote_rpi_gpio files ⇒ expectation zero — the ADR-mandated remediation, and the
+strongest subject-overreach guard in the benchmark set) · probes: aiohttp
+(sanctioned client), pyserial (the ADR-0019 serial exemption encoded by object
+choice), edit-inside-violating-module (stability under unrelated modification)
+· 2 known_limitation cases (wildcard, dynamic import). Every case's
+expectations include the standing baseline fire — probes are "no fire beyond
+baseline", not "zero".
+
+**Verification status: RUN 2026-09-14, BLOCKED ON ENGINE (gold PARKED).** The
+pruned staged-tree run (remote_rpi_gpio, scrape, rest, alpha_vantage, acomax,
+mirroring run_case) returned 13/14 FAIL — every failure traced to the
+namespace-import CONTAINS-descent artifact above, not to authoring. Only
+ha-bench-gpio-removal passes (deleting remote_rpi_gpio removes every path to
+the object). The two gold constraints and all 14 case expectations encode the
+INTENDED post-fix semantics and are void-until-fix; HA contributes **0 scorable
+units today** (the 4-repo effective population stays 35 cases / 27 units).
+Historical pin `6e172854` (2019-05-26, adds remote_rpi_gpio) recorded as era
+context only — pre-dates ADR-0019 (2021-12-20), so pre-ADR gpiozero usage is
+anachronism, not violation. The full-graph 88k-node detect additionally
+remains the deferred >60-min hazard (independent perf issue).
+
+**Population if/when the engine fix lands: 49 cases / 48 expected-violation
+scoring units** (was 35 / 27; HA would add 14 cases / 21 units, of which 9
+units are the standing baseline violation re-appearing per case — an
+honest-accounting note for the #148 scorer). #106 target 50+ / ~100: shortfall
+persists; levers unchanged (more injected diffs per unit, more historical pins,
+plus the per-repo edge-case families proposed on #138: import-form variants,
+deletions/remediations, alias/wildcard/dynamic-import behaviors).
+
 ---
 
 ## Appendix: evidence-search commands used (for the annotator)
@@ -590,4 +699,13 @@ grep -n "load_data_from_gcs" experimenter/experimenter/jetstream/client.py
 grep -rn "sdc.crypto|decrypter|JWEHelper" app/ --include="*.py"
 grep -rn "cookie_session\[" app/ --include="*.py"
 grep -rn "async_set_unique_id" homeassistant/components/*/config_flow.py   # (home-assistant)
+
+# home-assistant (2026-09-14 full census)
+grep -rn "from bs4 import\|import bs4" homeassistant/ --include="*.py"    # exactly one hit: scrape/coordinator.py:7 (the sanctioned exception)
+grep -rln "from selenium\|import selenium" homeassistant/ --include="*.py" # empty
+grep -rn "import gpiozero\|from gpiozero" homeassistant/ --include="*.py"  # only remote_rpi_gpio (__init__:3-4, binary_sensor:5, switch:5)
+grep -rn "from RPi import\|import RPi" homeassistant/ --include="*.py"     # empty
+grep -rln "import spidev\|import smbus\|from smbus2" homeassistant/ --include="*.py"  # empty
+grep -rln "remote_rpi_gpio" homeassistant/ --include="*.py" | grep -v "components/remote_rpi_gpio"  # empty (no transitive subjects)
+cat homeassistant/components/remote_rpi_gpio/manifest.json                 # quality_scale: legacy; requirements gpiozero==1.6.2, pigpio==1.78
 ```
