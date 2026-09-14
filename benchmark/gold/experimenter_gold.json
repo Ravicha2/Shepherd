@@ -1,0 +1,125 @@
+[
+  {
+    "adr_id": "ADR-0001",
+    "adr_path": "docs/adrs/0001-build-nimbus-console-in-experimenter.md",
+    "constraints": [],
+    "note": "Strategy ADR (build the Nimbus console inside Experimenter vs a new app); portfolio-level decision with no importable or implementable code relation. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0002",
+    "adr_path": "docs/adrs/0002-nimbus-front-end-directory-tree-and-stack.md",
+    "constraints": [],
+    "note": "Front-end directory tree + React/CRA/Bootstrap/GQL stack choice; JS-side layout and tooling, not Python FQN edges. Census section 4 flags this ADR as half of the repo's only natural conflict pair (ADR-0002 GQL mandate vs ADR-0008 HTMX migration), but the GQL mandate lives in the TypeScript/React tree and cannot be encoded as a Python FQN edge; the code-side anchor of that pair is carried by ADR-0008's graphene prohibition. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0003",
+    "adr_path": "docs/adrs/0003-analysis-visualization-architecture-approach.md",
+    "constraints": [
+      {
+        "subject": "experimenter.experimenter.jetstream.*",
+        "predicate": "requires_dependency",
+        "object": "google.cloud.storage",
+        "justification": "ADR-0003 (chosen option 2): 'The visualization front end fetches data via a Django REST API, which fetches Jetstream data on demand using GCS dependencies. Data is not stored in the database.' The Jetstream fetch layer depends on Google Cloud Storage for on-demand data access; object is the exact import target 'google.cloud.storage' (registered verbatim by plain import_statement or as the from-import fallback target) rather than a wildcard, to dodge NameResolver suffix collisions."
+      }
+    ],
+    "note": "Constraint evidence: experimenter/experimenter/jetstream/client.py:59 (load_data_from_gcs, the on-demand fetch locus) and experimenter/pyproject.toml:39 (google-cloud-storage>=3.13.0,<4). Known-miss semantics accepted (census conservatism): at the pin the GCS dependency is reached through django-storages indirection (experimenter/experimenter/settings.py:533 ANALYSIS_FILE_STORAGE = storages.backends.gcloud.GoogleCloudStorage; client.py:13 'from django.core.files.storage import storages', client.py:56 'analysis_storage = storages[\"analysis\"]'), so no jetstream module imports google.cloud directly and the import-level requires fires for any changed jetstream scope unless the diff itself adds the import. Subject is the doubled package prefix (repo layout experimenter/experimenter/jetstream/). DROPPED (decision recorded): the census's candidate prohibits_dependency on the DB write path ('It does not require storing the data to the Django database.') is not encodable at this pin — the census premise that client.py is clean is false (client.py:25 'from experimenter.experiments.models import NimbusExperiment', read access), and jetstream/tasks.py:18 imports the models as the sanctioned writer persisting results_data; any import-level prohibition with a subject covering the fetch path fires on the compliant read path or on the sanctioned task writer. Per the census conservatism note the debatable edge is dropped and only the GCS requires is carried."
+  },
+  {
+    "adr_id": "ADR-0004",
+    "adr_path": "docs/adrs/0004-monitoring-data-import.md",
+    "constraints": [],
+    "note": "Monitoring-data sourcing ADR (on-demand query vs ETL bucket vs Grafana embed); data-pipeline strategy with cost tradeoffs and explicitly transitional language ('would be ideal to implement option (2) immediately ... continuing work on option (4)'), no enforceable import/inheritance edge. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0005",
+    "adr_path": "docs/adrs/0005-doc-hub.md",
+    "constraints": [],
+    "note": "Docs-hub tooling ADR (Docusaurus + GitHub Pages); documentation-infrastructure decision outside the Python package namespace. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0006",
+    "adr_path": "docs/adrs/0006-doc-hub-repo.md",
+    "constraints": [],
+    "note": "Docs-hub repository-location ADR; infrastructure placement decision, no code-level constraint. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0007",
+    "adr_path": "docs/adrs/0007-doc-hub-url.md",
+    "constraints": [],
+    "note": "Docs-hub URL ADR; a string configuration decision, not an FQN relation. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0008",
+    "adr_path": "docs/adrs/0008-integrating-htmx.md",
+    "constraints": [
+      {
+        "subject": "experimenter.experimenter.nimbus_ui.*",
+        "predicate": "prohibits_dependency",
+        "object": "graphene",
+        "justification": "ADR-0008: 'using GraphQL significantly hinders the performance of the Experimenter as it adds extra overhead while making the call and the benefit of using GraphQL is not something we are making use of.' New HTMX pages bypass the GraphQL stack ('No API's call needed'); the graphene server-side stack is fully gone at the pin, so any nimbus_ui module importing graphene is a backslide. Object is the exact import target 'graphene' (not a wildcard) to dodge NameResolver suffix collisions."
+      }
+    ],
+    "note": "Constraint evidence: no graphene/graphene_django import anywhere under experimenter/experimenter/ (grep empty) and no graphene dependency in experimenter/pyproject.toml at the pin. This constraint is the code-side anchor of the census section 4 natural conflict pair ADR-0002 (GQL for the Nimbus front end) vs ADR-0008 (HTMX for new pages): a graphene import under nimbus_ui is simultaneously an ADR-0008 violation and a revival of ADR-0002's superseded GraphQL path. DROPPED (decision recorded): the census's candidate requires_dependency on htmx/django_htmx is not defensibly boundable — the mandate 'All web pages using HTMX!' cannot be bounded to FQNs without false-positive risk, and the only import-checkable object django_htmx is imported nowhere under nimbus_ui at the pin (HTMX usage is attribute dicts, e.g. experimenter/experimenter/nimbus_ui/forms.py:1988-1997 htmx_attrs hx-* update), so a requires on any nimbus_ui subject would fire on compliant modules; dropped per the census conservatism note."
+  },
+  {
+    "adr_id": "ADR-0009",
+    "adr_path": "docs/adrs/0009-nimbus-web-sdk-architecture.md",
+    "constraints": [],
+    "note": "Nimbus Web SDK Rust crate organization (cargo features, single library); outside the Python codebase entirely. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0010",
+    "adr_path": "docs/adrs/0010-jetstream-shared-schema.md",
+    "constraints": [
+      {
+        "subject": "experimenter.experimenter.jetstream.*",
+        "predicate": "requires_dependency",
+        "object": "mozilla_nimbus_schemas.*",
+        "justification": "ADR-0010 (chosen option 1B): 'define the schema using Pydantic, and put this definition in the experimenter repository ... one schema definition shared between Experimenter and Jetstream would allow for validation of outputs from Jetstream while removing the need for Experimenter to make assumptions.' The Jetstream ingest layer validates Jetstream output against the shared schema package; object is a wildcard because from-imports of submodules register the parent package target (mozilla_nimbus_schemas.jetstream)."
+      },
+      {
+        "subject": "schemas.mozilla_nimbus_schemas.*",
+        "predicate": "requires_dependency",
+        "object": "pydantic",
+        "justification": "ADR-0010: '[Option 1] Pydantic ... Create schema definitions using Pydantic' — the shared schema package is defined with pydantic models; schema modules must depend on pydantic. Object is the exact import target 'pydantic' (the from-import fallback target registered by 'from pydantic import BaseModel')."
+      }
+    ],
+    "note": "Constraint evidence (ingest side): experimenter/experimenter/jetstream/client.py:15 ('from mozilla_nimbus_schemas.jetstream import ...') and client.py:23 ('from pydantic import ValidationError'). Constraint evidence (schema-definition side): schemas/mozilla_nimbus_schemas/jetstream/statistics.py:5 and metadata.py:5 ('from pydantic import BaseModel, ...'). Subject spellings: the jetstream subject is doubled (repo layout experimenter/experimenter/jetstream/) while the schemas subject is single-prefix because the schemas/ tree sits at the repository root (schemas/mozilla_nimbus_schemas/). Historical note: at a2de3aebd37bbc6bc76f15ff2704f082c864e856 (2023-06-09, the commit that added schemas/) experimenter/experimenter/jetstream/client.py still hand-parses Jetstream JSON ('import json', json.loads at historical line 42) with no mozilla_nimbus_schemas and no pydantic import — a real ADR-0010 requires-violation snapshot taken weeks before fix b6d9aebc (2023-06-23, 'validate incoming jetstream schemas')."
+  },
+  {
+    "adr_id": "ADR-0011",
+    "adr_path": "docs/adrs/0011-nimbus-web-glean-application-structure.md",
+    "constraints": [],
+    "note": "Glean application-ID granularity decision (per product domain); telemetry-identity policy, no importable or implementable FQN relation. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0012",
+    "adr_path": "docs/adrs/0012-exposure-events-and-coenrolling-features.md",
+    "constraints": [],
+    "note": "Exposure-event attribution via the feature-JSON 'experiment' property; client-side messaging behavior, not a dependency/implementation edge. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0013",
+    "adr_path": "docs/adrs/0013-guardrail-metric-versioning.md",
+    "constraints": [],
+    "note": "Guardrail metric versioning convention ('_v#' suffixes); data-definition naming policy, not an FQN edge. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0014",
+    "adr_path": "docs/adrs/0014-desktop-randomization-unit.md",
+    "constraints": [],
+    "note": "Desktop randomization-unit change (normandy_id to group_id); client telemetry semantics, no code-level constraint. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0015",
+    "adr_path": "docs/adrs/0015-webapps-qa-strategy.md",
+    "constraints": [],
+    "note": "QA-only preview mode workflow for web apps; QA process decision, no enforceable code relation. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0016",
+    "adr_path": "docs/adrs/0016-ci-external-firefox-tracking.md",
+    "constraints": [],
+    "note": "CI workflow for tracking external Firefox changes; CI process decision, not an FQN relation. Emit no edges."
+  }
+]

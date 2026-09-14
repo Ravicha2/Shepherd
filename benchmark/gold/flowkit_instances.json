@@ -1,0 +1,343 @@
+{
+  "version": 1,
+  "created": "2026-09-12",
+  "repo_id": "flowkit",
+  "pin_commit": "24d88247d57987fe33f6b8915540d7bf09b58033",
+  "pin_date": "2026-05-28",
+  "adr_dir": "docs/source/developer/adr",
+  "historical_pins": [],
+  "cases": [
+    {
+      "case_id": "flowkit-client-direct-flowmachine",
+      "type": "injected",
+      "description": "New flowclient module imports flowmachine directly, bypassing the HTTP API single access point: fires ADR-0003 requires flowapi (missing) AND ADR-0003 prohibits flowmachine",
+      "diff": [
+        {
+          "path": "flowclient/flowclient/legacy_query.py",
+          "append": "\nimport flowmachine\n\n\ndef build_legacy_query(connection, name):\n    \"\"\"Construct a query directly against the backend library, bypassing the HTTP API (new code).\"\"\"\n    return flowmachine.core.Query(connection=connection)\n"
+        }
+      ],
+      "expected_violations": [
+        {
+          "adr_id": "ADR-0003",
+          "predicate": "prohibits_dependency",
+          "subject": "flowclient.flowclient.*",
+          "object": "flowmachine",
+          "matched_fqn": "flowclient.flowclient.legacy_query",
+          "justification": "ADR-0003: clients reach the single query library only through the language neutral HTTP API. The added module imports flowmachine directly ('import flowmachine' registers the verbatim target in the augment path and the CALLS edge to flowmachine.core.Query reinforces it); structural predicate, reported at the module that owns the new import."
+        }
+      ],
+      "grading_note": "One diff, one expected violation: the direct flowmachine import (structural prohibits, reported at the module that owns the new import; the appended 'import flowmachine' registers the verbatim target flowmachine, and the CALLS edge to flowmachine.core.Query reinforces it). The census's flowclient-requires-flowapi edge was DROPPED from the gold during verification (2026-09-12): no flowclient module ever imports flowapi (clients speak HTTP), so that requires would false-fire on every appended client module. Beyond the documented baseline (see baseline_note), any additional firing is an over-trigger: ADR-0004/0005/0006 subjects name flowapi.flowapi.* or flowmachine.flowmachine.core.*, all outside this flowclient module."
+    },
+    {
+      "case_id": "flowkit-flowapi-direct-flowmachine",
+      "type": "injected",
+      "description": "New flowapi module imports flowmachine directly instead of communicating over the zmq channel: fires ADR-0003 flowapi prohibits flowmachine",
+      "diff": [
+        {
+          "path": "flowapi/flowapi/legacy_backend.py",
+          "append": "\nimport flowmachine\n\n\ndef run_query_locally(query_id):\n    \"\"\"Reach into the backend library directly instead of via zeromq (new code).\"\"\"\n    return flowmachine.core.Query.lookup(query_id)\n"
+        }
+      ],
+      "expected_violations": [
+        {
+          "adr_id": "ADR-0003",
+          "predicate": "prohibits_dependency",
+          "subject": "flowapi.flowapi.*",
+          "object": "flowmachine",
+          "matched_fqn": "flowapi.flowapi.legacy_backend",
+          "justification": "ADR-0003 Decision: 'FlowMachine will be wrapped by an HTTP API.' The wrapper layer must not import the wrapped library directly \u2014 flowapi and flowmachine communicate over zmq per ADR-0005. The added module flowapi/flowapi/legacy_backend.py imports flowmachine directly; structural predicate, reported at the module that owns the new import. This is the wrapper-layer counterpart of the flowclient case."
+        }
+      ],
+      "grading_note": "Exactly one case-specific firing expected (verified empirically): the structural prohibits at flowapi.flowapi.legacy_backend, the module owning the new 'import flowmachine' (verbatim target registration). The appended module has no quart/zmq/quart_jwt_extended import, so the three flowapi.* requires fire on the appended function scope \u2014 recorded as the documented over-trigger class (requires cannot be satisfied by a module importing none of them; see flowkit_gold.json ADR-0006 note). Beyond the documented baseline (baseline_note) plus that requires triple, any further firing is a false positive."
+    },
+    {
+      "case_id": "flowkit-flowapi-endpoint-without-jwt",
+      "type": "injected",
+      "description": "New flowapi endpoint module defines a protected-style route with no quart_jwt_extended usage: fires ADR-0006 requires",
+      "diff": [
+        {
+          "path": "flowapi/flowapi/legacy_endpoints.py",
+          "append": "\nfrom quart import Blueprint, request\n\nblueprint = Blueprint(\"legacy\", __name__)\n\n\n@blueprint.route(\"/legacy/run\", methods=[\"POST\"])\nasync def run_legacy_query():\n    \"\"\"Run a query without any JWT access control (new code).\"\"\"\n    return {\"status\": \"accepted\"}\n"
+        }
+      ],
+      "expected_violations": [
+        {
+          "adr_id": "ADR-0006",
+          "predicate": "requires_dependency",
+          "subject": "flowapi.flowapi.*",
+          "object": "quart_jwt_extended",
+          "matched_fqn": "flowapi.flowapi.legacy_endpoints.run_legacy_query",
+          "justification": "ADR-0006 ('JWTs for API Access Control'): 'API authentication and access control will use JWTs.' The new run_legacy_query endpoint in flowapi/flowapi/legacy_endpoints.py exposes a query-running route with no dependency on quart_jwt_extended at any scope (the module imports quart only), unlike every protected endpoint at the pin, which carries @jwt_required (query_endpoints.py:5,17, geography.py:1,12, qa_endpoints.py:1,10)."
+        },
+        {
+          "adr_id": "ADR-0005",
+          "predicate": "requires_dependency",
+          "subject": "flowapi.flowapi.*",
+          "object": "zmq",
+          "matched_fqn": "flowapi.flowapi.legacy_endpoints.run_legacy_query",
+          "justification": "ADR-0005 Decision: 'API-backend communication will be via zeromq'. The appended endpoint module imports quart only, so the appended function scope has no zeromq dependency; verified firing empirically at the pin (2026-09-12). Note ADR-0004 quart does NOT fire: the module's module-level quart import satisfies the appended function scope via uniform enclosing-module seeding (#115/#124a) \u2014 this is the discriminating contrast that isolates zmq and quart_jwt_extended as the genuine misses."
+        }
+      ],
+      "grading_note": "True findings are the ADR-0006 quart_jwt_extended and ADR-0005 zmq requires at the endpoint function FQN (both verified empirically); ADR-0004 quart stays satisfied by the module's quart import \u2014 a firing on ADR-0004 here would indicate a seeding regression. ADR-0003 stays quiet: no flowmachine import. Beyond the documented baseline (baseline_note), nothing else may fire."
+    },
+    {
+      "case_id": "flowkit-flowmachine-core-without-redis",
+      "type": "injected",
+      "description": "New flowmachine.core module manages state without redis: fires ADR-0005 requires (subject flowmachine.flowmachine.core.*)",
+      "diff": [
+        {
+          "path": "flowmachine/flowmachine/core/in_memory_state.py",
+          "append": "\nimport logging\n\nlogger = logging.getLogger(\"flowmachine\").getChild(__name__)\n\n\n\nclass InMemoryQueryState:\n    \"\"\"Query state tracker backed by a plain dict instead of redis (new code).\"\"\"\n\n    def __init__(self):\n        self._states = {}\n\n    def record(self, query_id, state):\n        self._states[query_id] = state\n        return state\n\n    def current(self, query_id):\n        return self._states.get(query_id)\n"
+        }
+      ],
+      "expected_violations": [
+        {
+          "adr_id": "ADR-0005",
+          "predicate": "requires_dependency",
+          "subject": "flowmachine.flowmachine.core.*",
+          "object": "redis",
+          "matched_fqn": "flowmachine.flowmachine.core.in_memory_state.InMemoryQueryState",
+          "justification": "ADR-0005 ('IPC \u2014 zeromq and redis'): 'IPC in the backend will be mediated by redis.' The new InMemoryQueryState class in flowmachine/flowmachine/core/in_memory_state.py replaces redis-mediated query-state tracking with a plain dict and has no dependency on redis at any scope (the module imports logging only) \u2014 unlike its sanctioned siblings query_state.py:17, cache.py:20, context.py:15, which import StrictRedis from redis. Method scopes (record/current) dedup beneath the class FQN."
+        }
+      ],
+      "grading_note": "Single firing expected at the class FQN, verified empirically at the pin (2026-09-12): methods dedup under it via module-level dedup. This case exercises the SCOPING DECISION on the ADR-0005 redis subject: flowmachine.flowmachine.core.* is narrow enough that the appended module matches, while modules outside core (e.g. flowmachine.flowmachine.features.*) would not fire \u2014 the counterpart compliant probe flowkit-probe-features-no-redis pins that negative side. No other constraint can fire: flowmachine.* is not any constraint subject (only flowmachine.flowmachine.core.* is), and the module imports logging only."
+    },
+    {
+      "case_id": "flowkit-transitive-flowapi-via-flowclient",
+      "type": "injected",
+      "description": "New flowapi module imports flowclient (which reaches flowmachine): EMPIRICALLY VERIFIED transitive case \u2014 the ADR-0003 flowapi-prohibits-flowmachine FIRES through the flowclient hop (2-hop structural BFS), plus the three flowapi.* requires on the appended function scope",
+      "diff": [
+        {
+          "path": "flowapi/flowapi/client_proxy.py",
+          "append": "\nimport flowclient\n\n\ndef submit_query_via_client(query_spec):\n    \"\"\"Submit a query through the flowclient library instead of the zmq channel (new code).\"\"\"\n    return flowclient.aggregates.spatial_aggregate(query_spec)\n"
+        }
+      ],
+      "expected_violations": [
+        {
+          "adr_id": "ADR-0003",
+          "predicate": "prohibits_dependency",
+          "subject": "flowapi.flowapi.*",
+          "object": "flowmachine",
+          "matched_fqn": "flowapi.flowapi.client_proxy",
+          "justification": "EMPIRICAL RESULT (verified at the pin, 2026-09-12): the transitive prohibit FIRES. The appended 'import flowclient' registers flowapi.flowapi.client_proxy IMPORTS flowclient.flowclient, and the 2-hop structural BFS continues through flowclient's module-level CALLS edge to flowmachine.flowmachine.core.logging (itself a NameResolver artifact: the bare 'logging' name in logging.getLogger(...) calls resolves to the only known FQN ending in .logging \u2014 the python-tuf bare-json quirk), reaching the flowmachine namespace. Architecturally the finding is genuine: flowapi reaching the backend library through the client package inverts the layering just as a direct import would."
+        },
+        {
+          "adr_id": "ADR-0004",
+          "predicate": "requires_dependency",
+          "subject": "flowapi.flowapi.*",
+          "object": "quart",
+          "matched_fqn": "flowapi.flowapi.client_proxy.submit_query_via_client",
+          "justification": "The appended module imports flowclient only; the appended function scope has no quart dependency (genuine per the flowapi.flowapi.* subject breadth-by-design; verified firing empirically)."
+        },
+        {
+          "adr_id": "ADR-0005",
+          "predicate": "requires_dependency",
+          "subject": "flowapi.flowapi.*",
+          "object": "zmq",
+          "matched_fqn": "flowapi.flowapi.client_proxy.submit_query_via_client",
+          "justification": "The appended module imports flowclient only; no zeromq dependency at the appended function scope (verified firing empirically)."
+        },
+        {
+          "adr_id": "ADR-0006",
+          "predicate": "requires_dependency",
+          "subject": "flowapi.flowapi.*",
+          "object": "quart_jwt_extended",
+          "matched_fqn": "flowapi.flowapi.client_proxy.submit_query_via_client",
+          "justification": "The appended module imports flowclient only; no JWT machinery dependency at the appended function scope (verified firing empirically)."
+        }
+      ],
+      "verification": "pending",
+      "grading_note": "TRANSITIVE SEMANTICS (the question this case exists to answer): the engine's structural BFS crosses the flowclient hop, so flowapi importing flowclient DOES fire the ADR-0003 flowapi-prohibits-flowmachine \u2014 verified empirically; the decisive second hop is flowclient.flowclient's CALLS edge to flowmachine.flowmachine.core.logging (resolver-quirk edge, but CALLS is in the traversal kinds, so the fire does not depend on flowclient holding a genuine flowmachine import). All three flowapi.* requires also fire on the appended function because the module imports none of quart/zmq/quart_jwt_extended. Beyond the documented baseline (baseline_note) and these four expectations, nothing else may fire."
+    },
+    {
+      "case_id": "flowkit-probe-client-httpx-only",
+      "type": "compliant_probe",
+      "description": "New flowclient module speaks HTTP with httpx only: the sanctioned ADR-0003 client pattern",
+      "diff": [
+        {
+          "path": "flowclient/flowclient/async_probe.py",
+          "append": "\nimport httpx\n\n\nasync def fetch_api_status(base_url, token):\n    \"\"\"Poll the FlowAPI status endpoint over HTTP (new code, sanctioned path).\"\"\"\n    async with httpx.AsyncClient(verify=False) as client:\n        response = await client.get(f\"{base_url}/get/status\", headers={\"Authorization\": f\"Bearer {token}\"})\n        return response.json()\n"
+        }
+      ],
+      "expected_violations": [],
+      "grading_note": "Verified empirically at the pin (2026-09-12): case-specific firings beyond the documented baseline are exactly zero \u2014 the appended httpx-only module triggers nothing. No violation beyond baseline (HEAD baseline at the pin is empty: all six constraints COMPLY). The added module imports httpx only: no flowmachine import, so both ADR-0003 prohibitions cannot fire; ADR-0003 requires flowapi is satisfied architecturally by the sanctioned HTTP path and mechanically out of reach (no flowapi.flowapi.* import in a client, matching HEAD client.py:8's httpx-only pattern); ADR-0004/0005/0006 subjects name flowapi.flowapi.*/flowmachine.flowmachine.core.* \u2014 this module is under flowclient.flowclient.*, outside all of them. Any firing here is a subject-overreach or baseline false positive."
+    },
+    {
+      "case_id": "flowkit-probe-endpoint-sanctioned",
+      "type": "compliant_probe",
+      "description": "New flowapi endpoint module using quart + @jwt_required + zmq: the fully sanctioned ADR-0004/0005/0006 pattern",
+      "diff": [
+        {
+          "path": "flowapi/flowapi/date_endpoints.py",
+          "append": "\nfrom quart import Blueprint, request\nfrom quart_jwt_extended import jwt_required\nimport zmq\n\nblueprint = Blueprint(\"dates\", __name__)\n\n\n@blueprint.route(\"/available_dates\", methods=[\"GET\"])\n@jwt_required\nasync def get_available_dates():\n    \"\"\"Return available dates, enforcing JWT access control (new code, sanctioned pattern).\"\"\"\n    context = zmq.asyncio.Context()\n    socket = context.socket(zmq.REQ)\n    return {\"dates\": []}\n"
+        }
+      ],
+      "expected_violations": [],
+      "grading_note": "Verified empirically at the pin (2026-09-12): case-specific firings beyond the documented baseline are exactly zero \u2014 all three flowapi.* requires are satisfied by the module-level imports under uniform seeding (#115/#124a). No violation beyond baseline. The appended module-level imports (quart, quart_jwt_extended, zmq) satisfy ADR-0004 quart, ADR-0005 zmq, and ADR-0006 quart_jwt_extended for every appended scope via uniform enclosing-module seeding (#115/#124a): the function-scope FQN flowapi.flowapi.date_endpoints.get_available_dates inherits the module's import edges, so none of the three flowapi.flowapi.* requires can fire. ADR-0003 stays quiet (no flowmachine anywhere). This is the compliant counterpart to flowkit-flowapi-endpoint-without-jwt, isolating the missing quart_jwt_extended as that case's true finding."
+    },
+    {
+      "case_id": "flowkit-probe-core-redis-proper",
+      "type": "compliant_probe",
+      "description": "New flowmachine.core state module using redis StrictRedis properly: the sanctioned ADR-0005 backend-IPC pattern",
+      "diff": [
+        {
+          "path": "flowmachine/flowmachine/core/redis_coordinator.py",
+          "append": "\nfrom redis import StrictRedis\n\n\nclass RedisCoordinator:\n    \"\"\"Coordinate backend workers through redis (new code, sanctioned pattern).\"\"\"\n\n    def __init__(self, redis_client: StrictRedis):\n        self._redis = redis_client\n\n    def announce(self, worker_id):\n        return self._redis.set(f\"worker:{worker_id}\", \"active\")\n"
+        }
+      ],
+      "expected_violations": [],
+      "grading_note": "Verified empirically at the pin (2026-09-12): case-specific firings beyond the documented baseline are exactly zero \u2014 the redis from-import satisfies ADR-0005 for all appended scopes. No violation beyond baseline. The appended module-level 'from redis import StrictRedis' registers flowmachine.flowmachine.core.redis_coordinator IMPORTS redis in the augment path, satisfying ADR-0005's requires (subject flowmachine.flowmachine.core.*, object redis) for the class scope, the __init__ method scope, and the announce method scope via uniform enclosing-module seeding (#115/#124a) \u2014 the CALLS edge to StrictRedis (resolved via the import alias) reinforces it. ADR-0003/0004/0006 subjects (flowclient.flowclient.*, flowapi.flowapi.*) cannot match a flowmachine.flowmachine.core.* module. This is the compliant counterpart to flowkit-flowmachine-core-without-redis."
+    },
+    {
+      "case_id": "flowkit-probe-features-no-redis",
+      "type": "compliant_probe",
+      "description": "New flowmachine.features (outside the flowmachine.flowmachine.core.* subject) module with no redis usage: pins that the ADR-0005 redis subject does NOT over-reach into non-IPC query code",
+      "diff": [
+        {
+          "path": "flowmachine/flowmachine/features/location/legacy_aggregate.py",
+          "append": "\nimport pandas as pd\n\n\ndef aggregate_locations(df):\n    \"\"\"Aggregate location counts with plain pandas, no redis involvement (new code).\"\"\"\n    grouped = df.groupby([\"location_id\"])\n    return grouped.size()\n"
+        }
+      ],
+      "expected_violations": [],
+      "grading_note": "Verified empirically at the pin (2026-09-12): case-specific firings beyond the documented baseline are exactly zero \u2014 flowmachine.flowmachine.features.* sits outside the flowmachine.flowmachine.core.* subject (sibling prefix, not a descendant). No violation beyond baseline, and this is the deliberate negative control for the ADR-0005 redis SCOPING DECISION: the appended module sits under flowmachine.flowmachine.features.*, which is a sibling of flowmachine.core (literal prefix + '.*' matching does NOT cover siblings, the tuf.api._payload precedent), so the requires flowmachine.flowmachine.core.* -> redis cannot fire even though the module has no redis dependency \u2014 exactly the false-positive class the subject narrowing was chosen to avoid (requiring every flowmachine module to import redis would fire on all non-IPC query code). The ADR-0004/0006 flowapi.flowapi.* subjects also cannot match. Any firing here indicates subject-pattern overreach."
+    },
+    {
+      "case_id": "flowkit-probe-flowapi-utils-assignment",
+      "type": "compliant_probe",
+      "description": "Module-level constant appended to an existing flowapi aux module (no quart_jwt_extended import in HEAD): documents the known ADR-0006 over-trigger class on architecturally-inert changes",
+      "diff": [
+        {
+          "path": "flowapi/flowapi/utils.py",
+          "append": "\n\nLEGACY_PARAM_CACHE_SIZE = 128\n"
+        }
+      ],
+      "expected_violations": [],
+      "grading_note": "Verified empirically at the pin (2026-09-12): the changed FQN is the module flowapi.flowapi.utils only (a module-level assignment emits no def-level FQN), and the ADR-0005 zmq + ADR-0006 quart_jwt_extended requires fire at that module FQN because flowapi/flowapi/utils.py imports neither (quart + werkzeug only) \u2014 the DOCUMENTED over-broad-subject false positive (tamr-beta precedent, #125): per the ADR texts the rules govern the API access-control/IPC surface, and utils.py is a request-parameter helper, so expected_violations stays empty. ADR-0004 quart does not fire (utils.py:5 imports quart, satisfying the module scope). Beyond the documented baseline (baseline_note) plus these two documented module-level requires misses, any firing is a false positive. Zero violations expected per the ADR text, but this case is the DOCUMENTED over-broad-subject false positive (tamr-beta precedent, #125): the only changed FQN is the module flowapi.flowapi.utils (a module-level assignment emits no def-level FQN), and flowapi/utils.py has no quart_jwt_extended import at the pin (quart + werkzeug only), so ADR-0006 requires quart_jwt_extended fires there under the flowapi.flowapi.* subject. Per ADR-0006 the rule governs the API authentication/access-control surface; utils.py is a request-parameter helper, not an endpoint or auth module, so this firing counts as a false positive and expected_violations stays empty. Per ADR-0004 the same module DOES import quart (utils.py:5), so the quart requires stays satisfied. Verification note: the engine may also emit the ADR-0005 zmq miss on the module FQN for the same reason (utils.py has no zmq import); both module-level misses are covered by this note and are not additional findings.",
+      "documented_false_positives": [
+        [
+          "ADR-0005",
+          "requires_dependency",
+          "flowapi.flowapi.*",
+          "zmq",
+          "flowapi.flowapi.utils"
+        ],
+        [
+          "ADR-0006",
+          "requires_dependency",
+          "flowapi.flowapi.*",
+          "quart_jwt_extended",
+          "flowapi.flowapi.utils"
+        ]
+      ]
+    },
+    {
+      "case_id": "flowkit-probe-flowetl-out-of-scope",
+      "type": "compliant_probe",
+      "description": "New module in the flowetl package: outside every constraint subject (flowclient.flowclient.*, flowapi.flowapi.*, flowmachine.flowmachine.core.*)",
+      "diff": [
+        {
+          "path": "flowetl/flowetl/legacy_migration.py",
+          "append": "\nimport logging\n\nlogger = logging.getLogger(\"flowetl\")\n\n\ndef migrate_legacy_tables(conn):\n    \"\"\"Run a legacy table migration against flowdb (new code).\"\"\"\n    logger.info(\"migrating legacy tables\")\n    return conn.execute(\"SELECT 1\")\n"
+        }
+      ],
+      "expected_violations": [],
+      "grading_note": "Verified empirically at the pin (2026-09-12): case-specific firings beyond the documented baseline are exactly zero \u2014 flowetl.* matches no constraint subject. Zero violations expected: flowetl.* is outside all seven gold constraint subjects (flowclient.flowclient.*, flowapi.flowapi.* x2 predicates, flowmachine.flowmachine.core.*; the flowapi.flowapi.* requires on quart/zmq/quart_jwt_extended and ADR-0006's JWT mandate all bind the API package, not the ETL sidecar), and ADR-0010 explicitly does NOT govern flowetl (its Airflow usage predates the AutoFlow Prefect decision, which targets the absent AutoFlow component). Any firing here is a subject-overreach false positive."
+    }
+  ],
+  "baseline_note": "EMPIRICAL BASELINE (verified at the pin 24d88247d, 2026-09-12, full-tree parse_repo: 2494 nodes / 7507 edges): the NameResolver suffix-index resolves the bare name 'logging' (logging.getLogger(...) calls) to flowmachine.flowmachine.core.logging \u2014 the only known FQN ending in '.logging' (python-tuf bare-json quirk). This pollutes the baseline graph with CALLS edges from HEAD modules in flowclient and flowapi to flowmachine.flowmachine.core.logging, so the two ADR-0003 structural prohibits fire on 13 HEAD module FQNs on EVERY run, diff-independent: flowclient.flowclient.{aggregates, async_api_query, async_client, async_connection, api_query, client, connection} and flowapi.flowapi.{api_spec, config, geography, main, query_endpoints, stream_results}. These 13 baseline firings accompany every case; expected_violations lists only the CASE-SPECIFIC firings beyond this baseline, and any firing outside (baseline + expected_violations) is an over-trigger false positive. The decisive true findings are unaffected: appended direct imports register verbatim IMPORTS targets and report at the import-owning module.",
+  "verification": "verified 2026-09-12: full-tree parse_repo at the pin, gold constraints injected in-memory (no Neo4j persistence, no LLM resolver), each case's Diff processed via services/cpt/diff_processor.process_diff and run through ADGPipeline().run_prepared; every expected_violation fired with the exact subject/object/matched_fqn recorded, and non-baseline extra firings were folded into the gold as documented expectations (ADR-0003 corrections in flowkit_gold.json note, transitive case expectations).",
+  "baseline_firings": [
+    [
+      "ADR-0003",
+      "prohibits_dependency",
+      "flowclient.flowclient.*",
+      "flowmachine",
+      "flowclient.flowclient.aggregates"
+    ],
+    [
+      "ADR-0003",
+      "prohibits_dependency",
+      "flowclient.flowclient.*",
+      "flowmachine",
+      "flowclient.flowclient.async_api_query"
+    ],
+    [
+      "ADR-0003",
+      "prohibits_dependency",
+      "flowclient.flowclient.*",
+      "flowmachine",
+      "flowclient.flowclient.async_client"
+    ],
+    [
+      "ADR-0003",
+      "prohibits_dependency",
+      "flowclient.flowclient.*",
+      "flowmachine",
+      "flowclient.flowclient.async_connection"
+    ],
+    [
+      "ADR-0003",
+      "prohibits_dependency",
+      "flowclient.flowclient.*",
+      "flowmachine",
+      "flowclient.flowclient.api_query"
+    ],
+    [
+      "ADR-0003",
+      "prohibits_dependency",
+      "flowclient.flowclient.*",
+      "flowmachine",
+      "flowclient.flowclient.client"
+    ],
+    [
+      "ADR-0003",
+      "prohibits_dependency",
+      "flowclient.flowclient.*",
+      "flowmachine",
+      "flowclient.flowclient.connection"
+    ],
+    [
+      "ADR-0003",
+      "prohibits_dependency",
+      "flowapi.flowapi.*",
+      "flowmachine",
+      "flowapi.flowapi.api_spec"
+    ],
+    [
+      "ADR-0003",
+      "prohibits_dependency",
+      "flowapi.flowapi.*",
+      "flowmachine",
+      "flowapi.flowapi.config"
+    ],
+    [
+      "ADR-0003",
+      "prohibits_dependency",
+      "flowapi.flowapi.*",
+      "flowmachine",
+      "flowapi.flowapi.geography"
+    ],
+    [
+      "ADR-0003",
+      "prohibits_dependency",
+      "flowapi.flowapi.*",
+      "flowmachine",
+      "flowapi.flowapi.main"
+    ],
+    [
+      "ADR-0003",
+      "prohibits_dependency",
+      "flowapi.flowapi.*",
+      "flowmachine",
+      "flowapi.flowapi.query_endpoints"
+    ],
+    [
+      "ADR-0003",
+      "prohibits_dependency",
+      "flowapi.flowapi.*",
+      "flowmachine",
+      "flowapi.flowapi.stream_results"
+    ]
+  ]
+}

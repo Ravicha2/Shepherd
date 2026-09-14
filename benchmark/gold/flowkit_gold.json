@@ -1,0 +1,114 @@
+[
+  {
+    "adr_id": "ADR-0001",
+    "adr_path": "docs/source/developer/adr/0001-pipenv-for-package-and-dependency-management.md",
+    "constraints": [],
+    "note": "Tooling-choice ADR: pipenv vs pip vs conda is a package-manager workflow decision with no importable or implementable code relation between FQNs (the consequence is about user-installed non-Python deps like GDAL). Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0002",
+    "adr_path": "docs/source/developer/adr/0002-pytest-for-testing.md",
+    "constraints": [],
+    "note": "Testing-framework choice (pytest over nosetests/unittest); a dev-process/tooling decision about how tests are written, not a runtime dependency or implementation edge. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0003",
+    "adr_path": "docs/source/developer/adr/0003-http-api.md",
+    "constraints": [
+      {
+        "subject": "flowclient.flowclient.*",
+        "predicate": "prohibits_dependency",
+        "object": "flowmachine",
+        "justification": "ADR-0003: clients reach the single query library only through the language neutral HTTP API; a direct flowclient -> flowmachine import bypasses the single access point"
+      },
+      {
+        "subject": "flowapi.flowapi.*",
+        "predicate": "prohibits_dependency",
+        "object": "flowmachine",
+        "justification": "ADR-0003 Decision: 'FlowMachine will be wrapped by an HTTP API.' The wrapper layer must not import the wrapped library directly; they communicate over zmq per ADR-0005"
+      }
+    ],
+    "note": "Constraint evidence: flowclient/flowclient/client.py:8 (import httpx) and :14-15 (only flowclient.connection/flowclient.errors) \u2014 no flowmachine import anywhere in flowclient/; flowapi has zero 'import flowmachine'/'from flowmachine' statements (only docstring mentions at flowapi/flowapi/utils.py:12 and flowapi/flowapi/qa_endpoints.py:141, and env-var hostname strings at flowapi/flowapi/config.py:54-55,71-72 \u2014 not imports). The flowclient requires edge encodes the sanctioned path (via FlowAPI/HTTP); census 1.2 conservatism note acknowledged, but the prohibit edges carry the operative check (direct backend imports) and the requires edge is its positive counterpart, mirroring the flask gold's routes->services pattern. CORRECTIONS (empirical, 2026-09-12 verification run): (1) the census's flowclient-requires-flowapi edge is DROPPED as un-satisfiable in the import graph \u2014 flowclient is a separate pip package that speaks HTTP and no flowclient module ever imports flowapi, so the requires would false-fire on every appended client module (the census's own caveat that the checkable edge is 'no direct backend-library import' is carried entirely by the prohibits). (2) Both prohibits objects are the EXTERNAL root 'flowmachine', not 'flowmachine.*': the NameResolver suffix-index resolves the bare name 'logging' (logging.getLogger calls) to flowmachine.flowmachine.core.logging (the only known FQN ending in .logging \u2014 the python-tuf bare-json quirk), which pollutes the baseline graph with flowclient/flowapi -> flowmachine.flowmachine.core.logging CALLS edges and makes a wildcard flowmachine.* object fire on ~13 HEAD modules in every diff; the exact object 'flowmachine' (the package parent node, and the verbatim target registered by 'import flowmachine') fires only on genuine direct-import violations."
+  },
+  {
+    "adr_id": "ADR-0004",
+    "adr_path": "docs/source/developer/adr/0004-http-framework.md",
+    "constraints": [
+      {
+        "subject": "flowapi.flowapi.*",
+        "predicate": "requires_dependency",
+        "object": "quart",
+        "justification": "ADR-0004 Decision: 'The FlowKit API will make use of the Quart framework.' \u2014 the API layer is built on Quart"
+      }
+    ],
+    "note": "Constraint evidence: flowapi/flowapi/main.py:11 (from quart import Quart, request, current_app, has_request_context), flowapi/flowapi/jwt_auth_callbacks.py:12 (from quart import current_app, request, Response), flowapi/flowapi/geography.py:5, flowapi/flowapi/permissions.py:11, flowapi/flowapi/api_spec.py:6, flowapi/flowapi/stream_results.py:8, flowapi/flowapi/utils.py:5. Subject flowapi.flowapi.* is breadth-by-design: requires fires only on changed FQNs, so HEAD stays compliant; appended flowapi modules without a quart dependency fire."
+  },
+  {
+    "adr_id": "ADR-0005",
+    "adr_path": "docs/source/developer/adr/0005-IPC-methods.md",
+    "constraints": [
+      {
+        "subject": "flowapi.flowapi.*",
+        "predicate": "requires_dependency",
+        "object": "zmq",
+        "justification": "ADR-0005 Decision: 'API-backend communication will be via zeromq' \u2014 the API side of the IPC channel depends on zeromq"
+      },
+      {
+        "subject": "flowmachine.flowmachine.core.*",
+        "predicate": "requires_dependency",
+        "object": "redis",
+        "justification": "ADR-0005 Decision: 'IPC in the backend will be mediated by redis' \u2014 backend IPC/state code depends on redis"
+      }
+    ],
+    "note": "SCOPING DECISION (redis): the ADR sentence binds backend IPC, and the direct redis imports live exclusively in flowmachine core: flowmachine/flowmachine/core/query_state.py:17 (from redis import StrictRedis), flowmachine/flowmachine/core/cache.py:20, flowmachine/flowmachine/core/context.py:15, flowmachine/flowmachine/core/init.py:16,21. Server modules reach redis only indirectly via flowmachine.core.context.get_redis (flowmachine/flowmachine/core/server/action_handlers.py:25) \u2014 a direct-import check cannot bind them, and requiring EVERY flowmachine module to import redis would false-fire on non-IPC query/feature modules. Subject narrowed to flowmachine.flowmachine.core.*, whose members are exactly the modules the ADR's backend-IPC sentence plus the code actually bind. Constraint evidence (zmq): flowapi/flowapi/main.py:14-15 (import zmq; from zmq.asyncio import Context), flowapi/flowapi/api_spec.py:7 (from zmq.asyncio import Socket)."
+  },
+  {
+    "adr_id": "ADR-0006",
+    "adr_path": "docs/source/developer/adr/0006-JWTs.md",
+    "constraints": [
+      {
+        "subject": "flowapi.flowapi.*",
+        "predicate": "requires_dependency",
+        "object": "quart_jwt_extended",
+        "justification": "ADR-0006 Decision: 'API authentication and access control will use JWTs.' \u2014 the API's auth/access-control surface depends on the JWT machinery (quart_jwt_extended)"
+      }
+    ],
+    "note": "SCOPING DECISION: subject narrowed in spirit to the API access-control surface, but a wildcard-prefix subject cannot express 'endpoint modules', and a trio subject (flowapi.query_endpoints.*/flowapi.geography.*/flowapi.qa_endpoints.*) would leave the constraint permanently unable to fire on NEW endpoint modules (exactly the violation class the ADR guards) while appended scopes in already-covered modules are satisfied by enclosing-module seeding (#115). flowapi.flowapi.* is therefore the narrowest EXPRESSIBLE subject that keeps the constraint checkable on new endpoint modules; config/spec/aux modules (flowapi/flowapi/config.py, api_spec.py, utils.py \u2014 no quart_jwt_extended import at the pin) create a documented over-trigger class on architecturally-inert or non-endpoint appends, recorded per the tamr-beta precedent. Constraint evidence: flowapi/flowapi/main.py:23 (from quart_jwt_extended import JWTManager, get_jwt_identity) and :135 (jwt = JWTManager(app)); @jwt_required-protected endpoints import at flowapi/flowapi/query_endpoints.py:5 (decorators at :17,120,220), flowapi/flowapi/geography.py:1 (decorator at :12), flowapi/flowapi/qa_endpoints.py:1 (decorators at :10,80,193); claims consumption at flowapi/flowapi/user_model.py:7-8."
+  },
+  {
+    "adr_id": "ADR-0007",
+    "adr_path": "docs/source/developer/adr/0007-mapbox-for-worked-examples.md",
+    "constraints": [],
+    "note": "Notebook-visualisation library choice (Mapbox vs Folium vs GeoViews) for the worked-examples notebooks; affects documentation notebooks only, not the runtime packages' dependency or implementation edges. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0008",
+    "adr_path": "docs/source/developer/adr/0008-jupyter-notebooks-for-autoflow.md",
+    "constraints": [],
+    "note": "AutoFlow notebook-execution choice (Jupyter + Papermill + scrapbook); AutoFlow is an external deployment tool absent from this pin's Python packages, so the decision targets no importable FQN here. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0009",
+    "adr_path": "docs/source/developer/adr/0009-asciidoctor-pdf-for-notebook-conversion.md",
+    "constraints": [],
+    "note": "Notebook-to-PDF conversion tooling (nbconvert to ASCIIDoc, then Asciidoctor PDF); a build/document toolchain decision with no code-level dependency or implementation relation between repo FQNs. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0010",
+    "adr_path": "docs/source/developer/adr/0010-prefect-for-autoflow.md",
+    "constraints": [],
+    "note": "Workflow-engine choice for AutoFlow (Prefect over Airflow); no prefect/airflow import exists in the runtime packages at this pin (flowetl's Airflow usage is a separate component and ADR-0010 governs the absent AutoFlow). Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0011",
+    "adr_path": "docs/source/developer/adr/0011-redaction-strategy-for-labelled-aggregates.md",
+    "constraints": [],
+    "note": "Redaction policy: drop any labelled-spatial-aggregate aggregation zone containing a disaggregation below 15; a runtime numeric policy (redaction_threshold: int = 15 in flowmachine/flowmachine/features/location/redacted_labelled_spatial_aggregate.py:31), i.e. a business rule inside a query implementation, not a dependency or implementation edge between FQNs. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0012",
+    "adr_path": "docs/source/developer/adr/0012-claims-role-scope-rework.md",
+    "constraints": [],
+    "note": "Permissions-model rework (claims to roles/scopes) redesigning the flowauth DB schema, JWT contents, and the flowapi scope checks; a data-model/auth-domain redesign that is not expressible as a dependency or implementation edge between FQNs. Emit no edges."
+  }
+]

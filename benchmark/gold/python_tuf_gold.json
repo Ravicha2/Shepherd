@@ -1,0 +1,89 @@
+[
+  {
+    "adr_id": "ADR-0000",
+    "adr_path": "docs/adr/0000-use-markdown-architectural-decision-records.md",
+    "constraints": [],
+    "note": "Documentation-process ADR: adopting the MADR template governs how decisions are recorded, not how code is structured. No code locations exist for it. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0001",
+    "adr_path": "docs/adr/0001-python-version-3-6-plus.md",
+    "constraints": [
+      {
+        "subject": "tuf.*",
+        "predicate": "prohibits_dependency",
+        "object": "python2.7",
+        "justification": "ADR-0001 chooses Python 3.6+ only; Python 2.7 is named as end-of-life and explicitly rejected"
+      },
+      {
+        "subject": "tuf.*",
+        "predicate": "prohibits_dependency",
+        "object": "python3.5",
+        "justification": "ADR-0001 chooses Python 3.6+ only; Python 3.5 is named as end-of-life and explicitly rejected"
+      }
+    ],
+    "note": "Constraint evidence: the only Python-version code at the pin is the stdlib-version feature guard tuf/api/_payload.py:71 (sys.version_info >= (3, 11)); no tuf module imports or guards on python2.7/python3.5 (grep over tuf/ is empty). Carried for completeness with the eval gold verbatim; census 6 recommends not using these constraints in instances because they have zero firing potential at any modern pin (nothing can import a dead interpreter version) and would be eval-gold duplicates."
+  },
+  {
+    "adr_id": "ADR-0002",
+    "adr_path": "docs/adr/0002-pre-1-0-deprecation-strategy.md",
+    "constraints": [],
+    "note": "Release/support-process ADR: best-effort bug handling for pre-1.0.0 releases is a governance commitment about release etiquette, not a code-level architectural constraint. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0003",
+    "adr_path": "docs/adr/0003-where-to-develop-TUF-1-0-0.md",
+    "constraints": [],
+    "note": "Process/location ADR: developing TUF 1.0.0 in a subdirectory with a fresh implementation plan is a development-workflow decision with no importable or implementable code relation. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0004",
+    "adr_path": "docs/adr/0004-extent-of-OOP-in-metadata-model.md",
+    "constraints": [],
+    "note": "Data-representation ADR: complex metadata attributes are custom classes rather than dicts inside tuf.api.metadata (see tuf/api/_payload.py:84 class Signed and siblings); a representation choice is not a dependency or implementation edge between FQNs, and the mentioned self-validation is 'may be extended' (optional). Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0005",
+    "adr_path": "docs/adr/0005-use-google-python-style-guide.md",
+    "constraints": [],
+    "note": "Code-style ADR: naming and formatting conventions cannot be expressed as dependency or implementation edges between FQNs, and the linter-config suggestion is explicitly optional. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0006",
+    "adr_path": "docs/adr/0006-where-to-implemenent-model-serialization.md",
+    "constraints": [
+      {
+        "subject": "tuf.api.metadata.*",
+        "predicate": "requires_dependency",
+        "object": "tuf.api.serialization.*",
+        "justification": "ADR-0006 separates serialization from the metadata class model; metadata classes depend on the serialization package (tuf.api.serialization), not the other way around"
+      }
+    ],
+    "note": "Constraint evidence (metadata module depends on the serialization package, never the reverse): guard-agnostic TYPE_CHECKING from-import tuf/api/metadata.py:72; local-scope serializer imports tuf/api/metadata.py:158 (CanonicalJSONSerializer in signed_bytes), tuf/api/metadata.py:267 (JSONDeserializer in from_bytes), tuf/api/metadata.py:294 (JSONSerializer in to_bytes). ADR-0006 sanctions the reverse direction inside the serialization package itself (tuf/api/serialization/json.py:20 imports tuf.api.metadata)."
+  },
+  {
+    "adr_id": "ADR-0008",
+    "adr_path": "docs/adr/0008-accept-unrecognised-fields.md",
+    "constraints": [],
+    "note": "Runtime-behavior ADR: preserving unrecognized fields on load is deserialization behavior implemented inside the metadata API (unrecognized_fields handling in tuf/api/_payload.py), not a dependency or implementation relation between FQNs. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0009",
+    "adr_path": "docs/adr/0009-what-is-a-reference-implementation.md",
+    "constraints": [],
+    "note": "Vision ADR: declaring the primary purpose to be an exemplary reference implementation is design philosophy with no operationally checkable code-level constraint. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0010",
+    "adr_path": "docs/adr/0010-repository-library-design.md",
+    "constraints": [
+      {
+        "subject": "tuf.repository.*",
+        "predicate": "requires_dependency",
+        "object": "tuf.api.metadata.*",
+        "justification": "ADR-0010 states the repository library is built on top of the Metadata API; this is a dependency, not an inheritance rule"
+      }
+    ],
+    "note": "Constraint evidence (repository package depends on the Metadata API): tuf/repository/_repository.py:15 (from tuf.api.metadata import Metadata, MetaFile, Root, Signed, Snapshot, Targets, Timestamp); the class-scope method call sites Root(...) at tuf/repository/_repository.py:148, Timestamp(...) at :155, Snapshot(...) at :162. Do NOT emit requires_implementation tuf.repository._repository.Repository: ADR-0010 describes Repository as an ABC extendable by choice, not a mandatory base ('built on top of' = requires_dependency). Discriminating note: tuf/repository/__init__.py imports only tuf.repository._repository, and the transitive path does not satisfy the requires, which is what let the eval's __init__.py case fire."
+  }
+]

@@ -1,0 +1,158 @@
+{
+  "version": 1,
+  "created": "2026-09-14",
+  "repo_id": "structurizr-python",
+  "pin_commit": "31f1dcadb3ff113d8a77ce132657237ea01c307b",
+  "pin_date": "2025-08-14",
+  "adr_dir": "docs/development/adr",
+  "verification": "verified 2026-09-14: all 7 cases run empirically at the pin (in-memory ADG from parse_repo + gold constraints injected via merge_constraint_edges, augment_immutable + process_diff + detect, mirroring app/tests/services/cpt/test_cpt_detect_eval.py run_case); baseline detect at 31f1dcad yields zero violations (ADR-0008 surfaces as an orphan because no example deep-imports structurizr.api at HEAD); the ab5adc9 mid-2021 pin and the 6af4134 pre-pydantic skeleton pin verified as zero-violation historical baselines on detached worktrees (removed after); layout note: module FQNs carry the src-layout prefix (src.structurizr.*) while IMPORTS edge targets are the literal dotted import (structurizr.api.structurizr_client, pydantic) — this src-layout asymmetry is this repo's documented layout rule",
+  "historical_pins": [
+    {
+      "commit": "6af413490b3c620a797f2f0bd01ce5aff1f3c7a2",
+      "date": "2020-04-05",
+      "reason": "Parent of 'feat: add structurizr client settings' (= 6aa423ac, the first pydantic-importing commit, 2020-04-06). Content-verified: zero pydantic imports anywhere in src/ (git grep empty), src/structurizr/ is a cookiecutter skeleton (__init__.py, _version.py, helpers.py only), no api/ package and no examples/ exist yet. Empirically verified as a zero-violation baseline: both gold constraints are orphans at this pin (ADR-0009 subject src.structurizr.api.* matches nothing; ADR-0008 subject examples.* matches nothing). Recorded as context for the pre-ADR-0009 era, not used as a case pin: appending a json-only api module here would leave the requires orphan (pydantic resolves to no node in the 2020-04 tree), so no violation instance is reachable at this pin."
+    },
+    {
+      "commit": "ab5adc94c188c8e4bbd05d064fce4603a22e8255",
+      "date": "2021-12-01",
+      "reason": "Last commit of 2021: full package tree present (api/, model/, view/, workspace.py) with the api modules importing pydantic (api_response.py:1, structurizr_client_settings.py:1). Used as the historical compliant probe struct-bench-hist-2021-compliant: zero expected violations, the ADR-0009 requires is satisfied across the whole api package on this historical tree, exercising the satisfied-requires path at a pin far from HEAD. Empirically verified: baseline detect at this pin yields zero violations; ADR-0008 surfaces as an orphan (examples/ exists but deep-imports no api module here either)."
+    }
+  ],
+  "cases": [
+    {
+      "case_id": "struct-bench-api-legacy-json-response",
+      "type": "injected",
+      "description": "New module in the api package parses and stores API responses with the stdlib json module and a hand-rolled store class, bypassing the pydantic choice of ADR-0009 (added file; function-granularity plus class-granularity firings in one case, mirroring the python-tuf legacy-json-store precedent)",
+      "diff": [
+        {
+          "path": "src/structurizr/api/_legacy_response.py",
+          "status": "added",
+          "append": "\"\"\"Legacy API response handling on the stdlib json module (new code).\"\"\"\nimport json\n\n\ndef parse_response(raw):\n    \"\"\"Parse a raw API response payload with the stdlib json module (new code).\"\"\"\n    return json.loads(raw.decode(\"utf-8\"))\n\n\ndef dump_response(payload):\n    \"\"\"Serialize an API response payload with the stdlib json module (new code).\"\"\"\n    return json.dumps(payload).encode(\"utf-8\")\n\n\nclass LegacyResponseStore:\n    \"\"\"Response storage hand-rolled on the stdlib json module (new code).\"\"\"\n\n    def load(self, raw):\n        return json.loads(raw.decode(\"utf-8\"))\n"
+        }
+      ],
+      "expected_violations": [
+        {
+          "adr_id": "ADR-0009",
+          "predicate": "requires_dependency",
+          "subject": "src.structurizr.api.*",
+          "object": "pydantic",
+          "matched_fqn": "src.structurizr.api._legacy_response.parse_response",
+          "justification": "ADR-0009 chooses pydantic for JSON (de-)serialization and the gold constraint reads 'the api package performs the remote-workspace (de)serialization and depends on pydantic'. parse_response parses an API response payload with the stdlib json module in an added module that imports json only, so its scope has no pydantic dependency at any scope. Verified firing empirically at the pin: function-granularity report."
+        },
+        {
+          "adr_id": "ADR-0009",
+          "predicate": "requires_dependency",
+          "subject": "src.structurizr.api.*",
+          "object": "pydantic",
+          "matched_fqn": "src.structurizr.api._legacy_response.dump_response",
+          "justification": "ADR-0009 ('Use pydantic for JSON (de-)serialization'): the api package's serialization rides on pydantic, and the gold constraint reads the api package depends on pydantic. dump_response serializes a response payload with the stdlib json module; like its parse-side sibling it has no pydantic dependency at any scope in the added module. Verified firing empirically at the pin: second function-granularity report."
+        },
+        {
+          "adr_id": "ADR-0009",
+          "predicate": "requires_dependency",
+          "subject": "src.structurizr.api.*",
+          "object": "pydantic",
+          "matched_fqn": "src.structurizr.api._legacy_response.LegacyResponseStore",
+          "justification": "ADR-0009 ('Use pydantic for JSON (de-)serialization'): the api package's (de)serialization rides on pydantic. LegacyResponseStore is a new api-side class whose load method parses responses with the stdlib json module; the class scope has no pydantic dependency at any scope (module imports json only), so the class fails the requires and its load method dedups beneath it via module-level dedup. Verified firing empirically at the pin: class-granularity report."
+        }
+      ],
+      "grading_note": "All three firings are exact and genuine: the added module imports json only, so no seeding artifact is involved (unlike the committed api modules, which import pydantic at module level and would satisfy appended scopes under uniform seeding #115). Module-level dedup collapses LegacyResponseStore.load under LegacyResponseStore; if a dedup change re-opens the method FQN, ancestor-descendant tolerance scores it partial. The appended 'import json' is inert under ADR-0008 (object is structurizr.api.* only) and under ADR-0003 (no constraint emitted, see gold note). Instance-disjoint from every other case by module and by FQN."
+    },
+    {
+      "case_id": "struct-bench-api-legacy-json-client-class",
+      "type": "injected",
+      "description": "Class-only violation shape: a new api client class speaks raw JSON envelopes with the stdlib json module; the firing lands on the class FQN and the methods dedup beneath it (mirrors the python-tuf legacy-repo-client precedent)",
+      "diff": [
+        {
+          "path": "src/structurizr/api/_legacy_client.py",
+          "status": "added",
+          "append": "import json\n\n\nclass LegacyApiClient:\n    \"\"\"API client that speaks raw JSON envelopes (new code).\"\"\"\n\n    def fetch(self, raw):\n        return json.loads(raw.decode(\"utf-8\"))\n\n    def push(self, payload):\n        return json.dumps(payload).encode(\"utf-8\")\n"
+        }
+      ],
+      "expected_violations": [
+        {
+          "adr_id": "ADR-0009",
+          "predicate": "requires_dependency",
+          "subject": "src.structurizr.api.*",
+          "object": "pydantic",
+          "matched_fqn": "src.structurizr.api._legacy_client.LegacyApiClient",
+          "justification": "ADR-0009 ('Use pydantic for JSON (de-)serialization'): the api package's (de)serialization rides on pydantic. The added module imports json only and its LegacyApiClient methods parse/serialize raw JSON envelopes; the class scope (and, by inheritance, its method scopes) has no pydantic dependency at any scope, so the class fails the requires and both methods dedup beneath it via module-level dedup. Verified firing empirically at the pin: exactly one violation, at the class FQN."
+        }
+      ],
+      "grading_note": "Single exact firing at the class FQN. The method FQNs (LegacyApiClient.fetch/push) are changed FQNs too but must be deduped under the class-level report; a future dedup change that re-opens a method FQN scores partial via ancestor-descendant tolerance, never a new exact hit. Isolates the class-scope inheritance path from struct-bench-api-legacy-json-response (which has module-level functions): no shared module, no shared FQN."
+    },
+    {
+      "case_id": "struct-bench-probe-api-settings-seeded",
+      "type": "compliant_probe",
+      "description": "Stdlib-json helper appended inside the committed src/structurizr/api/structurizr_client_settings.py: the module's own pydantic import satisfies the appended scope even though the function itself only touches json (discriminating probe of module-import seeding, #115)",
+      "diff": [
+        {
+          "path": "src/structurizr/api/structurizr_client_settings.py",
+          "status": "modified",
+          "append": "\n\ndef _peek_raw_settings(data):\n    \"\"\"Re-parse raw settings bytes with the stdlib json module (new helper).\"\"\"\n    import json\n    return json.loads(data.decode(\"utf-8\"))\n"
+        }
+      ],
+      "expected_violations": [],
+      "grading_note": "No violation beyond baseline (baseline at the pin is empty): structurizr_client_settings.py imports pydantic at module level (line 31), so ADR-0009's requires is satisfied for the appended _peek_raw_settings via enclosing-module seeding (#115) even though the function itself never touches pydantic. The case discriminates a per-function-usage satisfaction semantics (issue 124 option b): such a change would flip this probe to a fire, and any ADR-0009 firing today means the #115 seeding regressed and counts as an over-trigger false positive. The appended 'import json' is inert under ADR-0008 (subject is examples.*, not src.structurizr.api.*)."
+    },
+    {
+      "case_id": "struct-bench-probe-api-pydantic-module",
+      "type": "compliant_probe",
+      "description": "New api IO helper module built on a pydantic BaseModel: the sanctioned ADR-0009 pattern as an added file (discriminating counterpart to struct-bench-api-legacy-json-response: same added-file shape, the pydantic import alone flips the requires from fire to satisfied)",
+      "diff": [
+        {
+          "path": "src/structurizr/api/_io_helper.py",
+          "status": "added",
+          "append": "\"\"\"Sanctioned API IO helper on pydantic (new code).\"\"\"\nfrom pydantic import BaseModel\n\n\nclass IOResponse(BaseModel):\n    \"\"\"IO model describing the JSON data of a response (new code).\"\"\"\n    status: str\n"
+        }
+      ],
+      "expected_violations": [],
+      "grading_note": "No violation beyond baseline (baseline at the pin is empty): the added module imports pydantic at module level, so ADR-0009's requires is satisfied for IOResponse and the enclosing module via the import (the annotated-field pattern mirrors api_response.py:21). If a future change stopped recording from-import targets for satisfaction, this case would flip to a fire and catch it. Instance-disjoint from every other case (new module, new class FQN)."
+    },
+    {
+      "case_id": "struct-bench-example-deep-import",
+      "type": "injected",
+      "description": "New example module imports StructurizrClient from inside the api package (from structurizr.api.structurizr_client import ...) instead of the sanctioned top-level export, bypassing the ADR-0008 public interface (added file; the repo's only other api-consuming example, upload_workspace.py:25, uses 'from structurizr import ...')",
+      "diff": [
+        {
+          "path": "examples/direct_api_client.py",
+          "status": "added",
+          "append": "\"\"\"Example that reaches into the api package directly (new code).\"\"\"\nfrom structurizr.api.structurizr_client import StructurizrClient\n\n\ndef upload(workspace):\n    \"\"\"Upload a workspace via a deep api import (new code).\"\"\"\n    client = StructurizrClient(api_key=\"x\", api_secret=\"y\", workspace_id=1)\n    return client.put_workspace(workspace)\n"
+        }
+      ],
+      "expected_violations": [
+        {
+          "adr_id": "ADR-0008",
+          "predicate": "prohibits_dependency",
+          "subject": "examples.*",
+          "object": "structurizr.api.*",
+          "matched_fqn": "examples.direct_api_client",
+          "justification": "ADR-0008 ('Package structure: export important classes and functions to the top level thus exposing a public interface'): the full api surface is exported at src/structurizr/__init__.py (StructurizrClient among them), so client code must consume the api through the top level. direct_api_client.py deep-imports structurizr.api.structurizr_client instead; the IMPORTS edge records the literal target structurizr.api.structurizr_client, which the gold object pattern structurizr.api.* covers. Verified firing empirically at the pin: module-granularity report at the added example module (its upload function dedups beneath it)."
+        }
+      ],
+      "grading_note": "Single exact firing at the added module FQN. The function FQN examples.direct_api_client.upload is a changed FQN too but must be deduped under the module-level report; a re-opened function report scores partial via ancestor-descendant tolerance. Baseline honesty: at HEAD the constraint is an orphan (no example deep-imports structurizr.api; big_bank/financial_risk_system/getting_started import structurizr.model/structurizr.view/top-level only, all outside the object pattern), so any baseline firing would be subject-overreach. Instance-disjoint from every other case (only case with an examples.* subject binding)."
+    },
+    {
+      "case_id": "struct-bench-probe-example-toplevel",
+      "type": "compliant_probe",
+      "description": "New example module consumes the api through the sanctioned top-level exports (from structurizr import StructurizrClient, StructurizrClientSettings), mirroring the committed examples/upload_workspace.py:25 pattern",
+      "diff": [
+        {
+          "path": "examples/toplevel_client.py",
+          "status": "added",
+          "append": "\"\"\"Example using the sanctioned top-level public interface (new code).\"\"\"\nfrom structurizr import StructurizrClient, StructurizrClientSettings\n\n\ndef upload(workspace):\n    \"\"\"Upload a workspace through the top-level exports (new code).\"\"\"\n    settings = StructurizrClientSettings()\n    client = StructurizrClient(settings=settings)\n    return client.put_workspace(workspace)\n"
+        }
+      ],
+      "expected_violations": [],
+      "grading_note": "No violation beyond baseline (baseline at the pin is empty): the import target is the top-level 'structurizr' package, which the ADR-0008 object pattern (structurizr.api.*) does not cover; this is the discriminating counterpart to struct-bench-example-deep-import (same added-example shape, the import depth alone flips the prohibits from fire to satisfied). If a future change broadened the object pattern to the whole structurizr.* tree, this probe would flip to a fire and catch the over-broadening; that reading was deliberately rejected in the gold note (the top level does not re-export model/view, so a whole-tree prohibition would indict the repo's own working examples). ADR-0009 stays quiet: the added example is outside its subject (src.structurizr.api.*)."
+    },
+    {
+      "case_id": "struct-bench-hist-2021-compliant",
+      "type": "historical",
+      "commit": "ab5adc94c188c8e4bbd05d064fce4603a22e8255",
+      "description": "Historical compliant probe at the last-2021 pin (2021-12-01): full package tree (api/, model/, view/, workspace.py) with the whole api package importing pydantic, so the ADR-0009 requires is satisfied everywhere it applies",
+      "expected_violations": [],
+      "grading_note": "Zero violations expected and empirically verified at this pin (baseline detect with the full gold constraint set on a detached worktree, removed after). The case exercises the satisfied-requires path on a historical tree far from HEAD. ADR-0008 surfaces as an orphan here (examples/ exists at this pin but deep-imports no api module), so any ADR-0008 firing at this pin is a subject-overreach false positive. See historical_pins for the pre-pydantic skeleton pin 6af4134, which is the era context for ADR-0009's decision date (2020-04-06 code, ADR text 2020-06-09)."
+    }
+  ]
+}

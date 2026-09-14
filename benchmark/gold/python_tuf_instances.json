@@ -1,0 +1,166 @@
+{
+  "version": 1,
+  "created": "2026-09-12",
+  "repo_id": "python-tuf",
+  "pin_commit": "6889cfbffbb90a17930fbdedf12ae050be775fe3",
+  "pin_date": "2026-07-14",
+  "adr_dir": "docs/adr",
+  "verification": "verified 2026-09-12: all 8 cases run empirically at the pin (in-memory ADG from parse_repo + gold constraints, process_diff + ADGPipeline().run_prepared); baseline detect at 6889cfbf yields zero violations; the historical compliant probe verified on a detached checkout of eb67b09c (worktree removed after); the 499f1c85^ and 22b27264 historical ADR-0006 candidates were rejected as unfireable (uniform seeding masks the requires) — see historical_pins reasons",
+  "historical_pins": [
+    {
+      "commit": "499f1c858ea315be578087bbb189b46e9504ecfc^",
+      "date": "2021-03-04",
+      "reason": "Parent of 'Add concrete de/serializer implementations' (= 4a22b4a5): content-verified that tuf/api/metadata.py has no tuf.api.serialization import at any scope while tuf/api/serialization/json.py already exists. Rejected as a case pin because the engine cannot fire ADR-0006 there: metadata.py's module-level json.dumps/loads factory calls register a CALLS edge tuf.api.metadata -> tuf.api.serialization.json (NameResolver resolves the bare 'json' name to the only known FQN ending in .json), and that module edge satisfies every appended scope under uniform seeding (#115/#124a), so the requires never fires. Empirically verified against the pipeline on a detached checkout of 4a22b4a5."
+    },
+    {
+      "commit": "eb67b09cf8348516f9fa9137a64232056f092a6d",
+      "date": "2022-01-26",
+      "reason": "a2794c2f^, parent of 'Drop legacy implementation': tuf/repository/ does not exist yet, so ADR-0010's subject matches nothing (constraint verified orphan at this pin) while ~7000 lines of legacy repository_tool.py/repository_lib.py implement repository functionality on raw tuf.formats/json wire code without the Metadata API. Used as the historical compliant probe tuf-bench-hist-pre-repository-compliant: zero expected violations, any ADR-0010 firing here is subject overreach. Empirically verified: baseline detect at this pin yields zero violations with the full gold constraint set, ADR-0010 listed as an orphan."
+    },
+    {
+      "commit": "5e17617fc5c2b9295fa9731e92e082e0329b3a36",
+      "date": "2022-11-28",
+      "reason": "'Add repository module': introduces tuf/repository/__init__.py + _repository.py; __init__.py imports only tuf.repository._repository (the discriminating counterpart for ADR-0010's requires, transitive path does not satisfy). Not used as a case pin: tuf/api/metadata.py at this commit already imports tuf.api.serialization at module level (line 61), so ADR-0006 stays masked here too, and an ADR-0010 injected instance at this pin would duplicate the eval-pin injected cases' shape."
+    },
+    {
+      "commit": "22b2726413f7cde2361bd701ac6b9bc21ee7bfcb",
+      "date": "2024-02-21",
+      "reason": "'Metadata API: move inner classes to internal module': large metadata.py refactor in the pin window. Rejected: tuf/api/metadata.py at this commit imports tuf.api.serialization at module level (line 67), so ADR-0006 is uniformly seeded/satisfied and no instance can fire here either."
+    }
+  ],
+  "cases": [
+    {
+      "case_id": "tuf-bench-legacy-json-store",
+      "type": "injected",
+      "description": "New module in the repository package loads and stores role metadata files with the stdlib json module and a hand-rolled role store class, bypassing the Metadata API entirely (added file; instance-disjoint from the eval's __init__.py helpers by module and by FQN)",
+      "diff": [
+        {
+          "path": "tuf/repository/_legacy.py",
+          "append": "\nimport json\nimport os\n\n\ndef read_role_file(role_path):\n    \"\"\"Load a role metadata file with the stdlib json module (new code).\"\"\"\n    with open(os.fspath(role_path), \"rb\") as file:\n        return json.loads(file.read().decode(\"utf-8\"))\n\n\ndef write_role_file(role_path, signed_dict):\n    \"\"\"Store a role metadata file with the stdlib json module (new code).\"\"\"\n    with open(os.fspath(role_path), \"wb\") as file:\n        file.write(json.dumps(signed_dict).encode(\"utf-8\"))\n\n\nclass LegacyRoleStore:\n    \"\"\"Role storage hand-rolled on the stdlib json module (new code).\"\"\"\n\n    def load(self, role_path):\n        with open(os.fspath(role_path), \"rb\") as file:\n            return json.loads(file.read().decode(\"utf-8\"))\n"
+        }
+      ],
+      "expected_violations": [
+        {
+          "adr_id": "ADR-0010",
+          "predicate": "requires_dependency",
+          "subject": "tuf.repository.*",
+          "object": "tuf.api.metadata.*",
+          "matched_fqn": "tuf.repository._legacy.read_role_file",
+          "justification": "ADR-0010 ('Repository library design built on top of Metadata API'): 'Metadata API makes modifying metadata far easier than legacy code base', and the gold constraint reads 'the repository library is built on top of the Metadata API; this is a dependency'. The new read_role_file function in the added module tuf/repository/_legacy.py parses a role metadata file with the stdlib json module, bypassing the Metadata API; the added module has no dependency on tuf.api.metadata at any scope. Function FQN reported because the change is behavior-level and the module scope (tuf.repository._legacy) reports only if the function itself were absent; verified firing empirically at the pin."
+        },
+        {
+          "adr_id": "ADR-0010",
+          "predicate": "requires_dependency",
+          "subject": "tuf.repository.*",
+          "object": "tuf.api.metadata.*",
+          "matched_fqn": "tuf.repository._legacy.write_role_file",
+          "justification": "ADR-0010 ('Repository library design built on top of Metadata API'): the repository library is built on top of the Metadata API, and the gold constraint reads 'the repository library is built on top of the Metadata API; this is a dependency'. The new write_role_file function stores a role metadata file with the stdlib json module, bypassing the Metadata API; like its read-side sibling it has no dependency on tuf.api.metadata at any scope in the added module. Verified firing empirically at the pin."
+        },
+        {
+          "adr_id": "ADR-0010",
+          "predicate": "requires_dependency",
+          "subject": "tuf.repository.*",
+          "object": "tuf.api.metadata.*",
+          "matched_fqn": "tuf.repository._legacy.LegacyRoleStore",
+          "justification": "ADR-0010 ('Repository library design built on top of Metadata API'): the repository library is built on top of the Metadata API, and the gold constraint reads 'the repository library is built on top of the Metadata API; this is a dependency'. LegacyRoleStore is a new repository-side class in the added module whose load method parses role metadata with the stdlib json module; the class scope has no dependency on tuf.api.metadata at any scope (the module imports json and os only), so the class fails the requires and its load method dedups beneath it via module-level dedup. Verified firing empirically at the pin."
+        }
+      ],
+      "grading_note": "All three firings are exact and genuine: the added module imports json/os only, so no seeding artifact is involved (unlike _repository.py, which imports tuf.api.metadata at module level and satisfies all of its scopes). Module-level dedup collapses LegacyRoleStore.load under LegacyRoleStore; if a dedup change re-opens the method FQN, ancestor-descendant tolerance scores it partial. The appended 'import json'/'import os' must stay quiet under ADR-0001: those prohibitions name only python2.7 and python3.5. Instance-disjointness: the eval's stdlib-json repository instance lives in tuf/repository/__init__.py (functions read_role_file_with_stdlib_json/write_role_file_with_stdlib_json); this case is a different module, different function names, and a class-level firing the eval does not have."
+    },
+    {
+      "case_id": "tuf-bench-legacy-repo-client",
+      "type": "injected",
+      "description": "Class-only violation shape: a new repository client class speaks raw JSON role files with the stdlib json module; the firing lands on the class FQN and the methods dedup beneath it",
+      "diff": [
+        {
+          "path": "tuf/repository/_writer.py",
+          "append": "\nimport json\n\n\nclass LegacyRepoClient:\n    \"\"\"Repository client that speaks raw JSON role files (new code).\"\"\"\n\n    def fetch_role(self, path):\n        with open(path, \"rb\") as file:\n            return json.loads(file.read().decode(\"utf-8\"))\n\n    def push_role(self, path, signed_dict):\n        with open(path, \"wb\") as file:\n            file.write(json.dumps(signed_dict).encode(\"utf-8\"))\n"
+        }
+      ],
+      "expected_violations": [
+        {
+          "adr_id": "ADR-0010",
+          "predicate": "requires_dependency",
+          "subject": "tuf.repository.*",
+          "object": "tuf.api.metadata.*",
+          "matched_fqn": "tuf.repository._writer.LegacyRepoClient",
+          "justification": "ADR-0010 ('Repository library design built on top of Metadata API'): the repository library is built on top of the Metadata API, and the gold constraint reads 'the repository library is built on top of the Metadata API; this is a dependency'. The added module tuf/repository/_writer.py imports json only and its LegacyRepoClient methods parse/store role metadata as raw JSON; the class scope (and, by inheritance, its method scopes) has no dependency on tuf.api.metadata at any scope, so the class fails the requires and both methods dedup beneath it via module-level dedup. Verified firing empirically at the pin: exactly one violation, at the class FQN."
+        }
+      ],
+      "grading_note": "Single exact firing at the class FQN. The method FQNs (LegacyRepoClient.fetch_role/push_role) are changed FQNs too but must be deduped under the class-level report; a future dedup change that re-opens a method FQN scores partial via ancestor-descendant tolerance, never a new exact hit. Instance-disjoint from the eval's __init__.py function helpers (different module, class-granularity firing) and from tuf-bench-legacy-json-store (this module has no module-level functions, isolating the class-scope inheritance path)."
+    },
+    {
+      "case_id": "tuf-bench-hist-pre-repository-compliant",
+      "type": "historical",
+      "commit": "eb67b09cf8348516f9fa9137a64232056f092a6d",
+      "description": "Historical compliant probe at the pre-legacy-drop pin (a2794c2f^, 2022-01-26): tuf/repository/ does not exist yet, so ADR-0010's subject matches nothing and the legacy wire-format repository code violates nothing in the gold constraint set",
+      "expected_violations": [],
+      "grading_note": "Zero violations expected and empirically verified at this pin (baseline detect with the full gold constraint set: no violations; ADR-0010 surfaces as an orphan constraint because tuf.repository.* matches no node in the 2022-01-26 tree). The legacy tuf/repository_tool.py and tuf/repository_lib.py (~7000 lines, raw tuf.formats/json wire handling, no Metadata API) predate ADR-0010's repository library design and sit entirely outside its subject; any ADR-0010 firing here is a subject-overreach false positive, and any ADR-0006 firing would be a false positive too because tuf/api/metadata.py at this pin imports tuf.api.serialization at module level (satisfied under uniform seeding). ADR-0001's prohibitions cannot fire: the pin's code contains no python2.7/python3.5 dependency."
+    },
+    {
+      "case_id": "tuf-bench-probe-repository-metadata-import",
+      "type": "compliant_probe",
+      "description": "New module in the repository package loads role metadata through the Metadata API from-import: the sanctioned ADR-0010 pattern",
+      "diff": [
+        {
+          "path": "tuf/repository/_reader.py",
+          "append": "\nfrom tuf.api.metadata import Metadata\n\n\ndef load_metadata_file(path):\n    \"\"\"Load metadata via the Metadata API (new code).\"\"\"\n    with open(path, \"rb\") as file:\n        return Metadata.from_file(file)\n"
+        }
+      ],
+      "expected_violations": [],
+      "grading_note": "No violation beyond baseline (baseline at the pin is empty): the added module imports Metadata from tuf.api.metadata at module level, so ADR-0010's requires is satisfied for the appended load_metadata_file via enclosing-module seeding (#115), and the function's own CALLS edge to Metadata.from_file reinforces it. This module is new at the eval pin (the eval used only __init__.py and _repository.py inside tuf/repository/), so the probe is instance-disjoint from every eval case. Any ADR-0010 firing on load_metadata_file or the module would be an over-trigger false positive."
+    },
+    {
+      "case_id": "tuf-bench-probe-repository-dotted-import",
+      "type": "compliant_probe",
+      "description": "New repository module whose only Metadata API dependency is the plain whole-module dotted import form: probes import-form registration on the ADR-0010 requires (repository-side counterpart of the eval's serialization dotted-import probe)",
+      "diff": [
+        {
+          "path": "tuf/repository/_dotted.py",
+          "append": "\nimport tuf.api.metadata\n\n\ndef load_role_metadata(role_path):\n    \"\"\"Load role metadata through the dotted Metadata API import form (new code).\"\"\"\n    return tuf.api.metadata.Metadata.from_file(role_path)\n"
+        }
+      ],
+      "expected_violations": [],
+      "grading_note": "No violation beyond baseline (baseline at the pin is empty). Import-form probe (verified in the post-augment graph): the plain whole-module form 'import tuf.api.metadata' registers IMPORTS tuf.repository._dotted -> tuf.api.metadata verbatim (import_statement records the full dotted target), which satisfies ADR-0010's requires for the appended load_role_metadata; the function's attribute-chain call also registers CALLS onto tuf.api.metadata.Metadata.from_file. This is the discriminating counterpart to tuf-bench-legacy-json-store: same added-file shape, but the dotted import form alone flips the requires from fire to satisfied. If a future change stopped recording plain-import targets, this case would flip to a fire and catch it."
+    },
+    {
+      "case_id": "tuf-bench-probe-sanctioned-serializer",
+      "type": "compliant_probe",
+      "description": "New MetadataSerializer subclass inside the serialization package: the sanctioned ADR-0006 home for wire-format serialization, appended as a class (different FQN granularity and diff than the eval's function helper in the same file)",
+      "diff": [
+        {
+          "path": "tuf/api/serialization/json.py",
+          "append": "\n\nclass CompactJSONSerializer(MetadataSerializer):\n    \"\"\"Compact wire-format serializer without whitespace (new code, sanctioned path).\"\"\"\n\n    def serialize(self, metadata_obj):\n        return json.dumps(metadata_obj.to_dict(), separators=(\",\", \":\")).encode(\"utf-8\")\n"
+        }
+      ],
+      "expected_violations": [],
+      "grading_note": "No violation beyond baseline (baseline at the pin is empty). tuf.api.serialization is outside both requires subjects (tuf.api.metadata.*, tuf.repository.*) and ADR-0006 explicitly sanctions serialization implementations living in the serialization package ('Serialization separated from metadata classes', option 3 / Compromise 2), with the package importing Metadata/Signed per its own HEAD from-import (tuf/api/serialization/json.py:20). Instance-disjointness within the shared file: the eval's case in json.py appended a module-level function (signed_metadata_from_bytes, dotted-import probe); this case appends a class subclassing MetadataSerializer, so neither the diff content nor the changed FQNs overlap. Any firing on CompactJSONSerializer would be a subject-overreach false positive; the appended code's json usage must stay quiet under ADR-0001 (prohibits name python2.7/python3.5 only)."
+    },
+    {
+      "case_id": "tuf-bench-probe-payload-out-of-scope",
+      "type": "compliant_probe",
+      "description": "Hand-rolled wire-format JSON helper in tuf/api/_payload.py: probes that ADR-0006's subject tuf.api.metadata.* does NOT cover the adjacent tuf.api._payload package (corrected form of the census's _payload suggestion, which cannot fire)",
+      "diff": [
+        {
+          "path": "tuf/api/_payload.py",
+          "append": "\n\ndef _wire_json_fallback(signed_dict):\n    \"\"\"Hand-rolled wire-format JSON encoding outside the serialization package (new code).\"\"\"\n    import json\n    return json.dumps(signed_dict, sort_keys=True).encode(\"utf-8\")\n"
+        }
+      ],
+      "expected_violations": [],
+      "grading_note": "No violation beyond baseline (baseline at the pin is empty), and this is a deliberate negative control: the appended helper hand-rolls wire-format JSON exactly like ADR-0006's rejected option 1, but the constraint's subject is the literal prefix tuf.api.metadata.* and tuf.api._payload is a sibling package, not a descendant of tuf.api.metadata, so no constraint covers it (tuf.* only prohibits python2.7/python3.5). Verified empirically: zero firings at the pin. Subject-pattern coverage finding recorded for the curation team: the census's suggestion of an ADR-0006 instance at tuf.api._payload.<name> (census section 6, row ADR-0006, option b) cannot fire under the gold subject and was downgraded from a violating instance to this compliant probe; a firing here would indicate subject-pattern overreach."
+    },
+    {
+      "case_id": "tuf-bench-probe-repository-json-satisfied",
+      "type": "compliant_probe",
+      "description": "New stdlib-json helper appended inside tuf/repository/_repository.py: the module's own Metadata API import satisfies the appended scope even though the function itself only touches json (discriminating probe of module-import seeding)",
+      "diff": [
+        {
+          "path": "tuf/repository/_repository.py",
+          "append": "\n\ndef _parse_role_bytes(data):\n    \"\"\"Re-parse raw role bytes with the stdlib json module (new helper).\"\"\"\n    import json\n    return json.loads(data.decode(\"utf-8\"))\n"
+        }
+      ],
+      "expected_violations": [],
+      "grading_note": "No violation beyond baseline (baseline at the pin is empty): tuf/repository/_repository.py imports tuf.api.metadata at module level (tuf/repository/_repository.py:15), so ADR-0010's requires is satisfied for the appended _parse_role_bytes via enclosing-module seeding (#115) even though the function itself never touches the Metadata API. Instance-disjointness within the shared file: the eval's _repository.py case is a zero-expectation probe appending a bare _helper(): pass; this case appends a stdlib-json-using function, so the diff and the changed FQN differ. The case discriminates a per-function-usage satisfaction semantics (issue 124 option b): such a change would flip this probe to a fire, and any ADR-0010 firing today means the #115 seeding regressed and counts as an over-trigger false positive."
+    }
+  ]
+}

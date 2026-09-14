@@ -1,0 +1,211 @@
+{
+  "version": 1,
+  "created": "2026-09-12",
+  "repo_id": "experimenter",
+  "pin_commit": "d61a2b8efcb7fd77a849c9f9dc163130473b7f16",
+  "pin_date": "2026-08-31",
+  "adr_dir": "docs/adrs",
+  "verification": "passed: all 9 cases verified empirically at the pin (in-memory ADG from parse_repo + gold constraints, process_diff + ADGPipeline().run_prepared); baseline detect at d61a2b8 yields zero violations; the historical case verified against a temp worktree at a2de3aeb (removed after verification); every expected_violation fired with exact subject/object/matched_fqn and every probe scored zero",
+  "historical_pins": [
+    {
+      "commit": "a2de3aebd37bbc6bc76f15ff2704f082c864e856",
+      "date": "2023-06-09",
+      "reason": "'add jetstream/analysis schemas' — the commit that introduces schemas/mozilla_nimbus_schemas/; at this tree experimenter/experimenter/jetstream/client.py still hand-parses Jetstream JSON ('import json', json.loads in load_data_from_gcs) with no mozilla_nimbus_schemas and no pydantic import. Content-verified via git show: the ADR-0010 requires-violation snapshot is real and predates the fix era (b6d9aebc, 2023-06-23, per census)."
+    }
+  ],
+  "cases": [
+    {
+      "case_id": "exp-bench-hist-pre-schema-client",
+      "type": "historical",
+      "commit": "a2de3aebd37bbc6bc76f15ff2704f082c864e856",
+      "description": "Historical ADR-0010 violation snapshot (2023-06-09): the Jetstream client ingests analysis results by hand-parsing JSON with the stdlib json module, weeks before schema-based validation landed; the shared-schema package (schemas/) was added by this very commit but the client never adopted it",
+      "expected_violations": [
+        {
+          "adr_id": "ADR-0010",
+          "predicate": "requires_dependency",
+          "subject": "experimenter.experimenter.jetstream.*",
+          "object": "mozilla_nimbus_schemas.*",
+          "matched_fqn": "experimenter.experimenter.jetstream.client",
+          "justification": "ADR-0010 (option 1B): 'define the schema using Pydantic ... one schema definition shared between Experimenter and Jetstream would allow for validation of outputs from Jetstream while removing the need for Experimenter to make assumptions.' At this commit experimenter/experimenter/jetstream/client.py imports json/os/django-storage/only-local models (verified via git show: 'import json' line 1, json.loads in load_data_from_gcs) and has no mozilla_nimbus_schemas dependency at any scope, so the ingest layer fails the shared-schema requires. Module FQN reported (doubled prefix per the experimenter/experimenter/ layout at this commit)."
+        }
+      ],
+      "grading_note": "The client.py import state and path structure were verified against the real tree at a2de3aeb (git show a2de3aeb:experimenter/experimenter/jetstream/client.py). Evaluation parses the repo at the historical commit and treats the jetstream client scopes as changed; sibling jetstream modules at this pin (models.py, tasks.py, results_manager.py) also lack a mozilla_nimbus_schemas dependency and would produce additional true findings of the same historical violation class — score them as true firings, not false positives; the required exact hit is the client module FQN. ADR-0010's schemas.mozilla_nimbus_schemas.* requires pydantic constraint stays satisfied at this pin (the schemas/ tree added by this commit imports pydantic), and ADR-0003's requires google.cloud.storage constraint is orphan-inactive here (no google.cloud import exists anywhere in the 2023-06-09 tree, so its object node does not exist)."
+    },
+    {
+      "case_id": "exp-bench-graphene-backslide",
+      "type": "injected",
+      "description": "New nimbus_ui module resurrects the dead graphene stack for a dashboard view: fires ADR-0008's GraphQL prohibition; this is the code-side anchor of the census section 4 natural conflict pair (ADR-0002 GQL mandate vs ADR-0008 HTMX migration) — synthetic-conflict injection comes later per issue 74",
+      "diff": [
+        {
+          "path": "experimenter/experimenter/nimbus_ui/legacy_graphql.py",
+          "append": "\nimport graphene\n\n\nclass LegacyGraphQLDashboardView:\n    \"\"\"Dashboard data served through the retired GraphQL stack (new code).\n\n    Reintroduces graphene, which ADR-0008 removed because 'using GraphQL\n    significantly hinders the performance of the Experimenter'.\n    \"\"\"\n\n    def dashboard_query(self, slug):\n        schema = graphene.Schema()\n        return schema.execute(\"{ experiment(slug: \\\"%s\\\") }\" % slug)\n"
+        }
+      ],
+      "expected_violations": [
+        {
+          "adr_id": "ADR-0008",
+          "predicate": "prohibits_dependency",
+          "subject": "experimenter.experimenter.nimbus_ui.*",
+          "object": "graphene",
+          "matched_fqn": "experimenter.experimenter.nimbus_ui.legacy_graphql",
+          "justification": "ADR-0008: 'using GraphQL significantly hinders the performance of the Experimenter as it adds extra overhead while making the call and the benefit of using GraphQL is not something we are making use of.' The added module imports graphene — a stack that is fully gone at the pin (no graphene import under experimenter/experimenter/, no graphene dependency in experimenter/pyproject.toml) — so the HTMX-era UI layer regresses to the deprecated GraphQL path. Structural predicate, reported at the module that owns the new import. Any graphene firing here simultaneously revives ADR-0002's superseded front-end GQL mandate (census section 4 natural conflict pair)."
+        }
+      ],
+      "grading_note": "Exactly one firing expected, at the added module FQN. The graphene EXTERNAL node is created by the diff augmentation itself (no graphene node exists in the baseline graph, so at baseline the prohibition is orphan-inactive and the pin is compliant). The appended class's method FQNs collapse into the module-level report (module owns the import). Any additional firing (e.g. an ADR-0010 or ADR-0003 requires on this nimbus_ui module) is a false positive: nimbus_ui is outside both requires subjects."
+    },
+    {
+      "case_id": "exp-bench-jetstream-db-snapshot",
+      "type": "injected",
+      "description": "New jetstream module caches experiment results through the Django ORM (experimenter.experiments.models) and hand-rolls its result shape without the shared schema package; documents the DB-write shape against ADR-0003's dropped prohibition while firing ADR-0010's requires",
+      "diff": [
+        {
+          "path": "experimenter/experimenter/jetstream/db_snapshot.py",
+          "append": "\nimport json\n\nfrom experimenter.experiments.models import NimbusExperiment\n\n\ndef snapshot_results_data(experiment_id):\n    \"\"\"Persist analysis results straight into the Django database (new code).\"\"\"\n    experiment = NimbusExperiment.objects.get(id=experiment_id)\n    raw = experiment.results_data or {}\n    experiment.results_data = json.loads(json.dumps(raw))\n    experiment.save()\n    return experiment.results_data\n\n\ndef purge_stale_snapshots(slug):\n    \"\"\"Delete cached analysis rows for a slug from the database (new code).\"\"\"\n    return NimbusExperiment.objects.filter(slug=slug).update(results_data={})\n\n\nclass DbResultsCache:\n    \"\"\"Database-backed cache for Jetstream analysis output (new code).\"\"\"\n\n    def load(self, experiment_id):\n        return NimbusExperiment.objects.get(id=experiment_id).results_data\n\n    def store(self, experiment_id, payload):\n        NimbusExperiment.objects.filter(id=experiment_id).update(results_data=payload)\n"
+        }
+      ],
+      "expected_violations": [
+        {
+          "adr_id": "ADR-0010",
+          "predicate": "requires_dependency",
+          "subject": "experimenter.experimenter.jetstream.*",
+          "object": "mozilla_nimbus_schemas.*",
+          "matched_fqn": "experimenter.experimenter.jetstream.db_snapshot.snapshot_results_data",
+          "justification": "ADR-0010 (option 1B): analysis results flowing through the Jetstream layer must be validated against the shared schema package. The added module persists and reshapes results_data with the stdlib json module and the Django ORM; it has no mozilla_nimbus_schemas dependency at any scope, so the appended function fails the requires."
+        },
+        {
+          "adr_id": "ADR-0010",
+          "predicate": "requires_dependency",
+          "subject": "experimenter.experimenter.jetstream.*",
+          "object": "mozilla_nimbus_schemas.*",
+          "matched_fqn": "experimenter.experimenter.jetstream.db_snapshot.purge_stale_snapshots",
+          "justification": "ADR-0010 (option 1B): like its sibling, the appended purge_stale_snapshots function operates on Jetstream analysis results in the module that imports no mozilla_nimbus_schemas at any scope, so it fails the shared-schema requires independently."
+        },
+        {
+          "adr_id": "ADR-0010",
+          "predicate": "requires_dependency",
+          "subject": "experimenter.experimenter.jetstream.*",
+          "object": "mozilla_nimbus_schemas.*",
+          "matched_fqn": "experimenter.experimenter.jetstream.db_snapshot.DbResultsCache",
+          "justification": "ADR-0010 (option 1B): the DbResultsCache class loads/stores analysis output with no dependency on the shared schema package at class scope (its module imports json and the Django ORM only); both methods dedup beneath the class FQN via module-level dedup."
+        }
+      ],
+      "grading_note": "Three exact ADR-0010 firings (two module-level functions + the class whose methods dedup beneath it); the module imports json and experimenter.experiments.models only, so no seeding artifact is involved (uniform seeding would satisfy appended scopes only via the module's own imports, which name neither mozilla_nimbus_schemas nor pydantic). Deliberate negative control on the dropped constraint: ADR-0003's DB-write prohibition was dropped from the gold (at the pin client.py:25 legitimately imports experimenter.experiments.models and jetstream/tasks.py:18 is the sanctioned writer persisting results_data), so ZERO ADR-0003 prohibits firings are expected on this DB-writing module — any prohibits firing here is a dropped-constraint resurrection false positive. ADR-0003's requires google.cloud.storage is also expected quiet here: no google.cloud node exists in this single-file diff, leaving the constraint orphan-inactive."
+    },
+    {
+      "case_id": "exp-bench-manual-schema-validation",
+      "type": "injected",
+      "description": "New jetstream ingest helpers fetch through GCS but validate the payloads with hand-rolled isinstance checks instead of the shared pydantic schemas: instance-disjoint from the historical case by module and FQN",
+      "diff": [
+        {
+          "path": "experimenter/experimenter/jetstream/manual_ingest.py",
+          "append": "\nimport google.cloud.storage\n\n\ndef validate_statistics_payload(payload):\n    \"\"\"Hand-rolled shape check for Jetstream statistics (new code).\"\"\"\n    if not isinstance(payload, list):\n        raise ValueError(\"statistics payload must be a list\")\n    for point in payload:\n        if not isinstance(point, dict) or \"metric\" not in point or \"statistic\" not in point:\n            raise ValueError(\"malformed statistics point\")\n    return payload\n\n\ndef validate_metadata_payload(payload):\n    \"\"\"Hand-rolled shape check for Jetstream metadata (new code).\"\"\"\n    if not isinstance(payload, dict) or \"analysis_start_time\" not in payload:\n        raise ValueError(\"malformed metadata payload\")\n    return payload\n"
+        }
+      ],
+      "expected_violations": [
+        {
+          "adr_id": "ADR-0010",
+          "predicate": "requires_dependency",
+          "subject": "experimenter.experimenter.jetstream.*",
+          "object": "mozilla_nimbus_schemas.*",
+          "matched_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_statistics_payload",
+          "justification": "ADR-0010 (option 1B): 'define the schema using Pydantic ... one schema definition shared between Experimenter and Jetstream would allow for validation of outputs from Jetstream.' The appended validate_statistics_payload validates Jetstream output with hand-rolled isinstance checks; the added module's only import is google.cloud.storage, so no scope of it reaches mozilla_nimbus_schemas and the requires fires at the function FQN."
+        },
+        {
+          "adr_id": "ADR-0010",
+          "predicate": "requires_dependency",
+          "subject": "experimenter.experimenter.jetstream.*",
+          "object": "mozilla_nimbus_schemas.*",
+          "matched_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_metadata_payload",
+          "justification": "ADR-0010 (option 1B): the appended validate_metadata_payload likewise validates Jetstream metadata by hand; the module has no mozilla_nimbus_schemas dependency at any scope, so it fails the shared-schema requires independently of its sibling."
+        }
+      ],
+      "grading_note": "Both ADR-0010 firings are exact and genuine: the added module's single module-level import (google.cloud.storage, plain whole-module form) satisfies ADR-0003's requires for every appended scope under uniform seeding (#115/#124a) but provides no path to mozilla_nimbus_schemas, isolating the ADR-0010 signal. Instance-disjoint from exp-bench-hist-pre-schema-client (different module, different FQNs, different pin) and from exp-bench-jetstream-db-snapshot (no ORM usage here). The appended 'import google.cloud.storage' must stay quiet under every prohibition in the gold: the only prohibits names graphene and applies to nimbus_ui, not jetstream."
+    },
+    {
+      "case_id": "exp-bench-gcs-bypass",
+      "type": "injected",
+      "description": "New jetstream fetch helpers pull analysis data over plain HTTP (requests) instead of Google Cloud Storage; a sibling GCS helper in the same diff establishes the google.cloud.storage node so the ADR-0003 requires is active",
+      "diff": [
+        {
+          "path": "experimenter/experimenter/jetstream/requests_fetch.py",
+          "append": "\nimport requests\nfrom mozilla_nimbus_schemas.jetstream import Statistics\n\n\ndef fetch_statistics_via_http(slug, window):\n    \"\"\"Fetch Jetstream statistics over plain HTTP instead of GCS (new code).\"\"\"\n    response = requests.get(f\"https://jetstream.example/statistics_{slug}_{window}.json\")\n    return Statistics.model_validate(response.json())\n\n\ndef fetch_metadata_via_http(slug):\n    \"\"\"Fetch Jetstream metadata over plain HTTP instead of GCS (new code).\"\"\"\n    response = requests.get(f\"https://jetstream.example/metadata_{slug}.json\")\n    return response.json()\n"
+        },
+        {
+          "path": "experimenter/experimenter/jetstream/gcs_helper.py",
+          "append": "\nimport google.cloud.storage\nfrom mozilla_nimbus_schemas.jetstream import Metadata\n\n\ndef load_metadata_from_gcs(path):\n    \"\"\"Load Jetstream metadata through the sanctioned GCS path (new code).\"\"\"\n    client = google.cloud.storage.Client()\n    blob = client.bucket(\"analysis\").blob(path)\n    return Metadata.model_validate_json(blob.download_as_bytes())\n"
+        }
+      ],
+      "expected_violations": [
+        {
+          "adr_id": "ADR-0003",
+          "predicate": "requires_dependency",
+          "subject": "experimenter.experimenter.jetstream.*",
+          "object": "google.cloud.storage",
+          "matched_fqn": "experimenter.experimenter.jetstream.requests_fetch.fetch_statistics_via_http",
+          "justification": "ADR-0003 (chosen option 2): 'The visualization front end fetches data via a Django REST API, which fetches Jetstream data on demand using GCS dependencies. Data is not stored in the database.' The appended fetch_statistics_via_http pulls Jetstream statistics over plain HTTP; the added module's imports (requests, mozilla_nimbus_schemas.jetstream) provide no path to google.cloud.storage, so the GCS-fetch requires fires at the function FQN."
+        },
+        {
+          "adr_id": "ADR-0003",
+          "predicate": "requires_dependency",
+          "subject": "experimenter.experimenter.jetstream.*",
+          "object": "google.cloud.storage",
+          "matched_fqn": "experimenter.experimenter.jetstream.requests_fetch.fetch_metadata_via_http",
+          "justification": "ADR-0003 (chosen option 2): the appended fetch_metadata_via_http likewise fetches Jetstream metadata over plain HTTP with no google.cloud.storage dependency at any scope of the added module, failing the GCS-fetch requires independently."
+        }
+      ],
+      "grading_note": "Two exact ADR-0003 firings, both at requests_fetch function FQNs. Mechanism note (verified in walk_imports): ADR-0003's object is the exact target google.cloud.storage, which the engine registers verbatim ONLY for the plain whole-module import form ('import google.cloud.storage'); the from-import form ('from google.cloud import storage') falls back to the parent target google.cloud, which does not match the object, so the sibling gcs_helper deliberately uses the plain form to activate the constraint node while remaining compliant itself (its module-level imports satisfy both requires for its own appended scope via enclosing-module seeding). requests_fetch imports mozilla_nimbus_schemas.jetstream, so ADR-0010's requires must stay quiet on both its functions — an ADR-0010 firing here is a false positive. Known-miss semantics accepted (recorded in the gold note for ADR-0003): at the pin the sanctioned client.py reaches GCS through django-storages indirection, so the import-level requires cannot be satisfied by HEAD code and only diff-introduced google.cloud.storage nodes activate it."
+    },
+    {
+      "case_id": "exp-bench-probe-jetstream-sanctioned",
+      "type": "compliant_probe",
+      "description": "New jetstream client-path module using the sanctioned pattern: plain google.cloud.storage import plus shared-schema validation, no experiments.models",
+      "diff": [
+        {
+          "path": "experimenter/experimenter/jetstream/schema_client.py",
+          "append": "\nimport google.cloud.storage\nfrom mozilla_nimbus_schemas.jetstream import SampleSizes, Statistics\n\n\ndef load_sizing_from_gcs(path):\n    \"\"\"Load population sizing through GCS and validate via the shared schema (new code).\"\"\"\n    client = google.cloud.storage.Client()\n    raw = client.bucket(\"analysis\").blob(path).download_as_bytes()\n    return SampleSizes.model_validate_json(raw)\n\n\ndef validate_statistics_blob(raw):\n    \"\"\"Validate a statistics blob against the shared schema (new code).\"\"\"\n    return Statistics.model_validate_json(raw)\n"
+        }
+      ],
+      "expected_violations": [],
+      "grading_note": "Zero violations expected. The added module imports google.cloud.storage (plain whole-module form, registering the exact object target) and mozilla_nimbus_schemas.jetstream at module level, so both requires (ADR-0003 GCS, ADR-0010 shared schema) are satisfied for every appended scope via enclosing-module seeding (#115); the function call sites google.cloud.storage.Client(...) and the model_validate calls reinforce the dependency edges. The module deliberately does not import experimenter.experiments.models — and no gold constraint prohibits that import anyway (the ADR-0003 DB-write prohibition was dropped; see the gold note). Any firing on this module is an over-trigger false positive."
+    },
+    {
+      "case_id": "exp-bench-probe-nimbus-ui-no-graphene",
+      "type": "compliant_probe",
+      "description": "New nimbus_ui page module built on plain Django views with no graphene: the sanctioned ADR-0008 HTMX-era pattern",
+      "diff": [
+        {
+          "path": "experimenter/experimenter/nimbus_ui/new/summary_views.py",
+          "append": "\nfrom django.shortcuts import render\nfrom django.views.generic import TemplateView\n\nfrom experimenter.experiments.models import NimbusExperiment\n\n\nclass ExperimentSummaryView(TemplateView):\n    \"\"\"Server-rendered experiment summary page, no GraphQL (new code).\"\"\"\n\n    template_name = \"nimbus_ui/experiment_summary.html\"\n\n    def get_context_data(self, **kwargs):\n        context = super().get_context_data(**kwargs)\n        context[\"experiment\"] = NimbusExperiment.objects.get(slug=kwargs[\"slug\"])\n        return context\n\n\ndef summary_fragment(request, slug):\n    \"\"\"HTMX fragment endpoint returning a partial render (new code).\"\"\"\n    experiment = NimbusExperiment.objects.get(slug=slug)\n    return render(request, \"nimbus_ui/fragments/summary.html\", {\"experiment\": experiment})\n"
+        }
+      ],
+      "expected_violations": [],
+      "grading_note": "Zero violations expected. The only nimbus_ui constraint is ADR-0008's prohibits graphene; the module imports django and experimenter.experiments.models only, and since no graphene node is introduced by the diff, the prohibition stays orphan-inactive — any firing here (e.g. an ADR-0008 requires or an ADR-0003/ADR-0010 requires reaching into nimbus_ui) is a subject-overreach false positive: nimbus_ui is outside both requires subjects. The django-htmx requires candidate was dropped from the gold (see the gold note for ADR-0008), so the absence of a django_htmx import in this HTMX-style module must not fire anything."
+    },
+    {
+      "case_id": "exp-bench-probe-schemas-pydantic",
+      "type": "compliant_probe",
+      "description": "New schema module under schemas/mozilla_nimbus_schemas/jetstream defining pydantic models: the sanctioned ADR-0010 option-1B definition path",
+      "diff": [
+        {
+          "path": "schemas/mozilla_nimbus_schemas/jetstream/population.py",
+          "append": "\nfrom pydantic import BaseModel, Field\n\n\nclass PopulationEstimate(BaseModel):\n    \"\"\"Population sizing estimate shared between Experimenter and Jetstream (new code).\"\"\"\n\n    window: str = Field(description=\"analysis window, e.g. daily, weekly, overall\")\n    estimate: float\n    is_significant: bool\n\n\nclass PopulationEstimates(BaseModel):\n    \"\"\"Container for per-branch population estimates (new code).\"\"\"\n\n    branches: dict[str, PopulationEstimate] = Field(default_factory=dict)\n"
+        }
+      ],
+      "expected_violations": [],
+      "grading_note": "Zero violations expected: schemas.mozilla_nimbus_schemas.jetstream.population sits under the ADR-0010 schemas subject, and the module's 'from pydantic import BaseModel, Field' registers the pydantic dependency at module level, satisfying the requires for both appended classes via uniform seeding (#124a). The FQN is single-prefix (schemas.mozilla_nimbus_schemas.*) because the schemas/ tree sits at the repository root, unlike the doubled experimenter/experimenter/ package layout — the gold carries both spellings deliberately. Any firing here (e.g. the jetstream-subject requires reaching into the schemas tree) is a subject-overreach false positive."
+    },
+    {
+      "case_id": "exp-bench-probe-db-write-no-prohibition",
+      "type": "compliant_probe",
+      "description": "New jetstream module that both writes via the Django ORM and validates through the shared schema: negative control pinning that the dropped ADR-0003 DB-write prohibition stays dropped",
+      "diff": [
+        {
+          "path": "experimenter/experimenter/jetstream/results_store.py",
+          "append": "\nimport google.cloud.storage\nfrom mozilla_nimbus_schemas.jetstream import Statistics\nfrom experimenter.experiments.models import NimbusExperiment\n\n\ndef refresh_results_data(experiment_id):\n    \"\"\"Re-fetch analysis data from GCS and refresh the stored results (new code).\"\"\"\n    client = google.cloud.storage.Client()\n    raw = client.bucket(\"analysis\").blob(f\"statistics_{experiment_id}.json\").download_as_bytes()\n    Statistics.model_validate_json(raw)\n    NimbusExperiment.objects.filter(id=experiment_id).update(results_data={\"v3\": {}})\n    return True\n"
+        }
+      ],
+      "expected_violations": [],
+      "grading_note": "Zero violations expected. This module deliberately combines the three import surfaces of the gold set: google.cloud.storage (plain form satisfies ADR-0003's requires), mozilla_nimbus_schemas.jetstream (satisfies ADR-0010's requires), and experimenter.experiments.models (the ADR-0003 DB-write prohibition was DROPPED from the gold — the census-flagged tasks.py writer plus client.py:25's own model import make any import-level prohibition false-positive-prone — so the ORM write here must fire nothing). Any ADR-0003 prohibits firing on this module is a dropped-constraint resurrection false positive; any ADR-0010 firing is a seeding regression (the module-level schema import satisfies every appended scope under #115/#124a)."
+    }
+  ]
+}

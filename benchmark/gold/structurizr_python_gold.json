@@ -1,0 +1,70 @@
+[
+  {
+    "adr_id": "ADR-0001",
+    "adr_path": "docs/development/adr/0001-record-architecture-decisions.md",
+    "constraints": [],
+    "note": "Meta-process ADR: adopting Nygard-style ADR recording governs how decisions are documented, not how code is structured. No code relation exists. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0002",
+    "adr_path": "docs/development/adr/0002-version-control-our-code.md",
+    "constraints": [],
+    "note": "Process/tooling ADR: git + GitHub collaboration is infrastructure, not a dependency or implementation edge between FQNs. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0003",
+    "adr_path": "docs/development/adr/0003-python-3-6-only.md",
+    "constraints": [],
+    "note": "Deliberately NOT encoded (contrast python-tuf ADR-0001 in the eval gold): the Decision states 'only support Python 3.6 and above' but, unlike python-tuf's ADR-0001, no interpreter version is explicitly named as rejected in the Decision section (Python 2 appears only as Context rationale: 'Python 2 support will be discontinued in 2020'). Encoding a python2 prohibition from that sentence would re-create the passing-mention -> constraint failure mode the eval set classifies as class-A false positives. The f-strings consequence is not a checkable dependency edge. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0004",
+    "adr_path": "docs/development/adr/0004-python-package-versioning.md",
+    "constraints": [],
+    "note": "Build-tooling ADR: versioneer for version management is build infrastructure (src/structurizr/_version.py is versioneer-generated), outside the dependency/implementation constraint grammar. TOOLING-scope family per the #136 classifier. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0005",
+    "adr_path": "docs/development/adr/0005-code-quality-assurance.md",
+    "constraints": [],
+    "note": "Tooling ADR: isort/black/flake8 are style-checking tools; linter edges are TOOLING-scope at resolution and cannot be expressed as dependency/implementation edges between FQNs. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0006",
+    "adr_path": "docs/development/adr/0006-code-testing.md",
+    "constraints": [],
+    "note": "Tooling ADR: tox test-environment configuration is build infrastructure. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0007",
+    "adr_path": "docs/development/adr/0007-unit-tests.md",
+    "constraints": [],
+    "note": "Tooling ADR: pytest as the test framework is a tooling choice, not an architectural constraint between FQNs. Emit no edges."
+  },
+  {
+    "adr_id": "ADR-0008",
+    "adr_path": "docs/development/adr/0008-package-structure.md",
+    "constraints": [
+      {
+        "subject": "examples.*",
+        "predicate": "prohibits_dependency",
+        "object": "structurizr.api.*",
+        "justification": "ADR-0008 exports important classes and functions to the top level to expose a public interface; the full api surface (StructurizrClient, StructurizrClientException, StructurizrClientSettings) is exported at src/structurizr/__init__.py, so client code must consume the api through the top level, not by reaching into structurizr.api directly"
+      }
+    ],
+    "note": "Constraint evidence (api public interface is the top level): src/structurizr/__init__.py docstring 'Create top level imports' with the api re-export block (StructurizrClient, StructurizrClientException, StructurizrClientSettings); the sanctioned client-consumption form is examples/upload_workspace.py:25 ('from structurizr import StructurizrClient, StructurizrClientSettings'). Subject is examples.* (the repo's client-consumer code); tests/ are deliberately NOT in the subject: the ADR's own sentence 'Our unit tests should reflect this package structure' reads as test layout mirroring the package tree (tests/unit/model/, tests/unit/view/), which the tests directory satisfies, so tests' deep imports are the sanctioned mirror shape, not violations. Scope limit documented: the object covers structurizr.api only. examples/* importing structurizr.model / structurizr.view directly is NOT a violation under this gold: the top level does not re-export model/view classes (only workspace + api surface), so for those the deep import IS the working pattern (3 of 4 examples at HEAD do it); encoding a model/view prohibition would make the baseline dirty against the repo's own working state. Import-target note: import edges record the literal dotted target (structurizr.api.structurizr_client), which is distinct from the module FQN prefix (src.structurizr.*); this src-layout asymmetry is this repo's documented layout rule (counterpart of flowkit's doubled pkg/pkg)."
+  },
+  {
+    "adr_id": "ADR-0009",
+    "adr_path": "docs/development/adr/0009-use-pydantic-for-json-de-serialization.md",
+    "constraints": [
+      {
+        "subject": "src.structurizr.api.*",
+        "predicate": "requires_dependency",
+        "object": "pydantic",
+        "justification": "ADR-0009 chooses pydantic for JSON (de-)serialization; the api package performs the remote-workspace (de)serialization and its settings/response modules depend on pydantic (src/structurizr/api/api_response.py:21, src/structurizr/api/structurizr_client_settings.py:31)"
+      }
+    ],
+    "note": "Constraint evidence (api package's JSON handling rides on pydantic): src/structurizr/api/api_response.py:21 (from pydantic import Field), src/structurizr/api/structurizr_client_settings.py:31 (from pydantic import UUID4, BaseSettings, DirectoryPath, Field, HttpUrl); the client shuttles Workspace/WorkspaceIO pydantic models (src/structurizr/api/structurizr_client.py:33). 39 pydantic imports across src at HEAD; zero 'import json' in src. Deliberately NOT encoded: (a) a blanket 'src.structurizr.* requires pydantic' (over-broad: any changed module without pydantic would spuriously fire); (b) a model-layer json prohibition ('src.structurizr.model.* prohibits json'): the ADR's separation consequence is class-level (each model has a corresponding IO pydantic model: Model/ModelIO co-located in src/structurizr/model/model.py, Workspace/WorkspaceIO in src/structurizr/workspace.py), not a package-level direction, and the Decision is a choice of tool for JSON (de-)serialization, not an explicit prohibition of stdlib json anywhere; encoding it would manufacture a mandate (the openlobby class-A failure mode). Subject/object shape note: object is the bare 'pydantic' top-level import target as recorded on IMPORTS edges; the subject carries the src. layout prefix because module FQNs are derived from paths (src-layout), this repo's documented layout rule."
+  }
+]
