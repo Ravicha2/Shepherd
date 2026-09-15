@@ -49,3 +49,20 @@
 - **Class-A provenance artifact:** the registered split cannot distinguish "object verified absent via node_search (empty result)" from "object never consulted" — both land in A. Refinement (e.g. recording consulted-but-empty node_search calls as tool-verified) routes to **#148**'s M1 instrumentation; not edited mid-batch per protocol.
 - **Traces are local-only** (`logs/` gitignored, #140 convention): `logs/benchmark-arms-149/<repo>-<arm>-run<k>/resolver_traces.jsonl`, 282 records, preserved for #148 re-scoring.
 - Smoke artifact (`benchmark/reports/smoke-2026-09-15/`, harness-validation cell) is not part of the batch denominator.
+
+## Precision / recall view (means over k=3)
+
+TP = exact + partial matches (ancestor tolerance); ingestion FP = unmatched uncredited edges; detection FP = every reported violation gold does not expect (structural + merge-mechanism + arm-candidate fires); recall = TP / expected units (ingestion 4/6/4/2 gold constraints, detection 6/12/18/6 expected violations per repo).
+
+| repo | arm | ingestion P | ingestion R | detection P | detection R |
+|---|---|---|---|---|---|
+| python-tuf | node_on | 53.3% | 75.0% | 14.3% | 100.0% |
+| python-tuf | node_off | 60.0% | 75.0% | 33.3% | 100.0% |
+| flowkit | node_on | 7.8% | 66.7% | 0.0% | 0.0% |
+| flowkit | node_off | 9.9% | 50.0% | 0.0% | 0.0% |
+| experimenter | node_on | 6.8% | 25.0% | 0.0% | 0.0% |
+| experimenter | node_off | 9.8% | 33.3% | 0.0% | 0.0% |
+| structurizr-python | node_on | 12.5% | 50.0% | 0.0% | 0.0% |
+| structurizr-python | node_off | 11.1% | 50.0% | 0.0% | 0.0% |
+
+Reading: ingestion precision is low everywhere (resolver over-extraction; node_on slightly less precise from decoy-hedge edges); the KEEP decision lives in flowkit ingestion recall 66.7% vs 50.0% (the anchor-bait row). Detection recall is 0% on three of four repos under BOTH arms — resolver-emitted patterns rarely equal gold patterns tuple-for-tuple, an arm-independent gap and the dominant quality problem. tuf is the exception (100% recall both arms; precision 14-33% from resolver-invented fires).
