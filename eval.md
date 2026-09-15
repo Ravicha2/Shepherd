@@ -470,7 +470,7 @@ Match tallies identical to the #134 baseline on every repo; the change is FP-onl
 
 **Impact / Decision:** **node_search KEEP** — the anchor-bait channel (primary expected effect, pre-registered on #142) is confirmed on flowkit: ADR-0006 `flowapi.flowapi.* requires quart_jwt_extended` partial in all node_on runs, miss in all node_off runs. The FP mass node_on adds is the predicted decoy-hedge residue (prompt-work) and routes to #146; detection-side expected units moved in **no** repo under either arm, so retrieval-quality complaints are not tool-surface questions. Caveats recorded in AGGREGATE.md: class-A cannot distinguish verified-absent via node_search from never-consulted (tuf class shift is attribution, not matching — trace-verified); node_off showed a 2/3 runaway broad-prohibits invention on experimenter (~4.2k structural fires); traces are local-only.
 
-**Comparability:** the unoptimized baseline row for the forward order — #145/#146's expected movement and #148's post-optimization records are judged against these numbers. Not comparable to any legacy eval-set ingestion row (different denominator, different gold).
+**Comparability:** re-framed as a PILOT 2026-09-16 (metrics incomplete: no token/time; #149 comment 5688694516) — quality findings and the KEEP decision stand, but the baseline of record is the instrumented re-run after #153 (same frozen registration). #146's expected movement is still judged against these quality rows. Not comparable to any legacy eval-set ingestion row (different denominator, different gold).
 
 ## Curation mode
 
