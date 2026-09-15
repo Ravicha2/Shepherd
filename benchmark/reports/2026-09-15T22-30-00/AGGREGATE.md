@@ -66,3 +66,18 @@ TP = exact + partial matches (ancestor tolerance); ingestion FP = unmatched uncr
 | structurizr-python | node_off | 11.1% | 50.0% | 0.0% | 0.0% |
 
 Reading: ingestion precision is low everywhere (resolver over-extraction; node_on slightly less precise from decoy-hedge edges); the KEEP decision lives in flowkit ingestion recall 66.7% vs 50.0% (the anchor-bait row). Detection recall is 0% on three of four repos under BOTH arms — resolver-emitted patterns rarely equal gold patterns tuple-for-tuple, an arm-independent gap and the dominant quality problem. tuf is the exception (100% recall both arms; precision 14-33% from resolver-invented fires).
+
+## Retrieval-side diagnosis (post-hoc, 2026-09-16; diagnostic, not a baseline change)
+
+Why detection recall is 0% on flowkit/experimenter/structurizr under both arms (36 missed units, node_on run1 classified):
+
+| cause | units | evidence |
+|---|---|---|
+| subject over-broad, tuple rejected (constraint emitted, engine fires it) | 13 | resolver anchors at the outer dir package: `flowapi.*` vs gold `flowapi.flowapi.*`, `experimenter.*` vs `experimenter.experimenter.nimbus_ui.*`, `src.*` vs `src.structurizr.api.*`; re-scoring with the ingestion scorer's subject tolerance alone recovers 9/12 flowkit, 18/18 experimenter, 4/6 structurizr |
+| object side also wrong (full tolerance recovers only 14/36 total) | 17 | experimenter objects: `pydantic` vs gold `mozilla_nimbus_schemas.*` (one over-deep fp `schemas.mozilla_nimbus_schemas...` with a different root), `google.auth` vs `google.cloud.storage` (absent from all resolved edges) |
+| constraint shape: predicate/role inversion | 3 | flowkit ADR-0003 emitted as `flowmachine.* requires flowapi.*` (direction inverted) instead of `flowclient/flowapi prohibits flowmachine` |
+| constraint never emitted | 2 | structurizr ADR-0008 `examples.* prohibits structurizr.api.*` absent |
+
+Engine-side failures: **zero** (no unit had the exact gold pattern emitted and failed to fire; tuf, the one flat-layout repo where the resolver emits exact patterns, scores 6/6). The ingestion scorer forgives ancestor-subject differences (partial credit) while the detection scorer demands exact tuple equality first — the same granularity slack ingestion punishes as nothing, detection punishes as total miss, so detection recall tracks **repo layout nesting** (flowapi/flowapi, experimenter/experimenter, src/structurizr nest; tuf is flat).
+
+Routing: subject-granularity steering and object-grounding (experimenter jetstream class) -> **#146** prompt/validation; the subject-tolerance question for the detection scorer is a convention decision for **#148**'s scorer to state before it lands, not a post-hoc loosening of this batch's numbers.
