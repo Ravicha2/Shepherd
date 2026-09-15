@@ -1,0 +1,652 @@
+{
+  "_meta": {
+    "generated_at": "2026-09-15T22-36-03",
+    "git_commit": "a3bc053",
+    "arm": "baseline",
+    "semble_version": "0.5.6",
+    "semble_model": "minishlab/potion-code-16M-v2",
+    "resolver_model": "google/gemini-3.1-flash-lite"
+  },
+  "repo_id": "python-tuf",
+  "arm": "node_on",
+  "run_index": 2,
+  "pin_commit": "6889cfbffbb90a17930fbdedf12ae050be775fe3",
+  "ingestion": {
+    "exact": 3,
+    "partial": 0,
+    "miss": 1,
+    "total": 4,
+    "false_positives": 3,
+    "false_positive_edges": [
+      {
+        "adr_id": "ADR-0004",
+        "subject": "tuf.*",
+        "predicate": "prohibits_dependency",
+        "object": "securesystemslib.formats",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0006",
+        "subject": "tuf.api.metadata.Metadata",
+        "predicate": "requires_implementation",
+        "object": "tuf.api.metadata.Metadata.to_dict",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0006",
+        "subject": "tuf.api.serialization.*",
+        "predicate": "requires_implementation",
+        "object": "tuf.api.serialization.MetadataSerializer",
+        "class": "B/C"
+      }
+    ],
+    "credited_fragments": [],
+    "excluded_tooling_edges": [],
+    "accuracy": 0.75,
+    "per_constraint": [
+      {
+        "adr_id": "ADR-0001",
+        "expected": {
+          "subject": "tuf.*",
+          "predicate": "prohibits_dependency",
+          "object": "python2.7",
+          "justification": "ADR-0001 chooses Python 3.6+ only; Python 2.7 is named as end-of-life and explicitly rejected"
+        },
+        "score": "exact_match",
+        "resolved_subject": "tuf.*",
+        "resolved_object": "python2.7",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0001",
+        "expected": {
+          "subject": "tuf.*",
+          "predicate": "prohibits_dependency",
+          "object": "python3.5",
+          "justification": "ADR-0001 chooses Python 3.6+ only; Python 3.5 is named as end-of-life and explicitly rejected"
+        },
+        "score": "exact_match",
+        "resolved_subject": "tuf.*",
+        "resolved_object": "python3.5",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0006",
+        "expected": {
+          "subject": "tuf.api.metadata.*",
+          "predicate": "requires_dependency",
+          "object": "tuf.api.serialization.*",
+          "justification": "ADR-0006 separates serialization from the metadata class model; metadata classes depend on the serialization package (tuf.api.serialization), not the other way around"
+        },
+        "score": "miss",
+        "resolved_subject": null,
+        "resolved_object": null
+      },
+      {
+        "adr_id": "ADR-0010",
+        "expected": {
+          "subject": "tuf.repository.*",
+          "predicate": "requires_dependency",
+          "object": "tuf.api.metadata.*",
+          "justification": "ADR-0010 states the repository library is built on top of the Metadata API; this is a dependency, not an inheritance rule"
+        },
+        "score": "exact_match",
+        "resolved_subject": "tuf.repository.*",
+        "resolved_object": "tuf.api.metadata.*",
+        "class": "B/C"
+      }
+    ],
+    "class_split": {
+      "A": {
+        "matched": 2,
+        "false_positive_edges": 0
+      },
+      "B/C": {
+        "matched": 1,
+        "false_positive_edges": 3
+      }
+    }
+  },
+  "detection": {
+    "cases": [
+      {
+        "case_id": "tuf-bench-legacy-json-store",
+        "type": "injected",
+        "per_unit": [
+          {
+            "expected_fqn": "tuf.repository._legacy.read_role_file",
+            "score": "exact_match"
+          },
+          {
+            "expected_fqn": "tuf.repository._legacy.write_role_file",
+            "score": "exact_match"
+          },
+          {
+            "expected_fqn": "tuf.repository._legacy.LegacyRoleStore",
+            "score": "exact_match"
+          }
+        ],
+        "exact": 3,
+        "partial": 0,
+        "miss": 0,
+        "total": 3,
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.dsse",
+              "changed_fqn": "tuf.api.dsse.SimpleEnvelope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.serialization.json",
+              "changed_fqn": "tuf.api.serialization",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "tuf-bench-legacy-repo-client",
+        "type": "injected",
+        "per_unit": [
+          {
+            "expected_fqn": "tuf.repository._writer.LegacyRepoClient",
+            "score": "exact_match"
+          }
+        ],
+        "exact": 1,
+        "partial": 0,
+        "miss": 0,
+        "total": 1,
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.dsse",
+              "changed_fqn": "tuf.api.dsse.SimpleEnvelope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.serialization.json",
+              "changed_fqn": "tuf.api.serialization",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "tuf-bench-hist-pre-repository-compliant",
+        "type": "historical",
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "total": 0,
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.serialization.json",
+              "changed_fqn": "tuf.api.serialization",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.repository_lib",
+              "changed_fqn": "tuf.repository_lib._get_written_metadata",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.repository_tool",
+              "changed_fqn": "tuf.repository_tool.append_signature",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.developer_tool",
+              "changed_fqn": "tuf.developer_tool._save_project_configuration",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "tuf-bench-probe-repository-metadata-import",
+        "type": "compliant_probe",
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "total": 0,
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.dsse",
+              "changed_fqn": "tuf.api.dsse.SimpleEnvelope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.serialization.json",
+              "changed_fqn": "tuf.api.serialization",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "tuf-bench-probe-repository-dotted-import",
+        "type": "compliant_probe",
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "total": 0,
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.dsse",
+              "changed_fqn": "tuf.api.dsse.SimpleEnvelope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.serialization.json",
+              "changed_fqn": "tuf.api.serialization",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "tuf-bench-probe-sanctioned-serializer",
+        "type": "compliant_probe",
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "total": 0,
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.serialization.json",
+              "changed_fqn": "tuf.api.serialization.json.CompactJSONSerializer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.dsse",
+              "changed_fqn": "tuf.api.dsse.SimpleEnvelope",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0006",
+              "predicate": "requires_implementation",
+              "subject": "tuf.api.serialization.*",
+              "object": "tuf.api.serialization.MetadataSerializer",
+              "matched_fqn": "tuf.api.serialization.json.CompactJSONSerializer.serialize",
+              "changed_fqn": "tuf.api.serialization.json.CompactJSONSerializer.serialize",
+              "change_type": "added"
+            }
+          ],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "tuf-bench-probe-payload-out-of-scope",
+        "type": "compliant_probe",
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "total": 0,
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.dsse",
+              "changed_fqn": "tuf.api.dsse.SimpleEnvelope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.serialization.json",
+              "changed_fqn": "tuf.api.serialization",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "tuf-bench-repository-class-import",
+        "type": "injected",
+        "per_unit": [
+          {
+            "expected_fqn": "tuf.repository._via_repository.MaintenanceRepository",
+            "score": "exact_match"
+          }
+        ],
+        "exact": 1,
+        "partial": 0,
+        "miss": 0,
+        "total": 1,
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.dsse",
+              "changed_fqn": "tuf.api.dsse.SimpleEnvelope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.serialization.json",
+              "changed_fqn": "tuf.api.serialization",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "tuf-bench-repository-facade-import",
+        "type": "injected",
+        "per_unit": [
+          {
+            "expected_fqn": "tuf.repository._via_package.describe_repository_layout",
+            "score": "exact_match"
+          }
+        ],
+        "exact": 1,
+        "partial": 0,
+        "miss": 0,
+        "total": 1,
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.dsse",
+              "changed_fqn": "tuf.api.dsse.SimpleEnvelope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.serialization.json",
+              "changed_fqn": "tuf.api.serialization",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "tuf-bench-probe-repository-sibling-import",
+        "type": "compliant_probe",
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "total": 0,
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.dsse",
+              "changed_fqn": "tuf.api.dsse.SimpleEnvelope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.serialization.json",
+              "changed_fqn": "tuf.api.serialization",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "tuf-bench-serialization-deleted",
+        "type": "known_limitation",
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "total": 0,
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.dsse",
+              "changed_fqn": "tuf.api.dsse.SimpleEnvelope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.serialization.json",
+              "changed_fqn": "tuf.api.serialization",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0006",
+              "predicate": "requires_implementation",
+              "subject": "tuf.api.serialization.*",
+              "object": "tuf.api.serialization.MetadataSerializer",
+              "matched_fqn": "tuf.api.serialization.SerializationError",
+              "changed_fqn": "tuf.api.serialization.SerializationError",
+              "change_type": "deleted"
+            },
+            {
+              "adr_id": "ADR-0006",
+              "predicate": "requires_implementation",
+              "subject": "tuf.api.serialization.*",
+              "object": "tuf.api.serialization.MetadataSerializer",
+              "matched_fqn": "tuf.api.serialization.DeserializationError",
+              "changed_fqn": "tuf.api.serialization.DeserializationError",
+              "change_type": "deleted"
+            },
+            {
+              "adr_id": "ADR-0006",
+              "predicate": "requires_implementation",
+              "subject": "tuf.api.serialization.*",
+              "object": "tuf.api.serialization.MetadataSerializer",
+              "matched_fqn": "tuf.api.serialization.MetadataDeserializer",
+              "changed_fqn": "tuf.api.serialization.MetadataDeserializer",
+              "change_type": "deleted"
+            },
+            {
+              "adr_id": "ADR-0006",
+              "predicate": "requires_implementation",
+              "subject": "tuf.api.serialization.*",
+              "object": "tuf.api.serialization.MetadataSerializer",
+              "matched_fqn": "tuf.api.serialization.MetadataSerializer.serialize",
+              "changed_fqn": "tuf.api.serialization.MetadataSerializer.serialize",
+              "change_type": "deleted"
+            },
+            {
+              "adr_id": "ADR-0006",
+              "predicate": "requires_implementation",
+              "subject": "tuf.api.serialization.*",
+              "object": "tuf.api.serialization.MetadataSerializer",
+              "matched_fqn": "tuf.api.serialization.SignedSerializer",
+              "changed_fqn": "tuf.api.serialization.SignedSerializer",
+              "change_type": "deleted"
+            }
+          ],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "tuf-bench-probe-metadata-seeded",
+        "type": "compliant_probe",
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "total": 0,
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.dsse",
+              "changed_fqn": "tuf.api.dsse.SimpleEnvelope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.serialization.json",
+              "changed_fqn": "tuf.api.serialization",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "tuf-bench-probe-repository-json-satisfied",
+        "type": "compliant_probe",
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "total": 0,
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.dsse",
+              "changed_fqn": "tuf.api.dsse.SimpleEnvelope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.serialization.json",
+              "changed_fqn": "tuf.api.serialization",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      }
+    ],
+    "exact": 6,
+    "partial": 0,
+    "miss": 0,
+    "total": 6,
+    "structural": 28,
+    "merge_mechanism": 6,
+    "arm_candidates": 0
+  }
+}

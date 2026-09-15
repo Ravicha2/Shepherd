@@ -1,0 +1,2524 @@
+{
+  "_meta": {
+    "generated_at": "2026-09-15T23-10-53",
+    "git_commit": "a3bc053",
+    "arm": "baseline",
+    "semble_version": "0.5.6",
+    "semble_model": "minishlab/potion-code-16M-v2",
+    "resolver_model": "google/gemini-3.1-flash-lite"
+  },
+  "repo_id": "experimenter",
+  "arm": "node_on",
+  "run_index": 3,
+  "pin_commit": "d61a2b8efcb7fd77a849c9f9dc163130473b7f16",
+  "ingestion": {
+    "exact": 0,
+    "partial": 1,
+    "miss": 3,
+    "total": 4,
+    "false_positives": 14,
+    "false_positive_edges": [
+      {
+        "adr_id": "ADR-0001",
+        "subject": "experimenter.*",
+        "predicate": "prohibits_dependency",
+        "object": "typescript",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0004",
+        "subject": "experimenter.*",
+        "predicate": "requires_dependency",
+        "object": "celery",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0008",
+        "subject": "experimenter.*",
+        "predicate": "prohibits_dependency",
+        "object": "graphene_django",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0008",
+        "subject": "experimenter.*",
+        "predicate": "prohibits_dependency",
+        "object": "apollo-client",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0009",
+        "subject": "cirrus.*",
+        "predicate": "requires_dependency",
+        "object": "cirrus_sdk",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0009",
+        "subject": "cirrus.*",
+        "predicate": "prohibits_dependency",
+        "object": "nimbus_megazord.fml",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0010",
+        "subject": "experimenter.*",
+        "predicate": "prohibits_dependency",
+        "object": "typescript",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0011",
+        "subject": "experimenter.*",
+        "predicate": "requires_implementation",
+        "object": "experimenter.experimenter.glean.*",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0011",
+        "subject": "experimenter.*",
+        "predicate": "prohibits_implementation",
+        "object": "experimenter.experimenter.glean.models.Prefs",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0012",
+        "subject": "experimenter.*",
+        "predicate": "requires_implementation",
+        "object": "experimenter.experimenter.experiments.api.v5.serializers.NimbusReviewSerializer",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0014",
+        "subject": "experimenter.*",
+        "predicate": "requires_dependency",
+        "object": "group_id",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0014",
+        "subject": "experimenter.*",
+        "predicate": "prohibits_dependency",
+        "object": "normandy_id",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0015",
+        "subject": "cirrus.server.cirrus.main.compute_features_enrollments_v2",
+        "predicate": "requires_dependency",
+        "object": "fastapi",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0015",
+        "subject": "experimenter.experimenter.kinto.tasks.nimbus_synchronize_preview_experiments_in_kinto",
+        "predicate": "requires_dependency",
+        "object": "kinto_http",
+        "class": "B/C"
+      }
+    ],
+    "credited_fragments": [],
+    "excluded_tooling_edges": [
+      {
+        "adr_id": "ADR-0002",
+        "subject": "experimenter.*",
+        "predicate": "requires_dependency",
+        "object": "graphene-django"
+      },
+      {
+        "adr_id": "ADR-0002",
+        "subject": "experimenter.*",
+        "predicate": "requires_dependency",
+        "object": "react"
+      },
+      {
+        "adr_id": "ADR-0002",
+        "subject": "experimenter.*",
+        "predicate": "requires_dependency",
+        "object": "bootstrap"
+      },
+      {
+        "adr_id": "ADR-0002",
+        "subject": "experimenter.*",
+        "predicate": "prohibits_dependency",
+        "object": "tailwind"
+      }
+    ],
+    "accuracy": 0.125,
+    "per_constraint": [
+      {
+        "adr_id": "ADR-0003",
+        "expected": {
+          "subject": "experimenter.experimenter.jetstream.*",
+          "predicate": "requires_dependency",
+          "object": "google.cloud.storage",
+          "justification": "ADR-0003 (chosen option 2): 'The visualization front end fetches data via a Django REST API, which fetches Jetstream data on demand using GCS dependencies. Data is not stored in the database.' The Jetstream fetch layer depends on Google Cloud Storage for on-demand data access; object is the exact import target 'google.cloud.storage' (registered verbatim by plain import_statement or as the from-import fallback target) rather than a wildcard, to dodge NameResolver suffix collisions."
+        },
+        "score": "miss",
+        "resolved_subject": "experimenter.*",
+        "resolved_object": "google.auth"
+      },
+      {
+        "adr_id": "ADR-0008",
+        "expected": {
+          "subject": "experimenter.experimenter.nimbus_ui.*",
+          "predicate": "prohibits_dependency",
+          "object": "graphene",
+          "justification": "ADR-0008: 'using GraphQL significantly hinders the performance of the Experimenter as it adds extra overhead while making the call and the benefit of using GraphQL is not something we are making use of.' New HTMX pages bypass the GraphQL stack ('No API's call needed'); the graphene server-side stack is fully gone at the pin, so any nimbus_ui module importing graphene is a backslide. Object is the exact import target 'graphene' (not a wildcard) to dodge NameResolver suffix collisions."
+        },
+        "score": "partial_match",
+        "resolved_subject": "experimenter.*",
+        "resolved_object": "graphene",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0010",
+        "expected": {
+          "subject": "experimenter.experimenter.jetstream.*",
+          "predicate": "requires_dependency",
+          "object": "mozilla_nimbus_schemas.*",
+          "justification": "ADR-0010 (chosen option 1B): 'define the schema using Pydantic, and put this definition in the experimenter repository ... one schema definition shared between Experimenter and Jetstream would allow for validation of outputs from Jetstream while removing the need for Experimenter to make assumptions.' The Jetstream ingest layer validates Jetstream output against the shared schema package; object is a wildcard because from-imports of submodules register the parent package target (mozilla_nimbus_schemas.jetstream)."
+        },
+        "score": "miss",
+        "resolved_subject": "experimenter.*",
+        "resolved_object": "pydantic"
+      },
+      {
+        "adr_id": "ADR-0010",
+        "expected": {
+          "subject": "schemas.mozilla_nimbus_schemas.*",
+          "predicate": "requires_dependency",
+          "object": "pydantic",
+          "justification": "ADR-0010: '[Option 1] Pydantic ... Create schema definitions using Pydantic' \u2014 the shared schema package is defined with pydantic models; schema modules must depend on pydantic. Object is the exact import target 'pydantic' (the from-import fallback target registered by 'from pydantic import BaseModel')."
+        },
+        "score": "miss",
+        "resolved_subject": "experimenter.*",
+        "resolved_object": "pydantic"
+      }
+    ],
+    "class_split": {
+      "B/C": {
+        "matched": 1,
+        "false_positive_edges": 14
+      }
+    }
+  },
+  "detection": {
+    "cases": [
+      {
+        "case_id": "exp-bench-hist-pre-schema-client",
+        "type": "historical",
+        "per_unit": [
+          {
+            "expected_fqn": "experimenter.experimenter.jetstream.client",
+            "score": "miss"
+          }
+        ],
+        "exact": 0,
+        "partial": 0,
+        "miss": 1,
+        "total": 1,
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0008",
+              "predicate": "prohibits_dependency",
+              "subject": "experimenter.*",
+              "object": "graphene",
+              "matched_fqn": "experimenter.experimenter.experiments.api.v5",
+              "changed_fqn": "experimenter.experimenter.experiments.api.v5",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0008",
+              "predicate": "prohibits_dependency",
+              "subject": "experimenter.*",
+              "object": "graphene_django",
+              "matched_fqn": "experimenter.experimenter.experiments.api.v5.types",
+              "changed_fqn": "experimenter.experimenter.experiments.api.v5.types.NimbusExperimentApplicationEnum.Meta",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "graphene-django",
+              "matched_fqn": "experimenter.experimenter.jetstream.client",
+              "changed_fqn": "experimenter.experimenter.jetstream.client",
+              "change_type": "modified"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "react",
+              "matched_fqn": "experimenter.experimenter.jetstream.client",
+              "changed_fqn": "experimenter.experimenter.jetstream.client",
+              "change_type": "modified"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "bootstrap",
+              "matched_fqn": "experimenter.experimenter.jetstream.client",
+              "changed_fqn": "experimenter.experimenter.jetstream.client",
+              "change_type": "modified"
+            },
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "google.auth",
+              "matched_fqn": "experimenter.experimenter.jetstream.client",
+              "changed_fqn": "experimenter.experimenter.jetstream.client",
+              "change_type": "modified"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "celery",
+              "matched_fqn": "experimenter.experimenter.jetstream.client",
+              "changed_fqn": "experimenter.experimenter.jetstream.client",
+              "change_type": "modified"
+            },
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.*",
+              "matched_fqn": "experimenter.experimenter.jetstream.client",
+              "changed_fqn": "experimenter.experimenter.jetstream.client",
+              "change_type": "modified"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.experiments.api.v5.serializers.NimbusReviewSerializer",
+              "matched_fqn": "experimenter.experimenter.jetstream.client",
+              "changed_fqn": "experimenter.experimenter.jetstream.client",
+              "change_type": "modified"
+            },
+            {
+              "adr_id": "ADR-0014",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "group_id",
+              "matched_fqn": "experimenter.experimenter.jetstream.client",
+              "changed_fqn": "experimenter.experimenter.jetstream.client",
+              "change_type": "modified"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "pydantic",
+              "matched_fqn": "experimenter.experimenter.jetstream.client.AnalysisWindow",
+              "changed_fqn": "experimenter.experimenter.jetstream.client.AnalysisWindow",
+              "change_type": "modified"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "pydantic",
+              "matched_fqn": "experimenter.experimenter.jetstream.client.load_data_from_gcs",
+              "changed_fqn": "experimenter.experimenter.jetstream.client.load_data_from_gcs",
+              "change_type": "modified"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "pydantic",
+              "matched_fqn": "experimenter.experimenter.jetstream.client.get_data",
+              "changed_fqn": "experimenter.experimenter.jetstream.client.get_data",
+              "change_type": "modified"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "pydantic",
+              "matched_fqn": "experimenter.experimenter.jetstream.client.get_metadata",
+              "changed_fqn": "experimenter.experimenter.jetstream.client.get_metadata",
+              "change_type": "modified"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "pydantic",
+              "matched_fqn": "experimenter.experimenter.jetstream.client.get_analysis_errors",
+              "changed_fqn": "experimenter.experimenter.jetstream.client.get_analysis_errors",
+              "change_type": "modified"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "pydantic",
+              "matched_fqn": "experimenter.experimenter.jetstream.client.get_results_metrics_map",
+              "changed_fqn": "experimenter.experimenter.jetstream.client.get_results_metrics_map",
+              "change_type": "modified"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "pydantic",
+              "matched_fqn": "experimenter.experimenter.jetstream.client.get_other_metrics_names_and_map",
+              "changed_fqn": "experimenter.experimenter.jetstream.client.get_other_metrics_names_and_map",
+              "change_type": "modified"
+            }
+          ],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "exp-bench-graphene-backslide",
+        "type": "injected",
+        "per_unit": [
+          {
+            "expected_fqn": "experimenter.experimenter.nimbus_ui.legacy_graphql",
+            "score": "miss"
+          }
+        ],
+        "exact": 0,
+        "partial": 0,
+        "miss": 1,
+        "total": 1,
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "prohibits_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.models.Prefs",
+              "matched_fqn": "experimenter.experimenter.glean.middleware",
+              "changed_fqn": "experimenter.experimenter.glean.middleware",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "prohibits_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.models.Prefs",
+              "matched_fqn": "experimenter.experimenter.glean.models",
+              "changed_fqn": "experimenter.experimenter.glean.models.Prefs",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "graphene-django",
+              "matched_fqn": "experimenter.experimenter.nimbus_ui.legacy_graphql.LegacyGraphQLDashboardView",
+              "changed_fqn": "experimenter.experimenter.nimbus_ui.legacy_graphql.LegacyGraphQLDashboardView",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "react",
+              "matched_fqn": "experimenter.experimenter.nimbus_ui.legacy_graphql.LegacyGraphQLDashboardView",
+              "changed_fqn": "experimenter.experimenter.nimbus_ui.legacy_graphql.LegacyGraphQLDashboardView",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "bootstrap",
+              "matched_fqn": "experimenter.experimenter.nimbus_ui.legacy_graphql.LegacyGraphQLDashboardView",
+              "changed_fqn": "experimenter.experimenter.nimbus_ui.legacy_graphql.LegacyGraphQLDashboardView",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "google.auth",
+              "matched_fqn": "experimenter.experimenter.nimbus_ui.legacy_graphql.LegacyGraphQLDashboardView",
+              "changed_fqn": "experimenter.experimenter.nimbus_ui.legacy_graphql.LegacyGraphQLDashboardView",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "celery",
+              "matched_fqn": "experimenter.experimenter.nimbus_ui.legacy_graphql.LegacyGraphQLDashboardView",
+              "changed_fqn": "experimenter.experimenter.nimbus_ui.legacy_graphql.LegacyGraphQLDashboardView",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "pydantic",
+              "matched_fqn": "experimenter.experimenter.nimbus_ui.legacy_graphql.LegacyGraphQLDashboardView",
+              "changed_fqn": "experimenter.experimenter.nimbus_ui.legacy_graphql.LegacyGraphQLDashboardView",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.*",
+              "matched_fqn": "experimenter.experimenter.nimbus_ui.legacy_graphql.LegacyGraphQLDashboardView",
+              "changed_fqn": "experimenter.experimenter.nimbus_ui.legacy_graphql.LegacyGraphQLDashboardView",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.experiments.api.v5.serializers.NimbusReviewSerializer",
+              "matched_fqn": "experimenter.experimenter.nimbus_ui.legacy_graphql.LegacyGraphQLDashboardView",
+              "changed_fqn": "experimenter.experimenter.nimbus_ui.legacy_graphql.LegacyGraphQLDashboardView",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0014",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "group_id",
+              "matched_fqn": "experimenter.experimenter.nimbus_ui.legacy_graphql.LegacyGraphQLDashboardView",
+              "changed_fqn": "experimenter.experimenter.nimbus_ui.legacy_graphql.LegacyGraphQLDashboardView",
+              "change_type": "added"
+            }
+          ],
+          "arm_candidates": [
+            {
+              "adr_id": "ADR-0008",
+              "predicate": "prohibits_dependency",
+              "subject": "experimenter.*",
+              "object": "graphene",
+              "matched_fqn": "experimenter.experimenter.nimbus_ui.legacy_graphql",
+              "changed_fqn": "experimenter.experimenter.nimbus_ui.legacy_graphql.LegacyGraphQLDashboardView.dashboard_query",
+              "change_type": "structural"
+            }
+          ]
+        }
+      },
+      {
+        "case_id": "exp-bench-jetstream-db-snapshot",
+        "type": "injected",
+        "per_unit": [
+          {
+            "expected_fqn": "experimenter.experimenter.jetstream.db_snapshot.snapshot_results_data",
+            "score": "miss"
+          },
+          {
+            "expected_fqn": "experimenter.experimenter.jetstream.db_snapshot.purge_stale_snapshots",
+            "score": "miss"
+          },
+          {
+            "expected_fqn": "experimenter.experimenter.jetstream.db_snapshot.DbResultsCache",
+            "score": "miss"
+          }
+        ],
+        "exact": 0,
+        "partial": 0,
+        "miss": 3,
+        "total": 3,
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "prohibits_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.models.Prefs",
+              "matched_fqn": "experimenter.experimenter.glean.middleware",
+              "changed_fqn": "experimenter.experimenter.glean.middleware",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "prohibits_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.models.Prefs",
+              "matched_fqn": "experimenter.experimenter.glean.models",
+              "changed_fqn": "experimenter.experimenter.glean.models.Prefs",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "graphene-django",
+              "matched_fqn": "experimenter.experimenter.jetstream.db_snapshot.snapshot_results_data",
+              "changed_fqn": "experimenter.experimenter.jetstream.db_snapshot.snapshot_results_data",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "react",
+              "matched_fqn": "experimenter.experimenter.jetstream.db_snapshot.snapshot_results_data",
+              "changed_fqn": "experimenter.experimenter.jetstream.db_snapshot.snapshot_results_data",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "bootstrap",
+              "matched_fqn": "experimenter.experimenter.jetstream.db_snapshot.snapshot_results_data",
+              "changed_fqn": "experimenter.experimenter.jetstream.db_snapshot.snapshot_results_data",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "google.auth",
+              "matched_fqn": "experimenter.experimenter.jetstream.db_snapshot.snapshot_results_data",
+              "changed_fqn": "experimenter.experimenter.jetstream.db_snapshot.snapshot_results_data",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "celery",
+              "matched_fqn": "experimenter.experimenter.jetstream.db_snapshot.snapshot_results_data",
+              "changed_fqn": "experimenter.experimenter.jetstream.db_snapshot.snapshot_results_data",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "pydantic",
+              "matched_fqn": "experimenter.experimenter.jetstream.db_snapshot.snapshot_results_data",
+              "changed_fqn": "experimenter.experimenter.jetstream.db_snapshot.snapshot_results_data",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.*",
+              "matched_fqn": "experimenter.experimenter.jetstream.db_snapshot.snapshot_results_data",
+              "changed_fqn": "experimenter.experimenter.jetstream.db_snapshot.snapshot_results_data",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.experiments.api.v5.serializers.NimbusReviewSerializer",
+              "matched_fqn": "experimenter.experimenter.jetstream.db_snapshot.snapshot_results_data",
+              "changed_fqn": "experimenter.experimenter.jetstream.db_snapshot.snapshot_results_data",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0014",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "group_id",
+              "matched_fqn": "experimenter.experimenter.jetstream.db_snapshot.snapshot_results_data",
+              "changed_fqn": "experimenter.experimenter.jetstream.db_snapshot.snapshot_results_data",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "graphene-django",
+              "matched_fqn": "experimenter.experimenter.jetstream.db_snapshot.purge_stale_snapshots",
+              "changed_fqn": "experimenter.experimenter.jetstream.db_snapshot.purge_stale_snapshots",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "react",
+              "matched_fqn": "experimenter.experimenter.jetstream.db_snapshot.purge_stale_snapshots",
+              "changed_fqn": "experimenter.experimenter.jetstream.db_snapshot.purge_stale_snapshots",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "bootstrap",
+              "matched_fqn": "experimenter.experimenter.jetstream.db_snapshot.purge_stale_snapshots",
+              "changed_fqn": "experimenter.experimenter.jetstream.db_snapshot.purge_stale_snapshots",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "google.auth",
+              "matched_fqn": "experimenter.experimenter.jetstream.db_snapshot.purge_stale_snapshots",
+              "changed_fqn": "experimenter.experimenter.jetstream.db_snapshot.purge_stale_snapshots",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "celery",
+              "matched_fqn": "experimenter.experimenter.jetstream.db_snapshot.purge_stale_snapshots",
+              "changed_fqn": "experimenter.experimenter.jetstream.db_snapshot.purge_stale_snapshots",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "pydantic",
+              "matched_fqn": "experimenter.experimenter.jetstream.db_snapshot.purge_stale_snapshots",
+              "changed_fqn": "experimenter.experimenter.jetstream.db_snapshot.purge_stale_snapshots",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.*",
+              "matched_fqn": "experimenter.experimenter.jetstream.db_snapshot.purge_stale_snapshots",
+              "changed_fqn": "experimenter.experimenter.jetstream.db_snapshot.purge_stale_snapshots",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.experiments.api.v5.serializers.NimbusReviewSerializer",
+              "matched_fqn": "experimenter.experimenter.jetstream.db_snapshot.purge_stale_snapshots",
+              "changed_fqn": "experimenter.experimenter.jetstream.db_snapshot.purge_stale_snapshots",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0014",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "group_id",
+              "matched_fqn": "experimenter.experimenter.jetstream.db_snapshot.purge_stale_snapshots",
+              "changed_fqn": "experimenter.experimenter.jetstream.db_snapshot.purge_stale_snapshots",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "graphene-django",
+              "matched_fqn": "experimenter.experimenter.jetstream.db_snapshot.DbResultsCache",
+              "changed_fqn": "experimenter.experimenter.jetstream.db_snapshot.DbResultsCache",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "react",
+              "matched_fqn": "experimenter.experimenter.jetstream.db_snapshot.DbResultsCache",
+              "changed_fqn": "experimenter.experimenter.jetstream.db_snapshot.DbResultsCache",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "bootstrap",
+              "matched_fqn": "experimenter.experimenter.jetstream.db_snapshot.DbResultsCache",
+              "changed_fqn": "experimenter.experimenter.jetstream.db_snapshot.DbResultsCache",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "google.auth",
+              "matched_fqn": "experimenter.experimenter.jetstream.db_snapshot.DbResultsCache",
+              "changed_fqn": "experimenter.experimenter.jetstream.db_snapshot.DbResultsCache",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "celery",
+              "matched_fqn": "experimenter.experimenter.jetstream.db_snapshot.DbResultsCache",
+              "changed_fqn": "experimenter.experimenter.jetstream.db_snapshot.DbResultsCache",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "pydantic",
+              "matched_fqn": "experimenter.experimenter.jetstream.db_snapshot.DbResultsCache",
+              "changed_fqn": "experimenter.experimenter.jetstream.db_snapshot.DbResultsCache",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.*",
+              "matched_fqn": "experimenter.experimenter.jetstream.db_snapshot.DbResultsCache",
+              "changed_fqn": "experimenter.experimenter.jetstream.db_snapshot.DbResultsCache",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.experiments.api.v5.serializers.NimbusReviewSerializer",
+              "matched_fqn": "experimenter.experimenter.jetstream.db_snapshot.DbResultsCache",
+              "changed_fqn": "experimenter.experimenter.jetstream.db_snapshot.DbResultsCache",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0014",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "group_id",
+              "matched_fqn": "experimenter.experimenter.jetstream.db_snapshot.DbResultsCache",
+              "changed_fqn": "experimenter.experimenter.jetstream.db_snapshot.DbResultsCache",
+              "change_type": "added"
+            }
+          ],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "exp-bench-manual-schema-validation",
+        "type": "injected",
+        "per_unit": [
+          {
+            "expected_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_statistics_payload",
+            "score": "miss"
+          },
+          {
+            "expected_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_metadata_payload",
+            "score": "miss"
+          }
+        ],
+        "exact": 0,
+        "partial": 0,
+        "miss": 2,
+        "total": 2,
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "prohibits_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.models.Prefs",
+              "matched_fqn": "experimenter.experimenter.glean.middleware",
+              "changed_fqn": "experimenter.experimenter.glean.middleware",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "prohibits_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.models.Prefs",
+              "matched_fqn": "experimenter.experimenter.glean.models",
+              "changed_fqn": "experimenter.experimenter.glean.models.Prefs",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "graphene-django",
+              "matched_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_statistics_payload",
+              "changed_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_statistics_payload",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "react",
+              "matched_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_statistics_payload",
+              "changed_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_statistics_payload",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "bootstrap",
+              "matched_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_statistics_payload",
+              "changed_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_statistics_payload",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "google.auth",
+              "matched_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_statistics_payload",
+              "changed_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_statistics_payload",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "celery",
+              "matched_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_statistics_payload",
+              "changed_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_statistics_payload",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "pydantic",
+              "matched_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_statistics_payload",
+              "changed_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_statistics_payload",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.*",
+              "matched_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_statistics_payload",
+              "changed_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_statistics_payload",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.experiments.api.v5.serializers.NimbusReviewSerializer",
+              "matched_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_statistics_payload",
+              "changed_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_statistics_payload",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0014",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "group_id",
+              "matched_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_statistics_payload",
+              "changed_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_statistics_payload",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "graphene-django",
+              "matched_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_metadata_payload",
+              "changed_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_metadata_payload",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "react",
+              "matched_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_metadata_payload",
+              "changed_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_metadata_payload",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "bootstrap",
+              "matched_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_metadata_payload",
+              "changed_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_metadata_payload",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "google.auth",
+              "matched_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_metadata_payload",
+              "changed_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_metadata_payload",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "celery",
+              "matched_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_metadata_payload",
+              "changed_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_metadata_payload",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "pydantic",
+              "matched_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_metadata_payload",
+              "changed_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_metadata_payload",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.*",
+              "matched_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_metadata_payload",
+              "changed_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_metadata_payload",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.experiments.api.v5.serializers.NimbusReviewSerializer",
+              "matched_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_metadata_payload",
+              "changed_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_metadata_payload",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0014",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "group_id",
+              "matched_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_metadata_payload",
+              "changed_fqn": "experimenter.experimenter.jetstream.manual_ingest.validate_metadata_payload",
+              "change_type": "added"
+            }
+          ],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "exp-bench-gcs-bypass",
+        "type": "injected",
+        "per_unit": [
+          {
+            "expected_fqn": "experimenter.experimenter.jetstream.requests_fetch.fetch_statistics_via_http",
+            "score": "miss"
+          },
+          {
+            "expected_fqn": "experimenter.experimenter.jetstream.requests_fetch.fetch_metadata_via_http",
+            "score": "miss"
+          }
+        ],
+        "exact": 0,
+        "partial": 0,
+        "miss": 2,
+        "total": 2,
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "prohibits_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.models.Prefs",
+              "matched_fqn": "experimenter.experimenter.glean.middleware",
+              "changed_fqn": "experimenter.experimenter.glean.middleware",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "prohibits_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.models.Prefs",
+              "matched_fqn": "experimenter.experimenter.glean.models",
+              "changed_fqn": "experimenter.experimenter.glean.models.Prefs",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "graphene-django",
+              "matched_fqn": "experimenter.experimenter.jetstream.requests_fetch.fetch_statistics_via_http",
+              "changed_fqn": "experimenter.experimenter.jetstream.requests_fetch.fetch_statistics_via_http",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "react",
+              "matched_fqn": "experimenter.experimenter.jetstream.requests_fetch.fetch_statistics_via_http",
+              "changed_fqn": "experimenter.experimenter.jetstream.requests_fetch.fetch_statistics_via_http",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "bootstrap",
+              "matched_fqn": "experimenter.experimenter.jetstream.requests_fetch.fetch_statistics_via_http",
+              "changed_fqn": "experimenter.experimenter.jetstream.requests_fetch.fetch_statistics_via_http",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "google.auth",
+              "matched_fqn": "experimenter.experimenter.jetstream.requests_fetch.fetch_statistics_via_http",
+              "changed_fqn": "experimenter.experimenter.jetstream.requests_fetch.fetch_statistics_via_http",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "celery",
+              "matched_fqn": "experimenter.experimenter.jetstream.requests_fetch.fetch_statistics_via_http",
+              "changed_fqn": "experimenter.experimenter.jetstream.requests_fetch.fetch_statistics_via_http",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.*",
+              "matched_fqn": "experimenter.experimenter.jetstream.requests_fetch.fetch_statistics_via_http",
+              "changed_fqn": "experimenter.experimenter.jetstream.requests_fetch.fetch_statistics_via_http",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.experiments.api.v5.serializers.NimbusReviewSerializer",
+              "matched_fqn": "experimenter.experimenter.jetstream.requests_fetch.fetch_statistics_via_http",
+              "changed_fqn": "experimenter.experimenter.jetstream.requests_fetch.fetch_statistics_via_http",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0014",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "group_id",
+              "matched_fqn": "experimenter.experimenter.jetstream.requests_fetch.fetch_statistics_via_http",
+              "changed_fqn": "experimenter.experimenter.jetstream.requests_fetch.fetch_statistics_via_http",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "graphene-django",
+              "matched_fqn": "experimenter.experimenter.jetstream.requests_fetch.fetch_metadata_via_http",
+              "changed_fqn": "experimenter.experimenter.jetstream.requests_fetch.fetch_metadata_via_http",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "react",
+              "matched_fqn": "experimenter.experimenter.jetstream.requests_fetch.fetch_metadata_via_http",
+              "changed_fqn": "experimenter.experimenter.jetstream.requests_fetch.fetch_metadata_via_http",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "bootstrap",
+              "matched_fqn": "experimenter.experimenter.jetstream.requests_fetch.fetch_metadata_via_http",
+              "changed_fqn": "experimenter.experimenter.jetstream.requests_fetch.fetch_metadata_via_http",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "google.auth",
+              "matched_fqn": "experimenter.experimenter.jetstream.requests_fetch.fetch_metadata_via_http",
+              "changed_fqn": "experimenter.experimenter.jetstream.requests_fetch.fetch_metadata_via_http",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "celery",
+              "matched_fqn": "experimenter.experimenter.jetstream.requests_fetch.fetch_metadata_via_http",
+              "changed_fqn": "experimenter.experimenter.jetstream.requests_fetch.fetch_metadata_via_http",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "pydantic",
+              "matched_fqn": "experimenter.experimenter.jetstream.requests_fetch.fetch_metadata_via_http",
+              "changed_fqn": "experimenter.experimenter.jetstream.requests_fetch.fetch_metadata_via_http",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.*",
+              "matched_fqn": "experimenter.experimenter.jetstream.requests_fetch.fetch_metadata_via_http",
+              "changed_fqn": "experimenter.experimenter.jetstream.requests_fetch.fetch_metadata_via_http",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.experiments.api.v5.serializers.NimbusReviewSerializer",
+              "matched_fqn": "experimenter.experimenter.jetstream.requests_fetch.fetch_metadata_via_http",
+              "changed_fqn": "experimenter.experimenter.jetstream.requests_fetch.fetch_metadata_via_http",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0014",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "group_id",
+              "matched_fqn": "experimenter.experimenter.jetstream.requests_fetch.fetch_metadata_via_http",
+              "changed_fqn": "experimenter.experimenter.jetstream.requests_fetch.fetch_metadata_via_http",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "graphene-django",
+              "matched_fqn": "experimenter.experimenter.jetstream.gcs_helper.load_metadata_from_gcs",
+              "changed_fqn": "experimenter.experimenter.jetstream.gcs_helper.load_metadata_from_gcs",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "react",
+              "matched_fqn": "experimenter.experimenter.jetstream.gcs_helper.load_metadata_from_gcs",
+              "changed_fqn": "experimenter.experimenter.jetstream.gcs_helper.load_metadata_from_gcs",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "bootstrap",
+              "matched_fqn": "experimenter.experimenter.jetstream.gcs_helper.load_metadata_from_gcs",
+              "changed_fqn": "experimenter.experimenter.jetstream.gcs_helper.load_metadata_from_gcs",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "google.auth",
+              "matched_fqn": "experimenter.experimenter.jetstream.gcs_helper.load_metadata_from_gcs",
+              "changed_fqn": "experimenter.experimenter.jetstream.gcs_helper.load_metadata_from_gcs",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "celery",
+              "matched_fqn": "experimenter.experimenter.jetstream.gcs_helper.load_metadata_from_gcs",
+              "changed_fqn": "experimenter.experimenter.jetstream.gcs_helper.load_metadata_from_gcs",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.*",
+              "matched_fqn": "experimenter.experimenter.jetstream.gcs_helper.load_metadata_from_gcs",
+              "changed_fqn": "experimenter.experimenter.jetstream.gcs_helper.load_metadata_from_gcs",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.experiments.api.v5.serializers.NimbusReviewSerializer",
+              "matched_fqn": "experimenter.experimenter.jetstream.gcs_helper.load_metadata_from_gcs",
+              "changed_fqn": "experimenter.experimenter.jetstream.gcs_helper.load_metadata_from_gcs",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0014",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "group_id",
+              "matched_fqn": "experimenter.experimenter.jetstream.gcs_helper.load_metadata_from_gcs",
+              "changed_fqn": "experimenter.experimenter.jetstream.gcs_helper.load_metadata_from_gcs",
+              "change_type": "added"
+            }
+          ],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "exp-bench-jetstream-cluster",
+        "type": "injected",
+        "per_unit": [
+          {
+            "expected_fqn": "experimenter.experimenter.jetstream.csv_export.export_statistics_csv",
+            "score": "miss"
+          },
+          {
+            "expected_fqn": "experimenter.experimenter.jetstream.csv_export.export_metadata_csv",
+            "score": "miss"
+          },
+          {
+            "expected_fqn": "experimenter.experimenter.jetstream.http_pull.pull_statistics_over_http",
+            "score": "miss"
+          },
+          {
+            "expected_fqn": "experimenter.experimenter.jetstream.http_pull.pull_statistics_over_http",
+            "score": "miss"
+          },
+          {
+            "expected_fqn": "experimenter.experimenter.jetstream.http_pull.pull_metadata_over_http",
+            "score": "miss"
+          },
+          {
+            "expected_fqn": "experimenter.experimenter.jetstream.http_pull.pull_metadata_over_http",
+            "score": "miss"
+          },
+          {
+            "expected_fqn": "experimenter.experimenter.jetstream.gcs_raw.load_raw_from_gcs",
+            "score": "miss"
+          },
+          {
+            "expected_fqn": "experimenter.experimenter.jetstream.gcs_raw.RawEnvelopeCache",
+            "score": "miss"
+          }
+        ],
+        "exact": 0,
+        "partial": 0,
+        "miss": 8,
+        "total": 8,
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "prohibits_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.models.Prefs",
+              "matched_fqn": "experimenter.experimenter.glean.middleware",
+              "changed_fqn": "experimenter.experimenter.glean.middleware",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "prohibits_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.models.Prefs",
+              "matched_fqn": "experimenter.experimenter.glean.models",
+              "changed_fqn": "experimenter.experimenter.glean.models.Prefs",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "graphene-django",
+              "matched_fqn": "experimenter.experimenter.jetstream.csv_export.export_statistics_csv",
+              "changed_fqn": "experimenter.experimenter.jetstream.csv_export.export_statistics_csv",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "react",
+              "matched_fqn": "experimenter.experimenter.jetstream.csv_export.export_statistics_csv",
+              "changed_fqn": "experimenter.experimenter.jetstream.csv_export.export_statistics_csv",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "bootstrap",
+              "matched_fqn": "experimenter.experimenter.jetstream.csv_export.export_statistics_csv",
+              "changed_fqn": "experimenter.experimenter.jetstream.csv_export.export_statistics_csv",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "google.auth",
+              "matched_fqn": "experimenter.experimenter.jetstream.csv_export.export_statistics_csv",
+              "changed_fqn": "experimenter.experimenter.jetstream.csv_export.export_statistics_csv",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "celery",
+              "matched_fqn": "experimenter.experimenter.jetstream.csv_export.export_statistics_csv",
+              "changed_fqn": "experimenter.experimenter.jetstream.csv_export.export_statistics_csv",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "pydantic",
+              "matched_fqn": "experimenter.experimenter.jetstream.csv_export.export_statistics_csv",
+              "changed_fqn": "experimenter.experimenter.jetstream.csv_export.export_statistics_csv",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.*",
+              "matched_fqn": "experimenter.experimenter.jetstream.csv_export.export_statistics_csv",
+              "changed_fqn": "experimenter.experimenter.jetstream.csv_export.export_statistics_csv",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.experiments.api.v5.serializers.NimbusReviewSerializer",
+              "matched_fqn": "experimenter.experimenter.jetstream.csv_export.export_statistics_csv",
+              "changed_fqn": "experimenter.experimenter.jetstream.csv_export.export_statistics_csv",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0014",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "group_id",
+              "matched_fqn": "experimenter.experimenter.jetstream.csv_export.export_statistics_csv",
+              "changed_fqn": "experimenter.experimenter.jetstream.csv_export.export_statistics_csv",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "graphene-django",
+              "matched_fqn": "experimenter.experimenter.jetstream.csv_export.export_metadata_csv",
+              "changed_fqn": "experimenter.experimenter.jetstream.csv_export.export_metadata_csv",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "react",
+              "matched_fqn": "experimenter.experimenter.jetstream.csv_export.export_metadata_csv",
+              "changed_fqn": "experimenter.experimenter.jetstream.csv_export.export_metadata_csv",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "bootstrap",
+              "matched_fqn": "experimenter.experimenter.jetstream.csv_export.export_metadata_csv",
+              "changed_fqn": "experimenter.experimenter.jetstream.csv_export.export_metadata_csv",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "google.auth",
+              "matched_fqn": "experimenter.experimenter.jetstream.csv_export.export_metadata_csv",
+              "changed_fqn": "experimenter.experimenter.jetstream.csv_export.export_metadata_csv",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "celery",
+              "matched_fqn": "experimenter.experimenter.jetstream.csv_export.export_metadata_csv",
+              "changed_fqn": "experimenter.experimenter.jetstream.csv_export.export_metadata_csv",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "pydantic",
+              "matched_fqn": "experimenter.experimenter.jetstream.csv_export.export_metadata_csv",
+              "changed_fqn": "experimenter.experimenter.jetstream.csv_export.export_metadata_csv",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.*",
+              "matched_fqn": "experimenter.experimenter.jetstream.csv_export.export_metadata_csv",
+              "changed_fqn": "experimenter.experimenter.jetstream.csv_export.export_metadata_csv",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.experiments.api.v5.serializers.NimbusReviewSerializer",
+              "matched_fqn": "experimenter.experimenter.jetstream.csv_export.export_metadata_csv",
+              "changed_fqn": "experimenter.experimenter.jetstream.csv_export.export_metadata_csv",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0014",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "group_id",
+              "matched_fqn": "experimenter.experimenter.jetstream.csv_export.export_metadata_csv",
+              "changed_fqn": "experimenter.experimenter.jetstream.csv_export.export_metadata_csv",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "graphene-django",
+              "matched_fqn": "experimenter.experimenter.jetstream.http_pull.pull_statistics_over_http",
+              "changed_fqn": "experimenter.experimenter.jetstream.http_pull.pull_statistics_over_http",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "react",
+              "matched_fqn": "experimenter.experimenter.jetstream.http_pull.pull_statistics_over_http",
+              "changed_fqn": "experimenter.experimenter.jetstream.http_pull.pull_statistics_over_http",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "bootstrap",
+              "matched_fqn": "experimenter.experimenter.jetstream.http_pull.pull_statistics_over_http",
+              "changed_fqn": "experimenter.experimenter.jetstream.http_pull.pull_statistics_over_http",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "google.auth",
+              "matched_fqn": "experimenter.experimenter.jetstream.http_pull.pull_statistics_over_http",
+              "changed_fqn": "experimenter.experimenter.jetstream.http_pull.pull_statistics_over_http",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "celery",
+              "matched_fqn": "experimenter.experimenter.jetstream.http_pull.pull_statistics_over_http",
+              "changed_fqn": "experimenter.experimenter.jetstream.http_pull.pull_statistics_over_http",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "pydantic",
+              "matched_fqn": "experimenter.experimenter.jetstream.http_pull.pull_statistics_over_http",
+              "changed_fqn": "experimenter.experimenter.jetstream.http_pull.pull_statistics_over_http",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.*",
+              "matched_fqn": "experimenter.experimenter.jetstream.http_pull.pull_statistics_over_http",
+              "changed_fqn": "experimenter.experimenter.jetstream.http_pull.pull_statistics_over_http",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.experiments.api.v5.serializers.NimbusReviewSerializer",
+              "matched_fqn": "experimenter.experimenter.jetstream.http_pull.pull_statistics_over_http",
+              "changed_fqn": "experimenter.experimenter.jetstream.http_pull.pull_statistics_over_http",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0014",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "group_id",
+              "matched_fqn": "experimenter.experimenter.jetstream.http_pull.pull_statistics_over_http",
+              "changed_fqn": "experimenter.experimenter.jetstream.http_pull.pull_statistics_over_http",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "graphene-django",
+              "matched_fqn": "experimenter.experimenter.jetstream.http_pull.pull_metadata_over_http",
+              "changed_fqn": "experimenter.experimenter.jetstream.http_pull.pull_metadata_over_http",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "react",
+              "matched_fqn": "experimenter.experimenter.jetstream.http_pull.pull_metadata_over_http",
+              "changed_fqn": "experimenter.experimenter.jetstream.http_pull.pull_metadata_over_http",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "bootstrap",
+              "matched_fqn": "experimenter.experimenter.jetstream.http_pull.pull_metadata_over_http",
+              "changed_fqn": "experimenter.experimenter.jetstream.http_pull.pull_metadata_over_http",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "google.auth",
+              "matched_fqn": "experimenter.experimenter.jetstream.http_pull.pull_metadata_over_http",
+              "changed_fqn": "experimenter.experimenter.jetstream.http_pull.pull_metadata_over_http",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "celery",
+              "matched_fqn": "experimenter.experimenter.jetstream.http_pull.pull_metadata_over_http",
+              "changed_fqn": "experimenter.experimenter.jetstream.http_pull.pull_metadata_over_http",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "pydantic",
+              "matched_fqn": "experimenter.experimenter.jetstream.http_pull.pull_metadata_over_http",
+              "changed_fqn": "experimenter.experimenter.jetstream.http_pull.pull_metadata_over_http",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.*",
+              "matched_fqn": "experimenter.experimenter.jetstream.http_pull.pull_metadata_over_http",
+              "changed_fqn": "experimenter.experimenter.jetstream.http_pull.pull_metadata_over_http",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.experiments.api.v5.serializers.NimbusReviewSerializer",
+              "matched_fqn": "experimenter.experimenter.jetstream.http_pull.pull_metadata_over_http",
+              "changed_fqn": "experimenter.experimenter.jetstream.http_pull.pull_metadata_over_http",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0014",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "group_id",
+              "matched_fqn": "experimenter.experimenter.jetstream.http_pull.pull_metadata_over_http",
+              "changed_fqn": "experimenter.experimenter.jetstream.http_pull.pull_metadata_over_http",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "graphene-django",
+              "matched_fqn": "experimenter.experimenter.jetstream.gcs_raw.load_raw_from_gcs",
+              "changed_fqn": "experimenter.experimenter.jetstream.gcs_raw.load_raw_from_gcs",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "react",
+              "matched_fqn": "experimenter.experimenter.jetstream.gcs_raw.load_raw_from_gcs",
+              "changed_fqn": "experimenter.experimenter.jetstream.gcs_raw.load_raw_from_gcs",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "bootstrap",
+              "matched_fqn": "experimenter.experimenter.jetstream.gcs_raw.load_raw_from_gcs",
+              "changed_fqn": "experimenter.experimenter.jetstream.gcs_raw.load_raw_from_gcs",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "google.auth",
+              "matched_fqn": "experimenter.experimenter.jetstream.gcs_raw.load_raw_from_gcs",
+              "changed_fqn": "experimenter.experimenter.jetstream.gcs_raw.load_raw_from_gcs",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "celery",
+              "matched_fqn": "experimenter.experimenter.jetstream.gcs_raw.load_raw_from_gcs",
+              "changed_fqn": "experimenter.experimenter.jetstream.gcs_raw.load_raw_from_gcs",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "pydantic",
+              "matched_fqn": "experimenter.experimenter.jetstream.gcs_raw.load_raw_from_gcs",
+              "changed_fqn": "experimenter.experimenter.jetstream.gcs_raw.load_raw_from_gcs",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.*",
+              "matched_fqn": "experimenter.experimenter.jetstream.gcs_raw.load_raw_from_gcs",
+              "changed_fqn": "experimenter.experimenter.jetstream.gcs_raw.load_raw_from_gcs",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.experiments.api.v5.serializers.NimbusReviewSerializer",
+              "matched_fqn": "experimenter.experimenter.jetstream.gcs_raw.load_raw_from_gcs",
+              "changed_fqn": "experimenter.experimenter.jetstream.gcs_raw.load_raw_from_gcs",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0014",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "group_id",
+              "matched_fqn": "experimenter.experimenter.jetstream.gcs_raw.load_raw_from_gcs",
+              "changed_fqn": "experimenter.experimenter.jetstream.gcs_raw.load_raw_from_gcs",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "graphene-django",
+              "matched_fqn": "experimenter.experimenter.jetstream.gcs_raw.RawEnvelopeCache",
+              "changed_fqn": "experimenter.experimenter.jetstream.gcs_raw.RawEnvelopeCache",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "react",
+              "matched_fqn": "experimenter.experimenter.jetstream.gcs_raw.RawEnvelopeCache",
+              "changed_fqn": "experimenter.experimenter.jetstream.gcs_raw.RawEnvelopeCache",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "bootstrap",
+              "matched_fqn": "experimenter.experimenter.jetstream.gcs_raw.RawEnvelopeCache",
+              "changed_fqn": "experimenter.experimenter.jetstream.gcs_raw.RawEnvelopeCache",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "google.auth",
+              "matched_fqn": "experimenter.experimenter.jetstream.gcs_raw.RawEnvelopeCache",
+              "changed_fqn": "experimenter.experimenter.jetstream.gcs_raw.RawEnvelopeCache",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "celery",
+              "matched_fqn": "experimenter.experimenter.jetstream.gcs_raw.RawEnvelopeCache",
+              "changed_fqn": "experimenter.experimenter.jetstream.gcs_raw.RawEnvelopeCache",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "pydantic",
+              "matched_fqn": "experimenter.experimenter.jetstream.gcs_raw.RawEnvelopeCache",
+              "changed_fqn": "experimenter.experimenter.jetstream.gcs_raw.RawEnvelopeCache",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.*",
+              "matched_fqn": "experimenter.experimenter.jetstream.gcs_raw.RawEnvelopeCache",
+              "changed_fqn": "experimenter.experimenter.jetstream.gcs_raw.RawEnvelopeCache",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.experiments.api.v5.serializers.NimbusReviewSerializer",
+              "matched_fqn": "experimenter.experimenter.jetstream.gcs_raw.RawEnvelopeCache",
+              "changed_fqn": "experimenter.experimenter.jetstream.gcs_raw.RawEnvelopeCache",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0014",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "group_id",
+              "matched_fqn": "experimenter.experimenter.jetstream.gcs_raw.RawEnvelopeCache",
+              "changed_fqn": "experimenter.experimenter.jetstream.gcs_raw.RawEnvelopeCache",
+              "change_type": "added"
+            }
+          ],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "exp-bench-hist-late-pre-schema-client",
+        "type": "historical",
+        "per_unit": [
+          {
+            "expected_fqn": "experimenter.experimenter.jetstream.client",
+            "score": "miss"
+          }
+        ],
+        "exact": 0,
+        "partial": 0,
+        "miss": 1,
+        "total": 1,
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0008",
+              "predicate": "prohibits_dependency",
+              "subject": "experimenter.*",
+              "object": "graphene",
+              "matched_fqn": "experimenter.experimenter.experiments.api.v5",
+              "changed_fqn": "experimenter.experimenter.experiments.api.v5",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0008",
+              "predicate": "prohibits_dependency",
+              "subject": "experimenter.*",
+              "object": "graphene_django",
+              "matched_fqn": "experimenter.experimenter.experiments.api.v5.types",
+              "changed_fqn": "experimenter.experimenter.experiments.api.v5.types.NimbusExperimentApplicationEnum.Meta",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "graphene-django",
+              "matched_fqn": "experimenter.experimenter.jetstream.client",
+              "changed_fqn": "experimenter.experimenter.jetstream.client",
+              "change_type": "modified"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "react",
+              "matched_fqn": "experimenter.experimenter.jetstream.client",
+              "changed_fqn": "experimenter.experimenter.jetstream.client",
+              "change_type": "modified"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "bootstrap",
+              "matched_fqn": "experimenter.experimenter.jetstream.client",
+              "changed_fqn": "experimenter.experimenter.jetstream.client",
+              "change_type": "modified"
+            },
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "google.auth",
+              "matched_fqn": "experimenter.experimenter.jetstream.client",
+              "changed_fqn": "experimenter.experimenter.jetstream.client",
+              "change_type": "modified"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "celery",
+              "matched_fqn": "experimenter.experimenter.jetstream.client",
+              "changed_fqn": "experimenter.experimenter.jetstream.client",
+              "change_type": "modified"
+            },
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.*",
+              "matched_fqn": "experimenter.experimenter.jetstream.client",
+              "changed_fqn": "experimenter.experimenter.jetstream.client",
+              "change_type": "modified"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.experiments.api.v5.serializers.NimbusReviewSerializer",
+              "matched_fqn": "experimenter.experimenter.jetstream.client",
+              "changed_fqn": "experimenter.experimenter.jetstream.client",
+              "change_type": "modified"
+            },
+            {
+              "adr_id": "ADR-0014",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "group_id",
+              "matched_fqn": "experimenter.experimenter.jetstream.client",
+              "changed_fqn": "experimenter.experimenter.jetstream.client",
+              "change_type": "modified"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "pydantic",
+              "matched_fqn": "experimenter.experimenter.jetstream.client.AnalysisWindow",
+              "changed_fqn": "experimenter.experimenter.jetstream.client.AnalysisWindow",
+              "change_type": "modified"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "pydantic",
+              "matched_fqn": "experimenter.experimenter.jetstream.client.load_data_from_gcs",
+              "changed_fqn": "experimenter.experimenter.jetstream.client.load_data_from_gcs",
+              "change_type": "modified"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "pydantic",
+              "matched_fqn": "experimenter.experimenter.jetstream.client.get_data",
+              "changed_fqn": "experimenter.experimenter.jetstream.client.get_data",
+              "change_type": "modified"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "pydantic",
+              "matched_fqn": "experimenter.experimenter.jetstream.client.get_metadata",
+              "changed_fqn": "experimenter.experimenter.jetstream.client.get_metadata",
+              "change_type": "modified"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "pydantic",
+              "matched_fqn": "experimenter.experimenter.jetstream.client.get_analysis_errors",
+              "changed_fqn": "experimenter.experimenter.jetstream.client.get_analysis_errors",
+              "change_type": "modified"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "pydantic",
+              "matched_fqn": "experimenter.experimenter.jetstream.client.get_results_metrics_map",
+              "changed_fqn": "experimenter.experimenter.jetstream.client.get_results_metrics_map",
+              "change_type": "modified"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "pydantic",
+              "matched_fqn": "experimenter.experimenter.jetstream.client.get_other_metrics_names_and_map",
+              "changed_fqn": "experimenter.experimenter.jetstream.client.get_other_metrics_names_and_map",
+              "change_type": "modified"
+            }
+          ],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "exp-bench-probe-jetstream-sanctioned",
+        "type": "compliant_probe",
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "total": 0,
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "prohibits_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.models.Prefs",
+              "matched_fqn": "experimenter.experimenter.glean.middleware",
+              "changed_fqn": "experimenter.experimenter.glean.middleware",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "prohibits_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.models.Prefs",
+              "matched_fqn": "experimenter.experimenter.glean.models",
+              "changed_fqn": "experimenter.experimenter.glean.models.Prefs",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "graphene-django",
+              "matched_fqn": "experimenter.experimenter.jetstream.schema_client.load_sizing_from_gcs",
+              "changed_fqn": "experimenter.experimenter.jetstream.schema_client.load_sizing_from_gcs",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "react",
+              "matched_fqn": "experimenter.experimenter.jetstream.schema_client.load_sizing_from_gcs",
+              "changed_fqn": "experimenter.experimenter.jetstream.schema_client.load_sizing_from_gcs",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "bootstrap",
+              "matched_fqn": "experimenter.experimenter.jetstream.schema_client.load_sizing_from_gcs",
+              "changed_fqn": "experimenter.experimenter.jetstream.schema_client.load_sizing_from_gcs",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "google.auth",
+              "matched_fqn": "experimenter.experimenter.jetstream.schema_client.load_sizing_from_gcs",
+              "changed_fqn": "experimenter.experimenter.jetstream.schema_client.load_sizing_from_gcs",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "celery",
+              "matched_fqn": "experimenter.experimenter.jetstream.schema_client.load_sizing_from_gcs",
+              "changed_fqn": "experimenter.experimenter.jetstream.schema_client.load_sizing_from_gcs",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.*",
+              "matched_fqn": "experimenter.experimenter.jetstream.schema_client.load_sizing_from_gcs",
+              "changed_fqn": "experimenter.experimenter.jetstream.schema_client.load_sizing_from_gcs",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.experiments.api.v5.serializers.NimbusReviewSerializer",
+              "matched_fqn": "experimenter.experimenter.jetstream.schema_client.load_sizing_from_gcs",
+              "changed_fqn": "experimenter.experimenter.jetstream.schema_client.load_sizing_from_gcs",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0014",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "group_id",
+              "matched_fqn": "experimenter.experimenter.jetstream.schema_client.load_sizing_from_gcs",
+              "changed_fqn": "experimenter.experimenter.jetstream.schema_client.load_sizing_from_gcs",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "graphene-django",
+              "matched_fqn": "experimenter.experimenter.jetstream.schema_client.validate_statistics_blob",
+              "changed_fqn": "experimenter.experimenter.jetstream.schema_client.validate_statistics_blob",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "react",
+              "matched_fqn": "experimenter.experimenter.jetstream.schema_client.validate_statistics_blob",
+              "changed_fqn": "experimenter.experimenter.jetstream.schema_client.validate_statistics_blob",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "bootstrap",
+              "matched_fqn": "experimenter.experimenter.jetstream.schema_client.validate_statistics_blob",
+              "changed_fqn": "experimenter.experimenter.jetstream.schema_client.validate_statistics_blob",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "google.auth",
+              "matched_fqn": "experimenter.experimenter.jetstream.schema_client.validate_statistics_blob",
+              "changed_fqn": "experimenter.experimenter.jetstream.schema_client.validate_statistics_blob",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "celery",
+              "matched_fqn": "experimenter.experimenter.jetstream.schema_client.validate_statistics_blob",
+              "changed_fqn": "experimenter.experimenter.jetstream.schema_client.validate_statistics_blob",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.*",
+              "matched_fqn": "experimenter.experimenter.jetstream.schema_client.validate_statistics_blob",
+              "changed_fqn": "experimenter.experimenter.jetstream.schema_client.validate_statistics_blob",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.experiments.api.v5.serializers.NimbusReviewSerializer",
+              "matched_fqn": "experimenter.experimenter.jetstream.schema_client.validate_statistics_blob",
+              "changed_fqn": "experimenter.experimenter.jetstream.schema_client.validate_statistics_blob",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0014",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "group_id",
+              "matched_fqn": "experimenter.experimenter.jetstream.schema_client.validate_statistics_blob",
+              "changed_fqn": "experimenter.experimenter.jetstream.schema_client.validate_statistics_blob",
+              "change_type": "added"
+            }
+          ],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "exp-bench-probe-nimbus-ui-no-graphene",
+        "type": "compliant_probe",
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "total": 0,
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "prohibits_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.models.Prefs",
+              "matched_fqn": "experimenter.experimenter.glean.middleware",
+              "changed_fqn": "experimenter.experimenter.glean.middleware",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "prohibits_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.models.Prefs",
+              "matched_fqn": "experimenter.experimenter.glean.models",
+              "changed_fqn": "experimenter.experimenter.glean.models.Prefs",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "graphene-django",
+              "matched_fqn": "experimenter.experimenter.nimbus_ui.new.summary_views.ExperimentSummaryView",
+              "changed_fqn": "experimenter.experimenter.nimbus_ui.new.summary_views.ExperimentSummaryView",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "react",
+              "matched_fqn": "experimenter.experimenter.nimbus_ui.new.summary_views.ExperimentSummaryView",
+              "changed_fqn": "experimenter.experimenter.nimbus_ui.new.summary_views.ExperimentSummaryView",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "bootstrap",
+              "matched_fqn": "experimenter.experimenter.nimbus_ui.new.summary_views.ExperimentSummaryView",
+              "changed_fqn": "experimenter.experimenter.nimbus_ui.new.summary_views.ExperimentSummaryView",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "google.auth",
+              "matched_fqn": "experimenter.experimenter.nimbus_ui.new.summary_views.ExperimentSummaryView",
+              "changed_fqn": "experimenter.experimenter.nimbus_ui.new.summary_views.ExperimentSummaryView",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "celery",
+              "matched_fqn": "experimenter.experimenter.nimbus_ui.new.summary_views.ExperimentSummaryView",
+              "changed_fqn": "experimenter.experimenter.nimbus_ui.new.summary_views.ExperimentSummaryView",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "pydantic",
+              "matched_fqn": "experimenter.experimenter.nimbus_ui.new.summary_views.ExperimentSummaryView",
+              "changed_fqn": "experimenter.experimenter.nimbus_ui.new.summary_views.ExperimentSummaryView",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.*",
+              "matched_fqn": "experimenter.experimenter.nimbus_ui.new.summary_views.ExperimentSummaryView",
+              "changed_fqn": "experimenter.experimenter.nimbus_ui.new.summary_views.ExperimentSummaryView",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.experiments.api.v5.serializers.NimbusReviewSerializer",
+              "matched_fqn": "experimenter.experimenter.nimbus_ui.new.summary_views.ExperimentSummaryView",
+              "changed_fqn": "experimenter.experimenter.nimbus_ui.new.summary_views.ExperimentSummaryView",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0014",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "group_id",
+              "matched_fqn": "experimenter.experimenter.nimbus_ui.new.summary_views.ExperimentSummaryView",
+              "changed_fqn": "experimenter.experimenter.nimbus_ui.new.summary_views.ExperimentSummaryView",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "graphene-django",
+              "matched_fqn": "experimenter.experimenter.nimbus_ui.new.summary_views.summary_fragment",
+              "changed_fqn": "experimenter.experimenter.nimbus_ui.new.summary_views.summary_fragment",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "react",
+              "matched_fqn": "experimenter.experimenter.nimbus_ui.new.summary_views.summary_fragment",
+              "changed_fqn": "experimenter.experimenter.nimbus_ui.new.summary_views.summary_fragment",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "bootstrap",
+              "matched_fqn": "experimenter.experimenter.nimbus_ui.new.summary_views.summary_fragment",
+              "changed_fqn": "experimenter.experimenter.nimbus_ui.new.summary_views.summary_fragment",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "google.auth",
+              "matched_fqn": "experimenter.experimenter.nimbus_ui.new.summary_views.summary_fragment",
+              "changed_fqn": "experimenter.experimenter.nimbus_ui.new.summary_views.summary_fragment",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "celery",
+              "matched_fqn": "experimenter.experimenter.nimbus_ui.new.summary_views.summary_fragment",
+              "changed_fqn": "experimenter.experimenter.nimbus_ui.new.summary_views.summary_fragment",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "pydantic",
+              "matched_fqn": "experimenter.experimenter.nimbus_ui.new.summary_views.summary_fragment",
+              "changed_fqn": "experimenter.experimenter.nimbus_ui.new.summary_views.summary_fragment",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.*",
+              "matched_fqn": "experimenter.experimenter.nimbus_ui.new.summary_views.summary_fragment",
+              "changed_fqn": "experimenter.experimenter.nimbus_ui.new.summary_views.summary_fragment",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.experiments.api.v5.serializers.NimbusReviewSerializer",
+              "matched_fqn": "experimenter.experimenter.nimbus_ui.new.summary_views.summary_fragment",
+              "changed_fqn": "experimenter.experimenter.nimbus_ui.new.summary_views.summary_fragment",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0014",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "group_id",
+              "matched_fqn": "experimenter.experimenter.nimbus_ui.new.summary_views.summary_fragment",
+              "changed_fqn": "experimenter.experimenter.nimbus_ui.new.summary_views.summary_fragment",
+              "change_type": "added"
+            }
+          ],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "exp-bench-probe-schemas-pydantic",
+        "type": "compliant_probe",
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "total": 0,
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "prohibits_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.models.Prefs",
+              "matched_fqn": "experimenter.experimenter.glean.middleware",
+              "changed_fqn": "experimenter.experimenter.glean.middleware",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "prohibits_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.models.Prefs",
+              "matched_fqn": "experimenter.experimenter.glean.models",
+              "changed_fqn": "experimenter.experimenter.glean.models.Prefs",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "exp-bench-probe-db-write-no-prohibition",
+        "type": "compliant_probe",
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "total": 0,
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "prohibits_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.models.Prefs",
+              "matched_fqn": "experimenter.experimenter.glean.middleware",
+              "changed_fqn": "experimenter.experimenter.glean.middleware",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "prohibits_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.models.Prefs",
+              "matched_fqn": "experimenter.experimenter.glean.models",
+              "changed_fqn": "experimenter.experimenter.glean.models.Prefs",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "graphene-django",
+              "matched_fqn": "experimenter.experimenter.jetstream.results_store.refresh_results_data",
+              "changed_fqn": "experimenter.experimenter.jetstream.results_store.refresh_results_data",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "react",
+              "matched_fqn": "experimenter.experimenter.jetstream.results_store.refresh_results_data",
+              "changed_fqn": "experimenter.experimenter.jetstream.results_store.refresh_results_data",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0002",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "bootstrap",
+              "matched_fqn": "experimenter.experimenter.jetstream.results_store.refresh_results_data",
+              "changed_fqn": "experimenter.experimenter.jetstream.results_store.refresh_results_data",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "google.auth",
+              "matched_fqn": "experimenter.experimenter.jetstream.results_store.refresh_results_data",
+              "changed_fqn": "experimenter.experimenter.jetstream.results_store.refresh_results_data",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "celery",
+              "matched_fqn": "experimenter.experimenter.jetstream.results_store.refresh_results_data",
+              "changed_fqn": "experimenter.experimenter.jetstream.results_store.refresh_results_data",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0011",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.glean.*",
+              "matched_fqn": "experimenter.experimenter.jetstream.results_store.refresh_results_data",
+              "changed_fqn": "experimenter.experimenter.jetstream.results_store.refresh_results_data",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "requires_implementation",
+              "subject": "experimenter.*",
+              "object": "experimenter.experimenter.experiments.api.v5.serializers.NimbusReviewSerializer",
+              "matched_fqn": "experimenter.experimenter.jetstream.results_store.refresh_results_data",
+              "changed_fqn": "experimenter.experimenter.jetstream.results_store.refresh_results_data",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0014",
+              "predicate": "requires_dependency",
+              "subject": "experimenter.*",
+              "object": "group_id",
+              "matched_fqn": "experimenter.experimenter.jetstream.results_store.refresh_results_data",
+              "changed_fqn": "experimenter.experimenter.jetstream.results_store.refresh_results_data",
+              "change_type": "added"
+            }
+          ],
+          "arm_candidates": []
+        }
+      }
+    ],
+    "exact": 0,
+    "partial": 0,
+    "miss": 18,
+    "total": 18,
+    "structural": 22,
+    "merge_mechanism": 205,
+    "arm_candidates": 1
+  }
+}

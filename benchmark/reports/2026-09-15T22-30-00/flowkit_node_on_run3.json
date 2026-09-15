@@ -1,0 +1,1135 @@
+{
+  "_meta": {
+    "generated_at": "2026-09-15T22-50-24",
+    "git_commit": "a3bc053",
+    "arm": "baseline",
+    "semble_version": "0.5.6",
+    "semble_model": "minishlab/potion-code-16M-v2",
+    "resolver_model": "google/gemini-3.1-flash-lite"
+  },
+  "repo_id": "flowkit",
+  "arm": "node_on",
+  "run_index": 3,
+  "pin_commit": "24d88247d57987fe33f6b8915540d7bf09b58033",
+  "ingestion": {
+    "exact": 0,
+    "partial": 4,
+    "miss": 2,
+    "total": 6,
+    "false_positives": 46,
+    "false_positive_edges": [
+      {
+        "adr_id": "ADR-0001",
+        "subject": "docs.*",
+        "predicate": "prohibits_dependency",
+        "object": "pip",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0001",
+        "subject": "flowapi.*",
+        "predicate": "prohibits_dependency",
+        "object": "pip",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0001",
+        "subject": "flowauth.*",
+        "predicate": "prohibits_dependency",
+        "object": "pip",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0001",
+        "subject": "flowclient.*",
+        "predicate": "prohibits_dependency",
+        "object": "pip",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0001",
+        "subject": "flowdb.*",
+        "predicate": "prohibits_dependency",
+        "object": "pip",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0001",
+        "subject": "flowetl.*",
+        "predicate": "prohibits_dependency",
+        "object": "pip",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0001",
+        "subject": "flowkit_jwt_generator.*",
+        "predicate": "prohibits_dependency",
+        "object": "pip",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0001",
+        "subject": "flowmachine.*",
+        "predicate": "prohibits_dependency",
+        "object": "pip",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0001",
+        "subject": "docs.*",
+        "predicate": "prohibits_dependency",
+        "object": "conda",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0001",
+        "subject": "flowapi.*",
+        "predicate": "prohibits_dependency",
+        "object": "conda",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0001",
+        "subject": "flowauth.*",
+        "predicate": "prohibits_dependency",
+        "object": "conda",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0001",
+        "subject": "flowclient.*",
+        "predicate": "prohibits_dependency",
+        "object": "conda",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0001",
+        "subject": "flowdb.*",
+        "predicate": "prohibits_dependency",
+        "object": "conda",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0001",
+        "subject": "flowetl.*",
+        "predicate": "prohibits_dependency",
+        "object": "conda",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0001",
+        "subject": "flowkit_jwt_generator.*",
+        "predicate": "prohibits_dependency",
+        "object": "conda",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0001",
+        "subject": "flowmachine.*",
+        "predicate": "prohibits_dependency",
+        "object": "conda",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0002",
+        "subject": "docs.*",
+        "predicate": "requires_dependency",
+        "object": "pytest",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0002",
+        "subject": "flowapi.*",
+        "predicate": "requires_dependency",
+        "object": "pytest",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0002",
+        "subject": "flowauth.*",
+        "predicate": "requires_dependency",
+        "object": "pytest",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0002",
+        "subject": "flowclient.*",
+        "predicate": "requires_dependency",
+        "object": "pytest",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0002",
+        "subject": "flowdb.*",
+        "predicate": "requires_dependency",
+        "object": "pytest",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0002",
+        "subject": "flowetl.*",
+        "predicate": "requires_dependency",
+        "object": "pytest",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0002",
+        "subject": "flowkit_jwt_generator.*",
+        "predicate": "requires_dependency",
+        "object": "pytest",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0002",
+        "subject": "flowmachine.*",
+        "predicate": "requires_dependency",
+        "object": "pytest",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0002",
+        "subject": "docs.*",
+        "predicate": "prohibits_dependency",
+        "object": "nose",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0002",
+        "subject": "flowapi.*",
+        "predicate": "prohibits_dependency",
+        "object": "nose",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0002",
+        "subject": "flowauth.*",
+        "predicate": "prohibits_dependency",
+        "object": "nose",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0002",
+        "subject": "flowclient.*",
+        "predicate": "prohibits_dependency",
+        "object": "nose",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0002",
+        "subject": "flowdb.*",
+        "predicate": "prohibits_dependency",
+        "object": "nose",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0002",
+        "subject": "flowetl.*",
+        "predicate": "prohibits_dependency",
+        "object": "nose",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0002",
+        "subject": "flowkit_jwt_generator.*",
+        "predicate": "prohibits_dependency",
+        "object": "nose",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0002",
+        "subject": "flowmachine.*",
+        "predicate": "prohibits_dependency",
+        "object": "nose",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0003",
+        "subject": "flowapi.*",
+        "predicate": "requires_dependency",
+        "object": "flowmachine.flowmachine.core.connection.*",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0004",
+        "subject": "flowapi.*",
+        "predicate": "prohibits_dependency",
+        "object": "flask",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0007",
+        "subject": "flowmachine.*",
+        "predicate": "prohibits_dependency",
+        "object": "folium",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0007",
+        "subject": "flowmachine.*",
+        "predicate": "prohibits_dependency",
+        "object": "geoviews",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0008",
+        "subject": "flowmachine.*",
+        "predicate": "requires_dependency",
+        "object": "papermill",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0008",
+        "subject": "flowmachine.*",
+        "predicate": "requires_dependency",
+        "object": "scrapbook",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0008",
+        "subject": "flowmachine.*",
+        "predicate": "requires_dependency",
+        "object": "nbconvert",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0009",
+        "subject": "flowmachine.*",
+        "predicate": "requires_dependency",
+        "object": "nbconvert",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0009",
+        "subject": "flowmachine.*",
+        "predicate": "requires_dependency",
+        "object": "asciidoctor",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0010",
+        "subject": "flowmachine.*",
+        "predicate": "requires_dependency",
+        "object": "prefect",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0010",
+        "subject": "flowmachine.*",
+        "predicate": "prohibits_dependency",
+        "object": "airflow",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0011",
+        "subject": "flowmachine.flowmachine.features.location.labelled_spatial_aggregate.LabelledSpatialAggregate",
+        "predicate": "requires_dependency",
+        "object": "flowmachine.flowmachine.features.location.redacted_labelled_spatial_aggregate.RedactedLabelledSpatialAggregate",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0012",
+        "subject": "flowauth.backend.flowauth.*",
+        "predicate": "requires_dependency",
+        "object": "flowauth.backend.flowauth.models.Role",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0012",
+        "subject": "flowauth.backend.flowauth.*",
+        "predicate": "requires_dependency",
+        "object": "flowauth.backend.flowauth.models.Scope",
+        "class": "B/C"
+      }
+    ],
+    "credited_fragments": [],
+    "excluded_tooling_edges": [],
+    "accuracy": 0.3333,
+    "per_constraint": [
+      {
+        "adr_id": "ADR-0003",
+        "expected": {
+          "subject": "flowclient.flowclient.*",
+          "predicate": "prohibits_dependency",
+          "object": "flowmachine",
+          "justification": "ADR-0003: clients reach the single query library only through the language neutral HTTP API; a direct flowclient -> flowmachine import bypasses the single access point"
+        },
+        "score": "miss",
+        "resolved_subject": "flowmachine.flowmachine.*",
+        "resolved_object": "flowmachine.flowmachine.core.connection.*"
+      },
+      {
+        "adr_id": "ADR-0003",
+        "expected": {
+          "subject": "flowapi.flowapi.*",
+          "predicate": "prohibits_dependency",
+          "object": "flowmachine",
+          "justification": "ADR-0003 Decision: 'FlowMachine will be wrapped by an HTTP API.' The wrapper layer must not import the wrapped library directly; they communicate over zmq per ADR-0005"
+        },
+        "score": "miss",
+        "resolved_subject": "flowmachine.flowmachine.*",
+        "resolved_object": "flowmachine.flowmachine.core.connection.*"
+      },
+      {
+        "adr_id": "ADR-0004",
+        "expected": {
+          "subject": "flowapi.flowapi.*",
+          "predicate": "requires_dependency",
+          "object": "quart",
+          "justification": "ADR-0004 Decision: 'The FlowKit API will make use of the Quart framework.' \u2014 the API layer is built on Quart"
+        },
+        "score": "partial_match",
+        "resolved_subject": "flowapi.*",
+        "resolved_object": "quart",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0005",
+        "expected": {
+          "subject": "flowapi.flowapi.*",
+          "predicate": "requires_dependency",
+          "object": "zmq",
+          "justification": "ADR-0005 Decision: 'API-backend communication will be via zeromq' \u2014 the API side of the IPC channel depends on zeromq"
+        },
+        "score": "partial_match",
+        "resolved_subject": "flowapi.*",
+        "resolved_object": "zmq",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0005",
+        "expected": {
+          "subject": "flowmachine.flowmachine.core.*",
+          "predicate": "requires_dependency",
+          "object": "redis",
+          "justification": "ADR-0005 Decision: 'IPC in the backend will be mediated by redis' \u2014 backend IPC/state code depends on redis"
+        },
+        "score": "partial_match",
+        "resolved_subject": "flowmachine.*",
+        "resolved_object": "redis",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0006",
+        "expected": {
+          "subject": "flowapi.flowapi.*",
+          "predicate": "requires_dependency",
+          "object": "quart_jwt_extended",
+          "justification": "ADR-0006 Decision: 'API authentication and access control will use JWTs.' \u2014 the API's auth/access-control surface depends on the JWT machinery (quart_jwt_extended)"
+        },
+        "score": "partial_match",
+        "resolved_subject": "flowapi.*",
+        "resolved_object": "quart_jwt_extended",
+        "class": "B/C"
+      }
+    ],
+    "class_split": {
+      "B/C": {
+        "matched": 4,
+        "false_positive_edges": 29
+      },
+      "A": {
+        "matched": 0,
+        "false_positive_edges": 17
+      }
+    }
+  },
+  "detection": {
+    "cases": [
+      {
+        "case_id": "flowkit-client-direct-flowmachine",
+        "type": "injected",
+        "per_unit": [
+          {
+            "expected_fqn": "flowclient.flowclient.legacy_query",
+            "score": "miss"
+          }
+        ],
+        "exact": 0,
+        "partial": 0,
+        "miss": 1,
+        "total": 1,
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "prohibits_dependency",
+              "subject": "flowmachine.flowmachine.*",
+              "object": "flowmachine.flowmachine.core.connection.*",
+              "matched_fqn": "flowmachine.flowmachine.core",
+              "changed_fqn": "flowmachine.flowmachine.core",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "flowkit-flowapi-direct-flowmachine",
+        "type": "injected",
+        "per_unit": [
+          {
+            "expected_fqn": "flowapi.flowapi.legacy_backend",
+            "score": "miss"
+          },
+          {
+            "expected_fqn": "flowapi.flowapi.legacy_backend.run_query_locally",
+            "score": "miss"
+          },
+          {
+            "expected_fqn": "flowapi.flowapi.legacy_backend.run_query_locally",
+            "score": "miss"
+          },
+          {
+            "expected_fqn": "flowapi.flowapi.legacy_backend.run_query_locally",
+            "score": "miss"
+          }
+        ],
+        "exact": 0,
+        "partial": 0,
+        "miss": 4,
+        "total": 4,
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "prohibits_dependency",
+              "subject": "flowmachine.flowmachine.*",
+              "object": "flowmachine.flowmachine.core.connection.*",
+              "matched_fqn": "flowmachine.flowmachine.core",
+              "changed_fqn": "flowmachine.flowmachine.core",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "requires_dependency",
+              "subject": "flowapi.*",
+              "object": "flowmachine.flowmachine.core.connection.*",
+              "matched_fqn": "flowapi.flowapi.legacy_backend.run_query_locally",
+              "changed_fqn": "flowapi.flowapi.legacy_backend.run_query_locally",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "requires_dependency",
+              "subject": "flowapi.*",
+              "object": "quart",
+              "matched_fqn": "flowapi.flowapi.legacy_backend.run_query_locally",
+              "changed_fqn": "flowapi.flowapi.legacy_backend.run_query_locally",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0005",
+              "predicate": "requires_dependency",
+              "subject": "flowapi.*",
+              "object": "zmq",
+              "matched_fqn": "flowapi.flowapi.legacy_backend.run_query_locally",
+              "changed_fqn": "flowapi.flowapi.legacy_backend.run_query_locally",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0006",
+              "predicate": "requires_dependency",
+              "subject": "flowapi.*",
+              "object": "quart_jwt_extended",
+              "matched_fqn": "flowapi.flowapi.legacy_backend.run_query_locally",
+              "changed_fqn": "flowapi.flowapi.legacy_backend.run_query_locally",
+              "change_type": "added"
+            }
+          ],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "flowkit-flowapi-endpoint-without-jwt",
+        "type": "injected",
+        "per_unit": [
+          {
+            "expected_fqn": "flowapi.flowapi.legacy_endpoints.run_legacy_query",
+            "score": "miss"
+          },
+          {
+            "expected_fqn": "flowapi.flowapi.legacy_endpoints.run_legacy_query",
+            "score": "miss"
+          }
+        ],
+        "exact": 0,
+        "partial": 0,
+        "miss": 2,
+        "total": 2,
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "prohibits_dependency",
+              "subject": "flowmachine.flowmachine.*",
+              "object": "flowmachine.flowmachine.core.connection.*",
+              "matched_fqn": "flowmachine.flowmachine.core",
+              "changed_fqn": "flowmachine.flowmachine.core",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "requires_dependency",
+              "subject": "flowapi.*",
+              "object": "flowmachine.flowmachine.core.connection.*",
+              "matched_fqn": "flowapi.flowapi.legacy_endpoints.run_legacy_query",
+              "changed_fqn": "flowapi.flowapi.legacy_endpoints.run_legacy_query",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0005",
+              "predicate": "requires_dependency",
+              "subject": "flowapi.*",
+              "object": "zmq",
+              "matched_fqn": "flowapi.flowapi.legacy_endpoints.run_legacy_query",
+              "changed_fqn": "flowapi.flowapi.legacy_endpoints.run_legacy_query",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0006",
+              "predicate": "requires_dependency",
+              "subject": "flowapi.*",
+              "object": "quart_jwt_extended",
+              "matched_fqn": "flowapi.flowapi.legacy_endpoints.run_legacy_query",
+              "changed_fqn": "flowapi.flowapi.legacy_endpoints.run_legacy_query",
+              "change_type": "added"
+            }
+          ],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "flowkit-flowmachine-core-without-redis",
+        "type": "injected",
+        "per_unit": [
+          {
+            "expected_fqn": "flowmachine.flowmachine.core.in_memory_state.InMemoryQueryState",
+            "score": "miss"
+          }
+        ],
+        "exact": 0,
+        "partial": 0,
+        "miss": 1,
+        "total": 1,
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "prohibits_dependency",
+              "subject": "flowmachine.flowmachine.*",
+              "object": "flowmachine.flowmachine.core.connection.*",
+              "matched_fqn": "flowmachine.flowmachine.core",
+              "changed_fqn": "flowmachine.flowmachine.core",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0005",
+              "predicate": "requires_dependency",
+              "subject": "flowmachine.*",
+              "object": "redis",
+              "matched_fqn": "flowmachine.flowmachine.core.in_memory_state.InMemoryQueryState",
+              "changed_fqn": "flowmachine.flowmachine.core.in_memory_state.InMemoryQueryState",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0008",
+              "predicate": "requires_dependency",
+              "subject": "flowmachine.*",
+              "object": "papermill",
+              "matched_fqn": "flowmachine.flowmachine.core.in_memory_state.InMemoryQueryState",
+              "changed_fqn": "flowmachine.flowmachine.core.in_memory_state.InMemoryQueryState",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0008",
+              "predicate": "requires_dependency",
+              "subject": "flowmachine.*",
+              "object": "scrapbook",
+              "matched_fqn": "flowmachine.flowmachine.core.in_memory_state.InMemoryQueryState",
+              "changed_fqn": "flowmachine.flowmachine.core.in_memory_state.InMemoryQueryState",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0008",
+              "predicate": "requires_dependency",
+              "subject": "flowmachine.*",
+              "object": "nbconvert",
+              "matched_fqn": "flowmachine.flowmachine.core.in_memory_state.InMemoryQueryState",
+              "changed_fqn": "flowmachine.flowmachine.core.in_memory_state.InMemoryQueryState",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0009",
+              "predicate": "requires_dependency",
+              "subject": "flowmachine.*",
+              "object": "nbconvert",
+              "matched_fqn": "flowmachine.flowmachine.core.in_memory_state.InMemoryQueryState",
+              "changed_fqn": "flowmachine.flowmachine.core.in_memory_state.InMemoryQueryState",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0009",
+              "predicate": "requires_dependency",
+              "subject": "flowmachine.*",
+              "object": "asciidoctor",
+              "matched_fqn": "flowmachine.flowmachine.core.in_memory_state.InMemoryQueryState",
+              "changed_fqn": "flowmachine.flowmachine.core.in_memory_state.InMemoryQueryState",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "requires_dependency",
+              "subject": "flowmachine.*",
+              "object": "prefect",
+              "matched_fqn": "flowmachine.flowmachine.core.in_memory_state.InMemoryQueryState",
+              "changed_fqn": "flowmachine.flowmachine.core.in_memory_state.InMemoryQueryState",
+              "change_type": "added"
+            }
+          ],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "flowkit-transitive-flowapi-via-flowclient",
+        "type": "injected",
+        "per_unit": [
+          {
+            "expected_fqn": "flowapi.flowapi.client_proxy",
+            "score": "miss"
+          },
+          {
+            "expected_fqn": "flowapi.flowapi.client_proxy.submit_query_via_client",
+            "score": "miss"
+          },
+          {
+            "expected_fqn": "flowapi.flowapi.client_proxy.submit_query_via_client",
+            "score": "miss"
+          },
+          {
+            "expected_fqn": "flowapi.flowapi.client_proxy.submit_query_via_client",
+            "score": "miss"
+          }
+        ],
+        "exact": 0,
+        "partial": 0,
+        "miss": 4,
+        "total": 4,
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "prohibits_dependency",
+              "subject": "flowmachine.flowmachine.*",
+              "object": "flowmachine.flowmachine.core.connection.*",
+              "matched_fqn": "flowmachine.flowmachine.core",
+              "changed_fqn": "flowmachine.flowmachine.core",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "requires_dependency",
+              "subject": "flowapi.*",
+              "object": "flowmachine.flowmachine.core.connection.*",
+              "matched_fqn": "flowapi.flowapi.client_proxy.submit_query_via_client",
+              "changed_fqn": "flowapi.flowapi.client_proxy.submit_query_via_client",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "requires_dependency",
+              "subject": "flowapi.*",
+              "object": "quart",
+              "matched_fqn": "flowapi.flowapi.client_proxy.submit_query_via_client",
+              "changed_fqn": "flowapi.flowapi.client_proxy.submit_query_via_client",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0005",
+              "predicate": "requires_dependency",
+              "subject": "flowapi.*",
+              "object": "zmq",
+              "matched_fqn": "flowapi.flowapi.client_proxy.submit_query_via_client",
+              "changed_fqn": "flowapi.flowapi.client_proxy.submit_query_via_client",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0006",
+              "predicate": "requires_dependency",
+              "subject": "flowapi.*",
+              "object": "quart_jwt_extended",
+              "matched_fqn": "flowapi.flowapi.client_proxy.submit_query_via_client",
+              "changed_fqn": "flowapi.flowapi.client_proxy.submit_query_via_client",
+              "change_type": "added"
+            }
+          ],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "flowkit-probe-client-httpx-only",
+        "type": "compliant_probe",
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "total": 0,
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "prohibits_dependency",
+              "subject": "flowmachine.flowmachine.*",
+              "object": "flowmachine.flowmachine.core.connection.*",
+              "matched_fqn": "flowmachine.flowmachine.core",
+              "changed_fqn": "flowmachine.flowmachine.core",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "flowkit-probe-endpoint-sanctioned",
+        "type": "compliant_probe",
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "total": 0,
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "prohibits_dependency",
+              "subject": "flowmachine.flowmachine.*",
+              "object": "flowmachine.flowmachine.core.connection.*",
+              "matched_fqn": "flowmachine.flowmachine.core",
+              "changed_fqn": "flowmachine.flowmachine.core",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "requires_dependency",
+              "subject": "flowapi.*",
+              "object": "flowmachine.flowmachine.core.connection.*",
+              "matched_fqn": "flowapi.flowapi.date_endpoints.get_available_dates",
+              "changed_fqn": "flowapi.flowapi.date_endpoints.get_available_dates",
+              "change_type": "added"
+            }
+          ],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "flowkit-probe-core-redis-proper",
+        "type": "compliant_probe",
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "total": 0,
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "prohibits_dependency",
+              "subject": "flowmachine.flowmachine.*",
+              "object": "flowmachine.flowmachine.core.connection.*",
+              "matched_fqn": "flowmachine.flowmachine.core",
+              "changed_fqn": "flowmachine.flowmachine.core",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0008",
+              "predicate": "requires_dependency",
+              "subject": "flowmachine.*",
+              "object": "papermill",
+              "matched_fqn": "flowmachine.flowmachine.core.redis_coordinator.RedisCoordinator",
+              "changed_fqn": "flowmachine.flowmachine.core.redis_coordinator.RedisCoordinator",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0008",
+              "predicate": "requires_dependency",
+              "subject": "flowmachine.*",
+              "object": "scrapbook",
+              "matched_fqn": "flowmachine.flowmachine.core.redis_coordinator.RedisCoordinator",
+              "changed_fqn": "flowmachine.flowmachine.core.redis_coordinator.RedisCoordinator",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0008",
+              "predicate": "requires_dependency",
+              "subject": "flowmachine.*",
+              "object": "nbconvert",
+              "matched_fqn": "flowmachine.flowmachine.core.redis_coordinator.RedisCoordinator",
+              "changed_fqn": "flowmachine.flowmachine.core.redis_coordinator.RedisCoordinator",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0009",
+              "predicate": "requires_dependency",
+              "subject": "flowmachine.*",
+              "object": "nbconvert",
+              "matched_fqn": "flowmachine.flowmachine.core.redis_coordinator.RedisCoordinator",
+              "changed_fqn": "flowmachine.flowmachine.core.redis_coordinator.RedisCoordinator",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0009",
+              "predicate": "requires_dependency",
+              "subject": "flowmachine.*",
+              "object": "asciidoctor",
+              "matched_fqn": "flowmachine.flowmachine.core.redis_coordinator.RedisCoordinator",
+              "changed_fqn": "flowmachine.flowmachine.core.redis_coordinator.RedisCoordinator",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "requires_dependency",
+              "subject": "flowmachine.*",
+              "object": "prefect",
+              "matched_fqn": "flowmachine.flowmachine.core.redis_coordinator.RedisCoordinator",
+              "changed_fqn": "flowmachine.flowmachine.core.redis_coordinator.RedisCoordinator",
+              "change_type": "added"
+            }
+          ],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "flowkit-probe-features-no-redis",
+        "type": "compliant_probe",
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "total": 0,
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "prohibits_dependency",
+              "subject": "flowmachine.flowmachine.*",
+              "object": "flowmachine.flowmachine.core.connection.*",
+              "matched_fqn": "flowmachine.flowmachine.core",
+              "changed_fqn": "flowmachine.flowmachine.core",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0005",
+              "predicate": "requires_dependency",
+              "subject": "flowmachine.*",
+              "object": "redis",
+              "matched_fqn": "flowmachine.flowmachine.features.location.legacy_aggregate.aggregate_locations",
+              "changed_fqn": "flowmachine.flowmachine.features.location.legacy_aggregate.aggregate_locations",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0008",
+              "predicate": "requires_dependency",
+              "subject": "flowmachine.*",
+              "object": "papermill",
+              "matched_fqn": "flowmachine.flowmachine.features.location.legacy_aggregate.aggregate_locations",
+              "changed_fqn": "flowmachine.flowmachine.features.location.legacy_aggregate.aggregate_locations",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0008",
+              "predicate": "requires_dependency",
+              "subject": "flowmachine.*",
+              "object": "scrapbook",
+              "matched_fqn": "flowmachine.flowmachine.features.location.legacy_aggregate.aggregate_locations",
+              "changed_fqn": "flowmachine.flowmachine.features.location.legacy_aggregate.aggregate_locations",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0008",
+              "predicate": "requires_dependency",
+              "subject": "flowmachine.*",
+              "object": "nbconvert",
+              "matched_fqn": "flowmachine.flowmachine.features.location.legacy_aggregate.aggregate_locations",
+              "changed_fqn": "flowmachine.flowmachine.features.location.legacy_aggregate.aggregate_locations",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0009",
+              "predicate": "requires_dependency",
+              "subject": "flowmachine.*",
+              "object": "nbconvert",
+              "matched_fqn": "flowmachine.flowmachine.features.location.legacy_aggregate.aggregate_locations",
+              "changed_fqn": "flowmachine.flowmachine.features.location.legacy_aggregate.aggregate_locations",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0009",
+              "predicate": "requires_dependency",
+              "subject": "flowmachine.*",
+              "object": "asciidoctor",
+              "matched_fqn": "flowmachine.flowmachine.features.location.legacy_aggregate.aggregate_locations",
+              "changed_fqn": "flowmachine.flowmachine.features.location.legacy_aggregate.aggregate_locations",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "requires_dependency",
+              "subject": "flowmachine.*",
+              "object": "prefect",
+              "matched_fqn": "flowmachine.flowmachine.features.location.legacy_aggregate.aggregate_locations",
+              "changed_fqn": "flowmachine.flowmachine.features.location.legacy_aggregate.aggregate_locations",
+              "change_type": "added"
+            }
+          ],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "flowkit-probe-flowapi-utils-assignment",
+        "type": "compliant_probe",
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "total": 0,
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "prohibits_dependency",
+              "subject": "flowmachine.flowmachine.*",
+              "object": "flowmachine.flowmachine.core.connection.*",
+              "matched_fqn": "flowmachine.flowmachine.core",
+              "changed_fqn": "flowmachine.flowmachine.core",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "requires_dependency",
+              "subject": "flowapi.*",
+              "object": "flowmachine.flowmachine.core.connection.*",
+              "matched_fqn": "flowapi.flowapi.utils",
+              "changed_fqn": "flowapi.flowapi.utils",
+              "change_type": "modified"
+            },
+            {
+              "adr_id": "ADR-0005",
+              "predicate": "requires_dependency",
+              "subject": "flowapi.*",
+              "object": "zmq",
+              "matched_fqn": "flowapi.flowapi.utils",
+              "changed_fqn": "flowapi.flowapi.utils",
+              "change_type": "modified"
+            },
+            {
+              "adr_id": "ADR-0006",
+              "predicate": "requires_dependency",
+              "subject": "flowapi.*",
+              "object": "quart_jwt_extended",
+              "matched_fqn": "flowapi.flowapi.utils",
+              "changed_fqn": "flowapi.flowapi.utils",
+              "change_type": "modified"
+            }
+          ],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "flowkit-probe-decoy-local-name",
+        "type": "compliant_probe",
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "total": 0,
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "prohibits_dependency",
+              "subject": "flowmachine.flowmachine.*",
+              "object": "flowmachine.flowmachine.core.connection.*",
+              "matched_fqn": "flowmachine.flowmachine.core",
+              "changed_fqn": "flowmachine.flowmachine.core",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "flowkit-decoy-module-var",
+        "type": "known_limitation",
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "total": 0,
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "prohibits_dependency",
+              "subject": "flowmachine.flowmachine.*",
+              "object": "flowmachine.flowmachine.core.connection.*",
+              "matched_fqn": "flowmachine.flowmachine.core",
+              "changed_fqn": "flowmachine.flowmachine.core",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "flowkit-probe-flowetl-out-of-scope",
+        "type": "compliant_probe",
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "total": 0,
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "prohibits_dependency",
+              "subject": "flowmachine.flowmachine.*",
+              "object": "flowmachine.flowmachine.core.connection.*",
+              "matched_fqn": "flowmachine.flowmachine.core",
+              "changed_fqn": "flowmachine.flowmachine.core",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      }
+    ],
+    "exact": 0,
+    "partial": 0,
+    "miss": 12,
+    "total": 12,
+    "structural": 13,
+    "merge_mechanism": 35,
+    "arm_candidates": 0
+  }
+}

@@ -445,6 +445,33 @@ Match tallies identical to the #134 baseline on every repo; the change is FP-onl
 
 **Comparability: NON-COMPARABLE for future resolver runs against all prior ingestion rows** (the tool surface and prompt changed). No committed baseline moved; the next re-baseline (post-freeze, on the benchmark denominator per #144) re-records against this surface.
 
+### 2026-09-15: issue #145 disposition (legacy-gold revalidation closed as superseded; schema-gap limitation documented)
+
+**Change:** none to any gold byte or committed report. The four #145 HITL decisions are recorded on the issue and closed as superseded by the benchmark gold re-curation (`benchmark/gold/`, verified 2026-09-15 post-#150 at a3bc053): openlobby and tamr_client exist only in the retired legacy eval set (`tests/ground_truth/`), which no forward issue (#146/#148/#149) reads, so no re-curation or re-baseline was executed. The openlobby ADR-0006 entry (superseded flask requires) stands as known-bad in the frozen 2026-09-08 artifact; a gold edit without its re-baseline would violate ADR 018, and editing a retired set buys nothing downstream consumes.
+
+**Numbers:** none — no run, no gold edit, nothing moves.
+
+**Impact:** one standing expressiveness limitation is now documented instead of fixed: the four-predicate grammar (`prohibits_dependency`, `requires_dependency`, `requires_implementation`, `prohibits_implementation`) cannot express configuration/feature-flag mandates (e.g. tamr ADR-0007's `TAMR_CLIENT_BETA=1` env-var gate); such mandates are out of vocabulary and any resolver edge forced into `requires_dependency` with the flag name as object scores FP by construction. Extending the vocabulary is an engine change plus a full re-baseline for one mandate class; recorded as a limitation (carries to the paper's threats-to-validity), not fixed.
+
+**Comparability: unchanged** — committed baselines stay 2026-09-08T13-06-27; every prior row remains diffable as before.
+
+### 2026-09-15: issue #149 benchmark arms batch (node_on vs node_off, k=3, benchmark gold)
+
+**Change:** first measurement batch on the benchmark denominator (`benchmark/gold/`, 4 in-scope repos at pins, 46 cases / 42 units). Protocol pre-registered on #149 (issuecomment 5679974749) before any run; arm design frozen from #138 comment 5652725309. New harness `app/tests/services/adg/test_benchmark_arms_eval.py` (7 TDD pins) transfers the #140 instrument unchanged and mirrors the #138 verification convention exactly (status-aware diffs, historical worktrees, documented-FP folding) with one registered extension: the structural baseline is measured empirically per run (empty-diff detect on that run's resolved-edge graph). Aggregator `benchmark/aggregate_arms.py` applies the registered reading. 24 cells (4 repos x 2 arms x k=3), 282 LLM sessions ≈ $0.9, ~52 min. Reports committed at `benchmark/reports/2026-09-15T22-30-00/` (per-cell JSON + `AGGREGATE.md` + `_tables.md`); traces local at `logs/benchmark-arms-149/` (#140 convention) for #148 re-scoring.
+
+**Numbers (arm effects beyond node_on noise floor, ≥2/3 paired-run consistency):**
+
+| repo | gold-matching load | FP mass | detection units |
+|---|---|---|---|
+| python-tuf | none (3/0/1 identical) | none beyond floor | none (6/0/0 both) |
+| flowkit | partial 4 vs 3, miss 2 vs 3 (3/3) | FP +19.7, class-A +11 (decoy hedge, 3/3) | none (0/0/12 both) |
+| experimenter | none | FP +1.33 vs floor 1 (weak, 2/3) | none (0/0/18 both) |
+| structurizr-python | none (0/1/1 identical) | FP -1 under node_on (3/3) | none (0/0/6 both) |
+
+**Impact / Decision:** **node_search KEEP** — the anchor-bait channel (primary expected effect, pre-registered on #142) is confirmed on flowkit: ADR-0006 `flowapi.flowapi.* requires quart_jwt_extended` partial in all node_on runs, miss in all node_off runs. The FP mass node_on adds is the predicted decoy-hedge residue (prompt-work) and routes to #146; detection-side expected units moved in **no** repo under either arm, so retrieval-quality complaints are not tool-surface questions. Caveats recorded in AGGREGATE.md: class-A cannot distinguish verified-absent via node_search from never-consulted (tuf class shift is attribution, not matching — trace-verified); node_off showed a 2/3 runaway broad-prohibits invention on experimenter (~4.2k structural fires); traces are local-only.
+
+**Comparability:** the unoptimized baseline row for the forward order — #145/#146's expected movement and #148's post-optimization records are judged against these numbers. Not comparable to any legacy eval-set ingestion row (different denominator, different gold).
+
 ## Curation mode
 
 

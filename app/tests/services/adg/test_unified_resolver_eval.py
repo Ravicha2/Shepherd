@@ -153,6 +153,9 @@ class EvalResult:
     # scope (tooling deps live in pyproject/setup.cfg/noxfile, not the import
     # graph), itemized so the exclusion stays reversible and auditable
     excluded_tooling_edges: list[dict] = field(default_factory=list)
+    # #149: every resolved edge of the run, so benchmark-side harnesses can
+    # feed the same run's edges into detection without re-resolving
+    resolved_edges: list = field(default_factory=list)
 
     @property
     def accuracy(self) -> float:
@@ -360,6 +363,7 @@ def run_eval(
                 config=LangExtractConfig(),
                 search_backend=search_backend,
             )
+            result.resolved_edges.extend(resolved_edges)
 
             expected_constraints = fixture.get("constraints", [])
             matched_edge_ids: set[int] = set()
