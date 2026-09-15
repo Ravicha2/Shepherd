@@ -5,12 +5,17 @@
   "pin_commit": "d61a2b8efcb7fd77a849c9f9dc163130473b7f16",
   "pin_date": "2026-08-31",
   "adr_dir": "docs/adrs",
-  "verification": "passed: all 9 cases verified empirically at the pin (in-memory ADG from parse_repo + gold constraints, process_diff + ADGPipeline().run_prepared); baseline detect at d61a2b8 yields zero violations; the historical case verified against a temp worktree at a2de3aeb (removed after verification); every expected_violation fired with exact subject/object/matched_fqn and every probe scored zero",
+  "verification": "passed: all 9 cases verified empirically at the pin (in-memory ADG from parse_repo + gold constraints, process_diff + ADGPipeline().run_prepared); baseline detect at d61a2b8 yields zero violations; the historical case verified against a temp worktree at a2de3aeb (removed after verification); every expected_violation fired with exact subject/object/matched_fqn and every probe scored zero. RE-VERIFIED 2026-09-15 post-#150 under the run_case convention (parse_repo -> add_external_nodes -> merge_constraint_edges -> specificity -> augment_immutable -> process_diff -> detect): that merge step creates EXTERNAL nodes for constraint objects, so ADR-0003 requires is active on every run; the three jetstream modules lacking a GCS import (db_snapshot scopes, the a2de3aeb client) fire it as documented_false_positives (over-broad-subject class), and the gcs-bypass mechanism note was corrected accordingly (from-import binds the exact object target once the node exists). Two new cases authored and verified 2026-09-15 (multi-fire jetstream cluster: 8 genuine units + 2 documented over-broad-subject FPs; historical adoption-gap pin 9857c48a: 1 genuine unit + 1 documented FP), plus the 9857c48a historical_pins entry.",
   "historical_pins": [
     {
       "commit": "a2de3aebd37bbc6bc76f15ff2704f082c864e856",
       "date": "2023-06-09",
       "reason": "'add jetstream/analysis schemas' — the commit that introduces schemas/mozilla_nimbus_schemas/; at this tree experimenter/experimenter/jetstream/client.py still hand-parses Jetstream JSON ('import json', json.loads in load_data_from_gcs) with no mozilla_nimbus_schemas and no pydantic import. Content-verified via git show: the ADR-0010 requires-violation snapshot is real and predates the fix era (b6d9aebc, 2023-06-23, per census)."
+    },
+    {
+      "commit": "9857c48a351c3f0eeda48262f97ab7c4988b3f61",
+      "date": "2023-06-23",
+      "reason": "Parent of the fix commit b6d9aebc ('validate incoming jetstream schemas', 2023-06-23 16:37 -0400): the last pre-adoption tree. Content-verified via git show: client.py imports json/os/collections/django-storages and experimenter.jetstream.models only — still no mozilla_nimbus_schemas, two weeks after the schemas package landed (the a2de3aeb pin) and hours before the fix. Used as the historical case exp-bench-hist-late-pre-schema-client: demonstrates the violation persisted from schema-availability to schema-adoption, the adoption-gap era in miniature."
     }
   ],
   "cases": [
@@ -29,7 +34,17 @@
           "justification": "ADR-0010 (option 1B): 'define the schema using Pydantic ... one schema definition shared between Experimenter and Jetstream would allow for validation of outputs from Jetstream while removing the need for Experimenter to make assumptions.' At this commit experimenter/experimenter/jetstream/client.py imports json/os/django-storage/only-local models (verified via git show: 'import json' line 1, json.loads in load_data_from_gcs) and has no mozilla_nimbus_schemas dependency at any scope, so the ingest layer fails the shared-schema requires. Module FQN reported (doubled prefix per the experimenter/experimenter/ layout at this commit)."
         }
       ],
-      "grading_note": "The client.py import state and path structure were verified against the real tree at a2de3aeb (git show a2de3aeb:experimenter/experimenter/jetstream/client.py). Evaluation parses the repo at the historical commit and treats the jetstream client scopes as changed; sibling jetstream modules at this pin (models.py, tasks.py, results_manager.py) also lack a mozilla_nimbus_schemas dependency and would produce additional true findings of the same historical violation class — score them as true firings, not false positives; the required exact hit is the client module FQN. ADR-0010's schemas.mozilla_nimbus_schemas.* requires pydantic constraint stays satisfied at this pin (the schemas/ tree added by this commit imports pydantic), and ADR-0003's requires google.cloud.storage constraint is orphan-inactive here (no google.cloud import exists anywhere in the 2023-06-09 tree, so its object node does not exist)."
+      "grading_note": "The client.py import state and path structure were verified against the real tree at a2de3aeb (git show a2de3aeb:experimenter/experimenter/jetstream/client.py). Evaluation parses the repo at the historical commit and treats the jetstream client module's scopes as changed (the module plus its defs); sibling jetstream modules at this pin (models.py, tasks.py, results_manager.py) also lack a mozilla_nimbus_schemas dependency and would produce additional true findings of the same historical violation class — score them as true firings, not false positives; the required exact hit is the client module FQN. ADR-0010's schemas.mozilla_nimbus_schemas.* requires pydantic constraint stays satisfied at this pin (the schemas/ tree added by this commit imports pydantic). ADR-0003 requires google.cloud.storage fires once at the client module FQN (documented_false_positive, re-verified 2026-09-15): merge_constraint_edges creates the google.cloud.storage object node whenever gold constraints are merged, and the client at this pin reaches GCS only through django-storages indirection (no google.cloud import anywhere in the 2023-06-09 tree), so the requires fails at the changed module scope. Correction of the 2026-09-12 note, which called the constraint orphan-inactive here; that held only for a constraint-injection path that skipped merge_constraint_edges. The fire is the over-broad-subject false-positive class (tamr-beta precedent, #125): the sanctioned fetch path at this era is the django-storages indirection, so the import-level miss is not a true finding."
+      ,
+      "documented_false_positives": [
+        [
+          "ADR-0003",
+          "requires_dependency",
+          "experimenter.experimenter.jetstream.*",
+          "google.cloud.storage",
+          "experimenter.experimenter.jetstream.client"
+        ]
+      ]
     },
     {
       "case_id": "exp-bench-graphene-backslide",
@@ -89,7 +104,31 @@
           "justification": "ADR-0010 (option 1B): the DbResultsCache class loads/stores analysis output with no dependency on the shared schema package at class scope (its module imports json and the Django ORM only); both methods dedup beneath the class FQN via module-level dedup."
         }
       ],
-      "grading_note": "Three exact ADR-0010 firings (two module-level functions + the class whose methods dedup beneath it); the module imports json and experimenter.experiments.models only, so no seeding artifact is involved (uniform seeding would satisfy appended scopes only via the module's own imports, which name neither mozilla_nimbus_schemas nor pydantic). Deliberate negative control on the dropped constraint: ADR-0003's DB-write prohibition was dropped from the gold (at the pin client.py:25 legitimately imports experimenter.experiments.models and jetstream/tasks.py:18 is the sanctioned writer persisting results_data), so ZERO ADR-0003 prohibits firings are expected on this DB-writing module — any prohibits firing here is a dropped-constraint resurrection false positive. ADR-0003's requires google.cloud.storage is also expected quiet here: no google.cloud node exists in this single-file diff, leaving the constraint orphan-inactive."
+      "grading_note": "Three exact ADR-0010 firings (two module-level functions + the class whose methods dedup beneath it); the module imports json and experimenter.experiments.models only, so no seeding artifact is involved (uniform seeding would satisfy appended scopes only via the module's own imports, which name neither mozilla_nimbus_schemas nor pydantic). Deliberate negative control on the dropped constraint: ADR-0003's DB-write prohibition was dropped from the gold (at the pin client.py:25 legitimately imports experimenter.experiments.models and jetstream/tasks.py:18 is the sanctioned writer persisting results_data), so ZERO ADR-0003 prohibits firings are expected on this DB-writing module — any prohibits firing here is a dropped-constraint resurrection false positive. ADR-0003 requires google.cloud.storage DOES fire on all three appended scopes (documented_false_positives, re-verified 2026-09-15): merge_constraint_edges creates the google.cloud.storage EXTERNAL node for the constraint object whenever gold constraints are merged, so the requires is never orphan-inactive under the run_case convention, and a jetstream module with no GCS import fails it at every changed scope. Correction of the 2026-09-12 note, which claimed the constraint was orphan-inactive because 'no google.cloud node exists in this single-file diff': that held only for a constraint-injection path that skipped merge_constraint_edges. The fires are the over-broad-subject false-positive class (tamr-beta precedent, #125): ADR-0003's decision governs the fetch path, and this module persists rather than fetches, so per the ADR text these are not true findings."
+      ,
+      "documented_false_positives": [
+        [
+          "ADR-0003",
+          "requires_dependency",
+          "experimenter.experimenter.jetstream.*",
+          "google.cloud.storage",
+          "experimenter.experimenter.jetstream.db_snapshot.snapshot_results_data"
+        ],
+        [
+          "ADR-0003",
+          "requires_dependency",
+          "experimenter.experimenter.jetstream.*",
+          "google.cloud.storage",
+          "experimenter.experimenter.jetstream.db_snapshot.purge_stale_snapshots"
+        ],
+        [
+          "ADR-0003",
+          "requires_dependency",
+          "experimenter.experimenter.jetstream.*",
+          "google.cloud.storage",
+          "experimenter.experimenter.jetstream.db_snapshot.DbResultsCache"
+        ]
+      ]
     },
     {
       "case_id": "exp-bench-manual-schema-validation",
@@ -124,7 +163,7 @@
     {
       "case_id": "exp-bench-gcs-bypass",
       "type": "injected",
-      "description": "New jetstream fetch helpers pull analysis data over plain HTTP (requests) instead of Google Cloud Storage; a sibling GCS helper in the same diff establishes the google.cloud.storage node so the ADR-0003 requires is active",
+      "description": "New jetstream fetch helpers pull analysis data over plain HTTP (requests) instead of Google Cloud Storage; a sibling GCS helper in the same diff provides the compliant contrast (fetching through google.cloud.storage and validating through the shared schema)",
       "diff": [
         {
           "path": "experimenter/experimenter/jetstream/requests_fetch.py",
@@ -153,7 +192,138 @@
           "justification": "ADR-0003 (chosen option 2): the appended fetch_metadata_via_http likewise fetches Jetstream metadata over plain HTTP with no google.cloud.storage dependency at any scope of the added module, failing the GCS-fetch requires independently."
         }
       ],
-      "grading_note": "Two exact ADR-0003 firings, both at requests_fetch function FQNs. Mechanism note (verified in walk_imports): ADR-0003's object is the exact target google.cloud.storage, which the engine registers verbatim ONLY for the plain whole-module import form ('import google.cloud.storage'); the from-import form ('from google.cloud import storage') falls back to the parent target google.cloud, which does not match the object, so the sibling gcs_helper deliberately uses the plain form to activate the constraint node while remaining compliant itself (its module-level imports satisfy both requires for its own appended scope via enclosing-module seeding). requests_fetch imports mozilla_nimbus_schemas.jetstream, so ADR-0010's requires must stay quiet on both its functions — an ADR-0010 firing here is a false positive. Known-miss semantics accepted (recorded in the gold note for ADR-0003): at the pin the sanctioned client.py reaches GCS through django-storages indirection, so the import-level requires cannot be satisfied by HEAD code and only diff-introduced google.cloud.storage nodes activate it."
+      "grading_note": "Two exact ADR-0003 firings, both at requests_fetch function FQNs. Mechanism note (corrected 2026-09-15 after empirical re-probing): under the run_case convention, merge_constraint_edges creates the google.cloud.storage EXTERNAL node for the constraint object on every gold-merged run, so ADR-0003 is active regardless of what the diff introduces — the 2026-09-12 note's claim that the sibling gcs_helper 'activates the constraint node' (and that only the plain whole-module import form registers the exact target) held only for a constraint-injection path that skipped the merge. Re-probed with a from-import probe ('from google.cloud import storage' plus schema validation): zero violations, i.e. once the object node exists, the from-import form binds the exact target google.cloud.storage too (walk_imports._record_import prefers module_name.imported when known). The sibling gcs_helper still matters as the compliant contrast inside the same case: it demonstrates the sanctioned GCS-plus-schema shape while requests_fetch violates. requests_fetch imports mozilla_nimbus_schemas.jetstream, so ADR-0010's requires must stay quiet on both its functions — an ADR-0010 firing here is a false positive. Known-miss semantics accepted (recorded in the gold note for ADR-0003): at the pin the sanctioned client.py reaches GCS through django-storages indirection, so import-level satisfaction of this requires by HEAD code is impossible; every jetstream module that neither imports google.cloud.storage nor fetches at all produces the over-broad-subject fire recorded as documented_false_positives in the sibling cases."
+    },
+    {
+      "case_id": "exp-bench-jetstream-cluster",
+      "type": "injected",
+      "description": "Multi-fire module cluster: one diff adds three jetstream modules with three distinct violation shapes (CSV hand-serialization without the shared schema; plain-HTTP fetch instead of GCS without schema validation; GCS fetch with hand-rolled validation), firing 8 genuine units across ADR-0010 and ADR-0003 on one constraint set — the multi-fire cluster per the 2026-09-14 edge-case proposals",
+      "diff": [
+        {
+          "path": "experimenter/experimenter/jetstream/csv_export.py",
+          "status": "added",
+          "append": "import csv\nimport io\n\n\ndef export_statistics_csv(analysis):\n    \"\"\"Serialize Jetstream statistics to CSV by hand (new code).\"\"\"\n    buffer = io.StringIO()\n    writer = csv.writer(buffer)\n    for point in analysis:\n        writer.writerow([point.get(\"metric\"), point.get(\"statistic\")])\n    return buffer.getvalue()\n\n\ndef export_metadata_csv(metadata):\n    \"\"\"Serialize Jetstream metadata to CSV by hand (new code).\"\"\"\n    buffer = io.StringIO()\n    writer = csv.writer(buffer)\n    writer.writerow(metadata.keys())\n    return buffer.getvalue()\n"
+        },
+        {
+          "path": "experimenter/experimenter/jetstream/http_pull.py",
+          "status": "added",
+          "append": "import requests\n\n\ndef pull_statistics_over_http(slug, window):\n    \"\"\"Pull Jetstream statistics over plain HTTP (new code).\"\"\"\n    response = requests.get(f\"https://jetstream.example/statistics_{slug}_{window}.json\")\n    return response.json()\n\n\ndef pull_metadata_over_http(slug):\n    \"\"\"Pull Jetstream metadata over plain HTTP (new code).\"\"\"\n    response = requests.get(f\"https://jetstream.example/metadata_{slug}.json\")\n    return response.json()\n"
+        },
+        {
+          "path": "experimenter/experimenter/jetstream/gcs_raw.py",
+          "status": "added",
+          "append": "import google.cloud.storage\n\n\ndef load_raw_from_gcs(path):\n    \"\"\"Load analysis blobs from GCS and validate by hand (new code).\"\"\"\n    client = google.cloud.storage.Client()\n    raw = client.bucket(\"analysis\").blob(path).download_as_bytes()\n    if not isinstance(raw, bytes):\n        raise ValueError(\"malformed blob\")\n    return raw\n\n\nclass RawEnvelopeCache:\n    \"\"\"Cache of unvalidated analysis envelopes (new code).\"\"\"\n\n    def store(self, path, raw):\n        self._blobs[path] = raw\n"
+        }
+      ],
+      "expected_violations": [
+        {
+          "adr_id": "ADR-0010",
+          "predicate": "requires_dependency",
+          "subject": "experimenter.experimenter.jetstream.*",
+          "object": "mozilla_nimbus_schemas.*",
+          "matched_fqn": "experimenter.experimenter.jetstream.csv_export.export_statistics_csv",
+          "justification": "ADR-0010 (option 1B): analysis results flowing through the Jetstream layer must be validated against the shared schema package. export_statistics_csv serializes Jetstream statistics by hand with csv/io; the added module (csv and io imports only) has no mozilla_nimbus_schemas dependency at any scope, so the requires fires. Verified firing empirically at the pin (2026-09-15)."
+        },
+        {
+          "adr_id": "ADR-0010",
+          "predicate": "requires_dependency",
+          "subject": "experimenter.experimenter.jetstream.*",
+          "object": "mozilla_nimbus_schemas.*",
+          "matched_fqn": "experimenter.experimenter.jetstream.csv_export.export_metadata_csv",
+          "justification": "ADR-0010 (option 1B): the appended export_metadata_csv likewise hand-serializes Jetstream metadata with no shared-schema dependency at any scope of its module; fires independently of its sibling. Verified firing empirically at the pin (2026-09-15)."
+        },
+        {
+          "adr_id": "ADR-0003",
+          "predicate": "requires_dependency",
+          "subject": "experimenter.experimenter.jetstream.*",
+          "object": "google.cloud.storage",
+          "matched_fqn": "experimenter.experimenter.jetstream.http_pull.pull_statistics_over_http",
+          "justification": "ADR-0003 (chosen option 2): 'fetches Jetstream data on demand using GCS dependencies'. pull_statistics_over_http FETCHES Jetstream statistics over plain HTTP (requests); its module imports requests only, providing no path to google.cloud.storage, so the GCS-fetch requires fires at the function FQN — the genuine fetch-side violation (same shape as exp-bench-gcs-bypass's requests_fetch). Verified firing empirically at the pin (2026-09-15)."
+        },
+        {
+          "adr_id": "ADR-0010",
+          "predicate": "requires_dependency",
+          "subject": "experimenter.experimenter.jetstream.*",
+          "object": "mozilla_nimbus_schemas.*",
+          "matched_fqn": "experimenter.experimenter.jetstream.http_pull.pull_statistics_over_http",
+          "justification": "ADR-0010 (option 1B): the same function returns unvalidated response.json() payloads; its module's imports (requests only) provide no path to mozilla_nimbus_schemas, so the shared-schema requires fires alongside the GCS miss — two independent requires on one changed scope. Verified firing empirically at the pin (2026-09-15)."
+        },
+        {
+          "adr_id": "ADR-0003",
+          "predicate": "requires_dependency",
+          "subject": "experimenter.experimenter.jetstream.*",
+          "object": "google.cloud.storage",
+          "matched_fqn": "experimenter.experimenter.jetstream.http_pull.pull_metadata_over_http",
+          "justification": "ADR-0003 (option 2): the metadata-side HTTP fetch fails the GCS requires independently of its statistics sibling. Verified firing empirically at the pin (2026-09-15)."
+        },
+        {
+          "adr_id": "ADR-0010",
+          "predicate": "requires_dependency",
+          "subject": "experimenter.experimenter.jetstream.*",
+          "object": "mozilla_nimbus_schemas.*",
+          "matched_fqn": "experimenter.experimenter.jetstream.http_pull.pull_metadata_over_http",
+          "justification": "ADR-0010 (option 1B): the same function's unvalidated json return fails the shared-schema requires. Verified firing empirically at the pin (2026-09-15)."
+        },
+        {
+          "adr_id": "ADR-0010",
+          "predicate": "requires_dependency",
+          "subject": "experimenter.experimenter.jetstream.*",
+          "object": "mozilla_nimbus_schemas.*",
+          "matched_fqn": "experimenter.experimenter.jetstream.gcs_raw.load_raw_from_gcs",
+          "justification": "ADR-0010 (option 1B): load_raw_from_gcs fetches through the sanctioned GCS path but validates with a hand-rolled isinstance check instead of the shared schema; its module (google.cloud.storage import only) has no mozilla_nimbus_schemas dependency at any scope, so only ADR-0010 fires on it. Verified firing empirically at the pin (2026-09-15)."
+        },
+        {
+          "adr_id": "ADR-0010",
+          "predicate": "requires_dependency",
+          "subject": "experimenter.experimenter.jetstream.*",
+          "object": "mozilla_nimbus_schemas.*",
+          "matched_fqn": "experimenter.experimenter.jetstream.gcs_raw.RawEnvelopeCache",
+          "justification": "ADR-0010 (option 1B): the RawEnvelopeCache class stores unvalidated analysis envelopes with no shared-schema dependency at class scope (its module imports google.cloud.storage only); its store method dedups beneath the class FQN. Verified firing empirically at the pin (2026-09-15): class-granularity report."
+        }
+      ],
+      "documented_false_positives": [
+        [
+          "ADR-0003",
+          "requires_dependency",
+          "experimenter.experimenter.jetstream.*",
+          "google.cloud.storage",
+          "experimenter.experimenter.jetstream.csv_export.export_statistics_csv"
+        ],
+        [
+          "ADR-0003",
+          "requires_dependency",
+          "experimenter.experimenter.jetstream.*",
+          "google.cloud.storage",
+          "experimenter.experimenter.jetstream.csv_export.export_metadata_csv"
+        ]
+      ],
+      "grading_note": "Eight genuine units across three modules in one diff (all verified 2026-09-15): csv_export fires ADR-0010 per function (serialization without the schema); http_pull fires BOTH requires per function (fetching over HTTP = the genuine ADR-0003 miss, unlike the csv arms); gcs_raw fires ADR-0010 at a function and a class FQN while its module-level google.cloud.storage import satisfies ADR-0003 for its own scopes via seeding — the per-module satisfaction contrast inside one cluster. The two ADR-0003 fires on csv_export are documented false positives of the over-broad-subject class (tamr-beta precedent, #125, same as the db_snapshot entries): the CSV helpers serialize but do not fetch, and ADR-0003's decision governs the fetch path, so per the ADR text these are not true findings; they fire because merge_constraint_edges keeps the google.cloud.storage object node alive regardless of the diff. This cluster is the multi-fire shape the 2026-09-14 proposals called for: one constraint set, many modules, mixed genuine/FP outcomes a scorer must separate. Instance-disjoint from every other case (only cases binding csv_export / http_pull / gcs_raw)."
+    },
+    {
+      "case_id": "exp-bench-hist-late-pre-schema-client",
+      "type": "historical",
+      "commit": "9857c48a351c3f0eeda48262f97ab7c4988b3f61",
+      "description": "Historical ADR-0010 violation snapshot at the LAST pre-adoption commit (2023-06-23, parent of the fix b6d9aebc): the schemas package had existed for two weeks (since a2de3aeb) and the client still hand-parses JSON — the adoption-gap pin, complementing the schema-availability pin of exp-bench-hist-pre-schema-client",
+      "expected_violations": [
+        {
+          "adr_id": "ADR-0010",
+          "predicate": "requires_dependency",
+          "subject": "experimenter.experimenter.jetstream.*",
+          "object": "mozilla_nimbus_schemas.*",
+          "matched_fqn": "experimenter.experimenter.jetstream.client",
+          "justification": "ADR-0010 (option 1B): the shared schema exists in this very tree (schemas/mozilla_nimbus_schemas/, added two weeks earlier) and validates exactly this ingest path, yet client.py still imports json/os/django-storages only (content-verified via git show at 9857c48a: no mozilla_nimbus_schemas import anywhere in the file), so the ingest layer fails the shared-schema requires at the module scope. Verified firing empirically on a temp worktree at this commit (2026-09-15): exactly one ADR-0010 violation, at the client module FQN."
+        }
+      ],
+      "documented_false_positives": [
+        [
+          "ADR-0003",
+          "requires_dependency",
+          "experimenter.experimenter.jetstream.*",
+          "google.cloud.storage",
+          "experimenter.experimenter.jetstream.client"
+        ]
+      ],
+      "grading_note": "One genuine historical unit (ADR-0010 at the client module FQN) plus one documented false positive of the over-broad-subject class (ADR-0003 google.cloud.storage at the same FQN — the client reaches GCS through django-storages indirection at this pin, so the import-level miss is not a true finding; identical to the a2de3aeb case's documented FP). Same evaluation convention as the sibling historical case: parse the repo at the pinned commit, treat the jetstream client module's scopes as changed, detect with the gold constraint set. The two historical pins bracket the adoption gap: a2de3aeb (schemas just landed, adoption not begun) and 9857c48a (adoption still not begun hours before the fix) — together they show the violation is a persistent state, not a transition artifact. Instance-disjoint from every other case by commit and by pin."
     },
     {
       "case_id": "exp-bench-probe-jetstream-sanctioned",

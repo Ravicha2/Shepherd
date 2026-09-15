@@ -5,7 +5,7 @@
   "pin_commit": "31f1dcadb3ff113d8a77ce132657237ea01c307b",
   "pin_date": "2025-08-14",
   "adr_dir": "docs/development/adr",
-  "verification": "verified 2026-09-14: all 7 cases run empirically at the pin (in-memory ADG from parse_repo + gold constraints injected via merge_constraint_edges, augment_immutable + process_diff + detect, mirroring app/tests/services/cpt/test_cpt_detect_eval.py run_case); baseline detect at 31f1dcad yields zero violations (ADR-0008 surfaces as an orphan because no example deep-imports structurizr.api at HEAD); the ab5adc9 mid-2021 pin and the 6af4134 pre-pydantic skeleton pin verified as zero-violation historical baselines on detached worktrees (removed after); layout note: module FQNs carry the src-layout prefix (src.structurizr.*) while IMPORTS edge targets are the literal dotted import (structurizr.api.structurizr_client, pydantic) — this src-layout asymmetry is this repo's documented layout rule",
+  "verification": "verified 2026-09-14: all 7 cases run empirically at the pin (in-memory ADG from parse_repo + gold constraints injected via merge_constraint_edges, augment_immutable + process_diff + detect, mirroring app/tests/services/cpt/test_cpt_detect_eval.py run_case); baseline detect at 31f1dcad yields zero violations (ADR-0008 surfaces as an orphan because no example deep-imports structurizr.api at HEAD); the ab5adc9 mid-2021 pin and the 6af4134 pre-pydantic skeleton pin verified as zero-violation historical baselines on detached worktrees (removed after); layout note: module FQNs carry the src-layout prefix (src.structurizr.*) while IMPORTS edge targets are the literal dotted import (structurizr.api.structurizr_client, pydantic) — this src-layout asymmetry is this repo's documented layout rule. RE-VERIFIED 2026-09-15 post-#150 under the run_case convention (all 7 original cases PASS unchanged) plus 2 new cases authored and verified the same day (plain-statement deep import fires at the module; tests-dir deep import stays silent).",
   "historical_pins": [
     {
       "commit": "6af413490b3c620a797f2f0bd01ce5aff1f3c7a2",
@@ -145,6 +145,43 @@
       ],
       "expected_violations": [],
       "grading_note": "No violation beyond baseline (baseline at the pin is empty): the import target is the top-level 'structurizr' package, which the ADR-0008 object pattern (structurizr.api.*) does not cover; this is the discriminating counterpart to struct-bench-example-deep-import (same added-example shape, the import depth alone flips the prohibits from fire to satisfied). If a future change broadened the object pattern to the whole structurizr.* tree, this probe would flip to a fire and catch the over-broadening; that reading was deliberately rejected in the gold note (the top level does not re-export model/view, so a whole-tree prohibition would indict the repo's own working examples). ADR-0009 stays quiet: the added example is outside its subject (src.structurizr.api.*)."
+    },
+    {
+      "case_id": "struct-bench-example-plain-deep-import",
+      "type": "injected",
+      "description": "New example module imports the api package with a plain import statement ('import structurizr.api.structurizr_client') instead of a from-import: the import-form counterpart of struct-bench-example-deep-import, exercising verbatim dotted-target registration on the prohibits side",
+      "diff": [
+        {
+          "path": "examples/plain_api_client.py",
+          "status": "added",
+          "append": "\"\"\"Example importing the api package with a plain statement (new code).\"\"\"\nimport structurizr.api.structurizr_client\n\n\ndef upload(workspace):\n    \"\"\"Upload a workspace via a plain-statement deep api import (new code).\"\"\"\n    client = structurizr.api.structurizr_client.StructurizrClient(api_key=\"x\", api_secret=\"y\", workspace_id=1)\n    return client.put_workspace(workspace)\n"
+        }
+      ],
+      "expected_violations": [
+        {
+          "adr_id": "ADR-0008",
+          "predicate": "prohibits_dependency",
+          "subject": "examples.*",
+          "object": "structurizr.api.*",
+          "matched_fqn": "examples.plain_api_client",
+          "justification": "ADR-0008 exports the api surface to the top level so client code consumes it via 'from structurizr import ...' (the sanctioned form, examples/upload_workspace.py:25). The added example imports structurizr.api.structurizr_client with a plain import statement; walk_imports records the literal dotted target verbatim for plain imports, and the gold object pattern structurizr.api.* covers it, so the prohibits fires. Verified firing empirically at the pin (2026-09-15): structural report at the added module FQN, changed anchor at the module's upload function."
+        }
+      ],
+      "grading_note": "Single exact firing at the added module FQN (verified 2026-09-15). Import-form pair with struct-bench-example-deep-import: same violation, from-import vs plain-statement form; the plain form records the target unconditionally (no known-fqn lookup), so this arm guards the verbatim-registration path, while the from-import sibling guards the module_name+imported resolution path. If plain-form registration ever stopped recording full dotted targets, this case flips to a miss while the from-import sibling still fires. Instance-disjoint from every other case (only case binding plain_api_client)."
+    },
+    {
+      "case_id": "struct-bench-probe-tests-deep-import",
+      "type": "compliant_probe",
+      "description": "New test module imports StructurizrClient straight from structurizr.api (the same deep import that fires in examples): pins the gold's tests-outside-subject exclusion and documents the engine's parse-time/diff-time asymmetry for test files",
+      "diff": [
+        {
+          "path": "tests/unit/api/test_deep_client.py",
+          "status": "added",
+          "append": "\"\"\"Unit tests importing the api package directly (new code).\"\"\"\nfrom structurizr.api.structurizr_client import StructurizrClient\n\n\ndef test_client_constructs():\n    client = StructurizrClient(api_key=\"x\", api_secret=\"y\", workspace_id=1)\n    assert client is not None\n"
+        }
+      ],
+      "expected_violations": [],
+      "grading_note": "Zero violations expected (verified 2026-09-15). Two independent reasons the deep import here must not fire: (1) gold-level: ADR-0008's subject is examples.* and tests/ are deliberately outside it (the ADR's own 'unit tests should reflect this package structure' sentence sanctions tests/unit/ mirroring the package tree with deep imports; see the gold note); (2) engine-level asymmetry documented by this probe: parse_repo skips test files entirely (_is_test_file: any tests/ path segment, or test_*.py names) so no HEAD test module ever enters the ADG, while the DIFF path (process_diff/augment_adg) has no test filter and does parse an added test file — its tests.* FQNs simply match no constraint subject. Any firing here is subject-overreach. If a future gold revision ever widened ADR-0008 to tests, or the diff path grew a test filter with different semantics, this probe is the tripwire; instance-disjoint from every other case (only case under tests/)."
     },
     {
       "case_id": "struct-bench-hist-2021-compliant",

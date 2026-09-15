@@ -5,7 +5,7 @@
   "pin_commit": "6889cfbffbb90a17930fbdedf12ae050be775fe3",
   "pin_date": "2026-07-14",
   "adr_dir": "docs/adr",
-  "verification": "verified 2026-09-12: all 8 cases run empirically at the pin (in-memory ADG from parse_repo + gold constraints, process_diff + ADGPipeline().run_prepared); baseline detect at 6889cfbf yields zero violations; the historical compliant probe verified on a detached checkout of eb67b09c (worktree removed after); the 499f1c85^ and 22b27264 historical ADR-0006 candidates were rejected as unfireable (uniform seeding masks the requires) — see historical_pins reasons",
+  "verification": "verified 2026-09-12: all 8 cases run empirically at the pin (in-memory ADG from parse_repo + gold constraints, process_diff + ADGPipeline().run_prepared); baseline detect at 6889cfbf yields zero violations; the historical compliant probe verified on a detached checkout of eb67b09c (worktree removed after); the 499f1c85^ and 22b27264 historical ADR-0006 candidates were rejected as unfireable (uniform seeding masks the requires) — see historical_pins reasons. RE-VERIFIED 2026-09-15 post-#150 under the run_case convention (parse_repo -> add_external_nodes -> merge_constraint_edges -> specificity -> augment_immutable -> process_diff -> detect): all 8 original cases PASS unchanged, plus 5 new cases authored and verified the same day (class-import fires, facade-import fires, sibling-import satisfies = the requires reachability triad; serialization deletion invisible = known limitation; metadata-appended scope seeded = ADR-0006 mask pinned).",
   "historical_pins": [
     {
       "commit": "499f1c858ea315be578087bbb189b46e9504ecfc^",
@@ -148,6 +148,94 @@
       ],
       "expected_violations": [],
       "grading_note": "No violation beyond baseline (baseline at the pin is empty), and this is a deliberate negative control: the appended helper hand-rolls wire-format JSON exactly like ADR-0006's rejected option 1, but the constraint's subject is the literal prefix tuf.api.metadata.* and tuf.api._payload is a sibling package, not a descendant of tuf.api.metadata, so no constraint covers it (tuf.* only prohibits python2.7/python3.5). Verified empirically: zero firings at the pin. Subject-pattern coverage finding recorded for the curation team: the census's suggestion of an ADR-0006 instance at tuf.api._payload.<name> (census section 6, row ADR-0006, option b) cannot fire under the gold subject and was downgraded from a violating instance to this compliant probe; a firing here would indicate subject-pattern overreach."
+    },
+    {
+      "case_id": "tuf-bench-repository-class-import",
+      "type": "injected",
+      "description": "New repository module subclasses the Repository ABC via 'from tuf.repository import Repository' and never touches the Metadata API: a fresh module whose only repository-package dependency is a CLASS-target import, which is a dead-end for the requires' dependency-path check",
+      "diff": [
+        {
+          "path": "tuf/repository/_via_repository.py",
+          "status": "added",
+          "append": "from tuf.repository import Repository\n\n\nclass MaintenanceRepository(Repository):\n    \"\"\"Repository maintenance operations built on the Repository ABC alone (new code).\"\"\"\n\n    def refresh_snapshot(self, threshold=1):\n        return self.snapshot(threshold)\n"
+        }
+      ],
+      "expected_violations": [
+        {
+          "adr_id": "ADR-0010",
+          "predicate": "requires_dependency",
+          "subject": "tuf.repository.*",
+          "object": "tuf.api.metadata.*",
+          "matched_fqn": "tuf.repository._via_repository.MaintenanceRepository",
+          "justification": "ADR-0010 ('Repository library design built on top of Metadata API'): the repository library is built on top of the Metadata API, and the gold constraint reads 'the repository library is built on top of the Metadata API; this is a dependency'. The added module performs repository maintenance work through the Repository ABC alone; its only import binds the class node tuf.repository.Repository, and class nodes carry no dependency edges toward the metadata package (method CALLS attach to method FQNs), so the class scope has no dependency path to tuf.api.metadata.* at any scope and the requires fires. Verified firing empirically at the pin (2026-09-15): exactly one violation, at the class FQN (refresh_snapshot dedups beneath it)."
+        }
+      ],
+      "grading_note": "Single exact firing at the class FQN. Mechanism: walk_imports resolves the from-import to the known class FQN (module_name + imported preferred when known), and BFS from a class node dead-ends (its methods' edges live on method FQNs), the same dead-end that makes the eval's __init__.py case fire (tuf/repository/__init__.py:13 imports the classes AbortEdit/Repository, never the module). If a future change attached method-level dependency edges to the enclosing class (or treated class imports as package facade hops), this case and the facade case below would flip to satisfied — that semantics change is exactly what this pair pins. Instance-disjoint from every other case (only case binding _via_repository)."
+    },
+    {
+      "case_id": "tuf-bench-repository-facade-import",
+      "type": "injected",
+      "description": "New repository module imports only the package facade ('import tuf.repository') and never the Metadata API: empirically the facade hop does NOT satisfy the requires, because the package's own edges are class-target imports that dead-end",
+      "diff": [
+        {
+          "path": "tuf/repository/_via_package.py",
+          "status": "added",
+          "append": "import tuf.repository\n\n\ndef describe_repository_layout():\n    \"\"\"Introspect the repository package for layout docs (new code).\"\"\"\n    return tuf.repository.__doc__\n"
+        }
+      ],
+      "expected_violations": [
+        {
+          "adr_id": "ADR-0010",
+          "predicate": "requires_dependency",
+          "subject": "tuf.repository.*",
+          "object": "tuf.api.metadata.*",
+          "matched_fqn": "tuf.repository._via_package.describe_repository_layout",
+          "justification": "ADR-0010 ('Repository library design built on top of Metadata API'): the repository library is built on top of the Metadata API. The added module leans on the repository package facade without any Metadata API dependency of its own; the plain import records the verbatim target tuf.repository, and BFS continues from the package node — but the package's only dependency edges are the class-target imports of AbortEdit and Repository (tuf/repository/__init__.py:13), which are dead-ends, so the path never reaches tuf.api.metadata.* and the requires fires at the appended function. Verified firing empirically at the pin (2026-09-15): exactly one violation, at the function FQN."
+        }
+      ],
+      "grading_note": "Single exact firing at the function FQN. This case started life as a compliant probe on the prediction that a 2-hop IMPORTS path (facade -> _repository -> tuf.api.metadata) would satisfy the requires; the empirical run refuted the prediction — the hop never reaches _repository the MODULE because __init__.py imports its classes, not the module. Together with tuf-bench-probe-repository-sibling-import (module-target hop, satisfied) and tuf-bench-repository-class-import (class-target, fires) this is the reachability-boundary triad for requires satisfaction: which hop target a repository module imports decides satisfaction, and the answer is module nodes yes, class nodes and class-only facades no. Any additional firing (e.g. ADR-0006) on this module is a false positive: the module is outside the tuf.api.metadata.* subject. Instance-disjoint from every other case (only case binding _via_package)."
+    },
+    {
+      "case_id": "tuf-bench-probe-repository-sibling-import",
+      "type": "compliant_probe",
+      "description": "New repository module imports the implementation module itself ('import tuf.repository._repository'), whose own module-level tuf.api.metadata import carries the 2-hop path that satisfies ADR-0010's requires: the satisfied arm of the reachability triad",
+      "diff": [
+        {
+          "path": "tuf/repository/_via_sibling.py",
+          "status": "added",
+          "append": "import tuf.repository._repository\n\n\ndef repository_module_summary():\n    \"\"\"Summarize the repository implementation module for docs (new code).\"\"\"\n    return tuf.repository._repository.__name__\n"
+        }
+      ],
+      "expected_violations": [],
+      "grading_note": "No violation beyond baseline (baseline at the pin is empty; verified 2026-09-15). The plain import records the verbatim module target tuf.repository._repository, whose own module-level import (tuf/repository/_repository.py:15, from tuf.api.metadata import ...) carries the BFS path to the requires' object, so the appended function is satisfied TRANSITIVELY — the fresh-module counterpart of the module-seeding probes: satisfaction here rides a sibling module's edges, not the enclosing module's. Discriminating contrast within the triad: same plain-import form as the facade case, but the module target satisfies where the class-only facade fires. If transitive satisfaction for requires were ever removed (per-function-usage semantics, issue 124 option b family), this probe flips to a fire — that is the regression it guards. Instance-disjoint from every other case (only case binding _via_sibling)."
+    },
+    {
+      "case_id": "tuf-bench-serialization-deleted",
+      "type": "known_limitation",
+      "description": "Deletion of the serialization package's __init__.py (the ADR-0006 requires' object side): records that requires cannot detect its dependency being deleted — the fire never moves to the depending module",
+      "diff": [
+        {
+          "path": "tuf/api/serialization/__init__.py",
+          "status": "deleted",
+          "append": ""
+        }
+      ],
+      "expected_violations": [],
+      "grading_note": "Zero violations expected (verified 2026-09-15), and that silence IS the finding. process_diff handles deleted files: the old bytes are parsed and every def in the deleted __init__.py (plus the module) becomes a deleted-type changed FQN. But requires predicates fire only when a changed FQN matches the constraint SUBJECT (tuf.api.metadata.* / tuf.repository.*); the deleted FQNs live under tuf.api.serialization, the OBJECT side, and tuf/api/metadata.py itself is unchanged so nothing re-evaluates its satisfaction — the requires on the metadata module cannot detect that its dependency was just removed. Second limitation layered on top: augment_adg cannot remove nodes, so the merged graph still carries the serialization nodes (the HA removal case documents the staged-tree workaround for prohibits-side deletions; here even that would not help, because the blindness is subject-side). This case type records the deletion-side recall ceiling for the benchmark report; if subject-revalidation-on-object-deletion ever lands, this expectation flips and the case must be re-authored as type injected."
+    },
+    {
+      "case_id": "tuf-bench-probe-metadata-seeded",
+      "type": "compliant_probe",
+      "description": "Hand-rolled JSON envelope class appended inside tuf/api/metadata.py itself: resolves the 'fresh-module ADR-0006 fire' proposal — no fresh module can ever match the subject, and appended scopes inside metadata.py are uniformly seeded, so ADR-0006 has zero fireable instances at this pin",
+      "diff": [
+        {
+          "path": "tuf/api/metadata.py",
+          "status": "modified",
+          "append": "\n\nclass LegacyJsonEnvelope:\n    \"\"\"Hand-rolled JSON envelope for metadata transport (new helper).\"\"\"\n\n    def to_wire(self, signed_dict):\n        import json\n        return json.dumps(signed_dict).encode(\"utf-8\")\n"
+        }
+      ],
+      "expected_violations": [],
+      "grading_note": "No violation beyond baseline (baseline at the pin is empty; verified 2026-09-15). Resolution of the 2026-09-14 edge-case proposal 'fresh-module ADR-0006 fire outside metadata.py seeding': impossible by construction. The subject tuf.api.metadata.* matches only the defs inside tuf/api/metadata.py (a module, not a package — no fresh file can produce an FQN under it), and every scope inside that module is satisfied under uniform seeding (#115/#124a) by the module's own serialization dependency (the module-level TYPE_CHECKING/serializer imports plus the CALLS edge to tuf.api.serialization.json that the bare-json resolver quirk registers). The appended LegacyJsonEnvelope therefore stays silent despite hand-rolling JSON exactly as ADR-0006's rejected option 1 describes — this probe documents ADR-0006 as un-fireable at any pin, the constraint-side counterpart of the historical_pins analysis (499f1c85^ / 22b27264 rejected for the same mask). If per-function-usage satisfaction (issue 124 option b) ever landed, this probe flips to a fire and ADR-0006 becomes fireable; that is the regression it guards. The appended function-local 'import json' must stay quiet under ADR-0001 (prohibits python2.7/python3.5 only)."
     },
     {
       "case_id": "tuf-bench-probe-repository-json-satisfied",

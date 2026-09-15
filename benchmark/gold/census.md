@@ -328,41 +328,46 @@ not FQN-encodable. **Verdict: swap (see §3).**
 ## 2. Scoring-unit totals
 
 Scoring unit = one constraint. Violation instance = one (repo, ADR, constraint,
-code location) where the pin demonstrably violates.
+code location) where the pin demonstrably violates. Table updated 2026-09-15
+after the scaling session (11 new cases; full 60-case re-verification under the
+run_case convention post-#150: all PASS).
 
-| repo | ADRs scanned | code-inferable ADRs | scoring units (constraints) | violation instances at pin | compliant instances (probes) |
-|------|------------:|--------------------:|----------------------------:|---------------------------:|-----------------------------:|
-| python-tuf | 10 | 3 | 4 | 0 | 4 (all-comply baseline) |
-| flowkit | 12 | 4 | 6 | 0 | 6 |
-| experimenter | 16 | 3 | 4 | 0 (+1 historical at `a2de3aeb`) | 4 |
-| eq-questionnaire-runner | 10 | 1 (weak) | 0–1 (0 recommended) | 1 mild, non-encodable | 0–1 |
-| home-assistant (held-out; gold authored 2026-09-14, §7, PARKED on engine fix) | 22 | 2 | 2 (void-until-fix) | **1 (genuine: ADR-0019 legacy `remote_rpi_gpio`)** | 0 scorable today (see §7 blocker) |
-| **Grand total (active 1–4)** | 48 | 11 | **14–15** | **0 at HEAD** (1–2 historical/weak) | **14–15** |
+| repo | ADRs scanned | code-inferable ADRs | gold constraints | cases | expected-violation units | documented FP fires |
+|------|------------:|--------------------:|-----------------:|------:|-------------------------:|--------------------:|
+| python-tuf | 10 | 3 | 4 | 13 | 6 | 0 |
+| flowkit | 12 | 4 | 6 | 13 | 12 (+3 promoted 09-15) | 3 (+ baseline 12, structural, every run) |
+| experimenter | 16 | 3 | 4 | 11 | 18 | 7 (all ADR-0003 over-broad-subject) |
+| structurizr-python (swap for eq-runner, §3) | 9 | 2 | 2 | 9 | 6 | 0 |
+| home-assistant (held-out → benchmark member, un-parked 2026-09-15 post-#150) | 22 | 2 | 2 | 14 | 21 (9 = standing baseline fire repeated per case) | 0 |
+| **Total** | 69 | 14 | 18 | **60** | **63** | **10** |
 
-**Against the target (50+ violation instances, ~100 scoring units): SHORT.**
+**Against the target (50+ violation instances, ~100 scoring units): cases at
+target (60 ≥ 50); units at 63 of ~100 — SHORT, disclosed, narrowing.**
 
-Gap analysis:
+Gap analysis (updated 2026-09-15):
 
-- The census yields **~14 scoring units** vs ~100 target — a gap of ~85. Even
-  doubling per-ADR constraint extraction (finer-grained subjects, e.g. splitting
-  ADR-0005 flowkit into per-package edges) gets maybe +5–8.
-- **Violations at pins are zero for all four active repos.** Every active repo's
-  HEAD complies with its own ADRs (expected: ADRs describe the adopted design).
-  The benchmark population therefore comes from *injected diffs* (per issue #74)
-  and/or *historical pins*, not from HEAD violations.
-- Scaling levers, in order of value:
-  1. **Injected-diff instances**: each scoring unit can host multiple injected
-     violation diffs (flask-style). With 14 constraints × 2–3 injected cases
-     each, the 50-instance population is reachable: 14 × 3 ≈ 42, plus
-     historical pins closes the gap.
-  2. **Historical pins** (already identified): python-tuf `499f1c85`/`a2794c2f^`
-     (ADR-0006/0010 violations), experimenter `a2de3aeb` (ADR-0010 violation),
-     eq-runner `f4803f94^` (ADR-0004 violation) — each is a real,
-     instance-disjoint violation snapshot.
-  3. **Add repos**: a fifth/sixth repo with dense checkable constraints would
-     add 5–15 units each (see §3 for candidate names from the ADR-Study-Dataset).
-  4. **home-assistant** (held-out) — **authored 2026-09-14** (§7 full census):
-     2 constraints, 14 cases / 21 units, one genuine live violation at pin.
+- The 2026-09-14 edge-case proposals are fully executed: structurizr
+  import-form pair + tests-dir probe; python-tuf requires reachability triad
+  (class import fires / facade import fires / sibling-module import satisfies),
+  serialization-deletion known limitation, ADR-0006 mask probe (un-fireable at
+  any pin, resolved); flowkit decoy-name pair (function-local guard holds,
+  module-level escapes = documented FP); experimenter multi-fire cluster (8
+  genuine units in one diff) + adoption-gap historical pin `9857c48a`.
+- Two substrate corrections landed with the re-verification (2026-09-15): (a)
+  merge_constraint_edges creates EXTERNAL nodes for constraint objects, so
+  under the run_case convention requires constraints are never orphan-inactive —
+  the 09-12 "orphan-inactive" claims in experimenter notes were wrong under this
+  path, and the affected fires are now recorded as documented over-broad-subject
+  FPs; (b) flowkit's baseline recount post-#150 is 12, not 13
+  (`flowapi.flowapi.api_spec` retired: its path used the namespace-import
+  CONTAINS descent #150 removed), and the flowapi-direct-flowmachine requires
+  triple was promoted from note-only to expected units (convention alignment
+  with the transitive case).
+- Remaining levers, in order of value: (1) more injected diffs per existing
+  unit (the cluster shape scales cheapest: 3 modules ≈ 8 units per authoring
+  session-hour); (2) additional historical pins in the eras already identified;
+  (3) 1–2 additional repos at structurizr density (2 constraints / 6 units
+  each). Each is independent; none blocks #149/#148.
 
 ---
 
@@ -474,9 +479,9 @@ change it.
 |------|---------|----------|--------|
 | python-tuf | `6889cfbffbb90a17930fbdedf12ae050be775fe3` | 2026-07-14 | violations found: none at pin (compliant); alternate candidates listed (`a2794c2f^`, `499f1c85^`, `5e17617f`, `22b27264`) |
 | flowkit | `24d88247d57987fe33f6b8915540d7bf09b58033` | 2026-05-28 | violations found: none at pin (compliant); injected-diff cases recommended |
-| mozilla-experimenter | `d61a2b8efcb7fd77a849c9f9dc163130473b7f16` | 2026-08-31 | violations found: none at pin (compliant); historical violation pin `a2de3aeb` (2023-06-09) identified |
+| mozilla-experimenter | `d61a2b8efcb7fd77a849c9f9dc163130473b7f16` | 2026-08-31 | violations found: none at pin (compliant); historical violation pins `a2de3aeb` (2023-06-09, schema-availability) and `9857c48a` (2023-06-23, last pre-adoption; parent of fix `b6d9aebc`) — case-verified 2026-09-15 |
 | eq-questionnaire-runner | `da90adfdc4390c0fd1d33dbc896adc38d6ca2022` | 2026-08-26 | violations found: 1 mild non-encodable (ADR-0010 cookie remnants); verdict SWAP |
-| home-assistant (held-out, report-only) | `e4b01b65d306cf4ffcd692b9eb7c7d2ce4f794e4` | 2026-09-01 | code repo; ADRs in separate repo `home-assistant-architecture` @ `0c4f7dbf21c9e1279bea23a1eb2f9ab295d0e9e9`; **gold authored 2026-09-14 (§7 full census) but PARKED: 2 constraints unencodable under current engine semantics (namespace-import CONTAINS-descent artifact, engine issue filed); 1 genuine live violation at pin** (ADR-0019, legacy `remote_rpi_gpio` importing gpiozero); full-graph detect also deferred (>60 min CPU hazard) |
+| home-assistant (held-out, report-only) | `e4b01b65d306cf4ffcd692b9eb7c7d2ce4f794e4` | 2026-09-01 | code repo; ADRs in separate repo `home-assistant-architecture` @ `0c4f7dbf21c9e1279bea23a1eb2f9ab295d0e9e9`; **gold authored 2026-09-14, VERIFIED 14/14 and un-parked 2026-09-15 post-#150 (PR #151)**: 2 constraints, 1 GENUINE live violation at pin (ADR-0019, legacy `remote_rpi_gpio` importing gpiozero); full-graph detect still deferred (>60 min CPU hazard, see §7 verification note) |
 
 ---
 
@@ -610,25 +615,20 @@ authoring; see also the BLOCKER bullet):
   three remote_rpi_gpio files + all ancestor CONTAINS-descents (issue 126
   reports package subjects at the decisive-edge owner) collapse to one
   violation.
-- **BLOCKER (discovered empirically 2026-09-14, pruned verification run):
+- **RESOLVED BLOCKER (found 2026-09-14, fixed 2026-09-15 by #150 / PR #151):
   namespace-import CONTAINS-descent artifact.** An IMPORTS edge that resolves
   to a package node (`from homeassistant.components import X`, 534 modules in
-  the real tree; also fallbacks onto `homeassistant` itself) lets the prohibits
-  BFS traverse CONTAINS from the package into its whole subtree, so
-  `homeassistant.components.* prohibits gpiozero` fires at every namespace
-  importer (observed: `alpha_vantage.sensor -> IMPORTS homeassistant.components
-  -> CONTAINS remote_rpi_gpio -> IMPORTS gpiozero`; `scrape.config_flow ->
-  IMPORTS homeassistant -> CONTAINS homeassistant.components -> CONTAINS
-  remote_rpi_gpio -> IMPORTS gpiozero`; `scrape.sensor` chains through the
-  scrape package into the same bomb). Pin baseline on a 5-component staged
-  tree = 4 fires (1 genuine); estimated hundreds on the real tree; any added
-  selenium module detonates the same cascade for ADR-0004. Both HA constraints
-  are therefore UNENCODABLE under current semantics. Proposed fix (engine
-  issue filed 2026-09-14): allow CONTAINS traversal only during pure descent
-  from the start/seed, never after a dependency edge — this preserves
-  package-level requires (start-descent then IMPORTS) and module→module
-  transitive paths while killing the cascade. HA gold is PARKED pending that
-  fix; do not score.
+  the real tree; also fallbacks onto `homeassistant` itself) let the prohibits
+  BFS traverse CONTAINS from the package into its whole subtree, firing at
+  every namespace importer (4 fires on the 5-component staged tree, 1 genuine;
+  hundreds projected on the real tree; any added selenium module detonated the
+  same cascade for ADR-0004). Fix (commit b4a7941): CONTAINS expands only
+  during pure descent from the start/seed — legal paths are `CONTAINS* DEP*` —
+  preserving package-level requires start-descent, module→module transitive
+  chains, and issue-126 relocation. Post-fix, the staged-tree verification is
+  **14/14 PASS** and both HA constraints are encodable as authored; gold
+  un-parked 2026-09-15. Full-graph confirmation remains with the deferred
+  report-only run.
 - Known engine gaps recorded as `known_limitation` cases: wildcard
   `from gpiozero import *` records no edge for external targets;
   `importlib.import_module("gpiozero")` is invisible to static extraction (also
@@ -649,25 +649,25 @@ choice), edit-inside-violating-module (stability under unrelated modification)
 expectations include the standing baseline fire — probes are "no fire beyond
 baseline", not "zero".
 
-**Verification status: RUN 2026-09-14, BLOCKED ON ENGINE (gold PARKED).** The
+**Verification status: VERIFIED 2026-09-15, 14/14 PASS (post-#150).** The
 pruned staged-tree run (remote_rpi_gpio, scrape, rest, alpha_vantage, acomax,
-mirroring run_case) returned 13/14 FAIL — every failure traced to the
-namespace-import CONTAINS-descent artifact above, not to authoring. Only
-ha-bench-gpio-removal passes (deleting remote_rpi_gpio removes every path to
-the object). The two gold constraints and all 14 case expectations encode the
-INTENDED post-fix semantics and are void-until-fix; HA contributes **0 scorable
-units today** (the 4-repo effective population stays 35 cases / 27 units).
-Historical pin `6e172854` (2019-05-26, adds remote_rpi_gpio) recorded as era
-context only — pre-dates ADR-0019 (2021-12-20), so pre-ADR gpiozero usage is
-anachronism, not violation. The full-graph 88k-node detect additionally
-remains the deferred >60-min hazard (independent perf issue).
+mirroring run_case) passes every case exactly as authored after the #150 fix
+(first run 2026-09-14: 13/14 FAIL on the namespace-import artifact, which
+became #150; expectations needed no changes). Pin baseline = exactly 1 genuine
+violation. Historical pin `6e172854` (2019-05-26, adds remote_rpi_gpio)
+recorded as era context only — pre-dates ADR-0019 (2021-12-20), so pre-ADR
+gpiozero usage is anachronism, not violation. Scoping caveat: the staged tree
+proves direct/2-hop paths and non-firing controls; full-graph confirmation
+(all ~2000 components, no other transitive subjects) belongs to the deferred
+report-only run, which additionally remains the >60-min CPU hazard
+(independent perf issue).
 
-**Population if/when the engine fix lands: 49 cases / 48 expected-violation
-scoring units** (was 35 / 27; HA would add 14 cases / 21 units, of which 9
-units are the standing baseline violation re-appearing per case — an
-honest-accounting note for the #148 scorer). #106 target 50+ / ~100: shortfall
-persists; levers unchanged (more injected diffs per unit, more historical pins,
-plus the per-repo edge-case families proposed on #138: import-form variants,
+**Population after HA (un-parked): 49 cases / 48 expected-violation scoring
+units** (was 35 / 27; HA adds 14 cases / 21 units, of which 9 units are the
+standing baseline violation re-appearing per case — an honest-accounting note
+for the #148 scorer). #106 target 50+ / ~100: shortfall persists; levers
+unchanged (more injected diffs per unit, more historical pins, plus the
+per-repo edge-case families proposed on #138: import-form variants,
 deletions/remediations, alias/wildcard/dynamic-import behaviors).
 
 ---
