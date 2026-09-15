@@ -47,9 +47,33 @@
           "object": "flowmachine",
           "matched_fqn": "flowapi.flowapi.legacy_backend",
           "justification": "ADR-0003 Decision: 'FlowMachine will be wrapped by an HTTP API.' The wrapper layer must not import the wrapped library directly \u2014 flowapi and flowmachine communicate over zmq per ADR-0005. The added module flowapi/flowapi/legacy_backend.py imports flowmachine directly; structural predicate, reported at the module that owns the new import. This is the wrapper-layer counterpart of the flowclient case."
+        },
+        {
+          "adr_id": "ADR-0004",
+          "predicate": "requires_dependency",
+          "subject": "flowapi.flowapi.*",
+          "object": "quart",
+          "matched_fqn": "flowapi.flowapi.legacy_backend.run_query_locally",
+          "justification": "ADR-0004 Decision: 'FlowAPI will be implemented using Quart.' The appended module is flowapi server-side code importing flowmachine only, so the appended function scope has no quart dependency \u2014 genuine per the flowapi.flowapi.* subject breadth-by-design (promoted from the 2026-09-12 grading-note-only documentation to expected units on 2026-09-15, matching the flowkit-transitive-flowapi-via-flowclient convention for the identical shape; verified firing empirically)."
+        },
+        {
+          "adr_id": "ADR-0005",
+          "predicate": "requires_dependency",
+          "subject": "flowapi.flowapi.*",
+          "object": "zmq",
+          "matched_fqn": "flowapi.flowapi.legacy_backend.run_query_locally",
+          "justification": "ADR-0005 Decision: 'API-backend communication will be via zeromq'. The appended module bypasses the zmq channel by importing flowmachine directly, so the appended function scope has no zeromq dependency \u2014 the fire and the prohibits above are two readings of the same bypass (genuine per subject breadth-by-design; verified firing empirically)."
+        },
+        {
+          "adr_id": "ADR-0006",
+          "predicate": "requires_dependency",
+          "subject": "flowapi.flowapi.*",
+          "object": "quart_jwt_extended",
+          "matched_fqn": "flowapi.flowapi.legacy_backend.run_query_locally",
+          "justification": "ADR-0006 ('JWTs for API Access Control'): 'API authentication and access control will use JWTs.' A flowapi module executing backend queries directly carries no JWT machinery at any scope \u2014 genuine per subject breadth-by-design (verified firing empirically)."
         }
       ],
-      "grading_note": "Exactly one case-specific firing expected (verified empirically): the structural prohibits at flowapi.flowapi.legacy_backend, the module owning the new 'import flowmachine' (verbatim target registration). The appended module has no quart/zmq/quart_jwt_extended import, so the three flowapi.* requires fire on the appended function scope \u2014 recorded as the documented over-trigger class (requires cannot be satisfied by a module importing none of them; see flowkit_gold.json ADR-0006 note). Beyond the documented baseline (baseline_note) plus that requires triple, any further firing is a false positive."
+      "grading_note": "Four case-specific firings expected (re-verified 2026-09-15): the structural prohibits at flowapi.flowapi.legacy_backend (the module owning the new 'import flowmachine', verbatim target registration) plus the three flowapi.* requires at the appended function scope. The requires triple is counted GENUINE here (subject breadth-by-design, the same convention flowkit-transitive-flowapi-via-flowclient already used for the identical shape); the 2026-09-12 note had parked them as documentation-only, an internal inconsistency this correction removes. Beyond the documented baseline (baseline_note) plus these four expectations, any further firing is a false positive."
     },
     {
       "case_id": "flowkit-flowapi-endpoint-without-jwt",
@@ -147,7 +171,7 @@
           "justification": "The appended module imports flowclient only; no JWT machinery dependency at the appended function scope (verified firing empirically)."
         }
       ],
-      "verification": "pending",
+      "verification": "verified 2026-09-12 (empirically, see file-level verification) and re-verified 2026-09-15 post-#150; this per-case field had been left stale at 'pending' from authoring",
       "grading_note": "TRANSITIVE SEMANTICS (the question this case exists to answer): the engine's structural BFS crosses the flowclient hop, so flowapi importing flowclient DOES fire the ADR-0003 flowapi-prohibits-flowmachine \u2014 verified empirically; the decisive second hop is flowclient.flowclient's CALLS edge to flowmachine.flowmachine.core.logging (resolver-quirk edge, but CALLS is in the traversal kinds, so the fire does not depend on flowclient holding a genuine flowmachine import). All three flowapi.* requires also fire on the appended function because the module imports none of quart/zmq/quart_jwt_extended. Beyond the documented baseline (baseline_note) and these four expectations, nothing else may fire."
     },
     {
@@ -232,6 +256,43 @@
       ]
     },
     {
+      "case_id": "flowkit-probe-decoy-local-name",
+      "type": "compliant_probe",
+      "description": "New flowclient module with NO flowmachine import but a function-local variable named flowmachine used in attribute-call position: the decoy-name guard (walk_calls scope_text) must keep the NameResolver suffix quirk from manufacturing a flowmachine edge",
+      "diff": [
+        {
+          "path": "flowclient/flowclient/backend_shim.py",
+          "status": "added",
+          "append": "\"\"\"Client-side query planning against a local shim (new code).\"\"\"\n\n\ndef plan_legacy_query(connection, name):\n    \"\"\"Build a query plan via a local variable named flowmachine (new code).\"\"\"\n    flowmachine = connection.plan(name)\n    return flowmachine.core.Query(connection)\n"
+        }
+      ],
+      "expected_violations": [],
+      "grading_note": "Verified empirically at the pin (2026-09-15): case-specific firings beyond the documented baseline are exactly zero. Mechanism: the call expression flowmachine.core.Query does not resolve as a dotted name (no known FQN ends with that suffix), so walk_calls falls back to the attribute chain's leftmost identifier 'flowmachine' — which the suffix index WOULD resolve to flowmachine.flowmachine (the doubled-layout package, the same bare-name quirk behind the baseline's 'logging' fires) — but the fallback is skipped because the guard regex finds '\\bflowmachine\\s*=' inside the enclosing function's scope_text (the local assignment), so no CALLS edge is created and the ADR-0003 prohibits stays quiet. This is the guard case the NameResolver suffix quirk demands: without it, every local variable sharing a name with a repo package would fire structural prohibits. Discriminating counterpart to flowkit-decoy-module-var, which pins the guard's boundary. Instance-disjoint from every other case (only case binding backend_shim)."
+    },
+    {
+      "case_id": "flowkit-decoy-module-var",
+      "type": "known_limitation",
+      "description": "Module-level variable named flowmachine (assigned at import time, used inside a function): the decoy guard only inspects the enclosing FUNCTION's scope_text, so the module-level assignment is invisible to it and the suffix quirk manufactures a flowmachine CALLS edge — a documented false-positive shape, not a compliance claim",
+      "diff": [
+        {
+          "path": "flowclient/flowclient/backend_var.py",
+          "status": "added",
+          "append": "\"\"\"Client-side shim configured at module scope (new code).\"\"\"\nflowmachine = None  # set by connect()\n\n\ndef plan_legacy_query(connection, name):\n    \"\"\"Build a query plan via the module-level shim named flowmachine (new code).\"\"\"\n    return flowmachine.core.Query(connection)\n"
+        }
+      ],
+      "expected_violations": [],
+      "documented_false_positives": [
+        [
+          "ADR-0003",
+          "prohibits_dependency",
+          "flowclient.flowclient.*",
+          "flowmachine",
+          "flowclient.flowclient.backend_var"
+        ]
+      ],
+      "grading_note": "Expected outcome: zero true violations, with ONE documented false positive (verified 2026-09-15): ADR-0003 structural prohibits fires at flowclient.flowclient.backend_var even though the module never imports flowmachine. Mechanism: the assignment 'flowmachine = None' lives at module level; walk_calls sets scope_text only when entering a function_definition, so at the call site inside plan_legacy_query the scope_text contains no assignment; the leftmost-name fallback therefore resolves bare 'flowmachine' via the suffix index to flowmachine.flowmachine and registers a CALLS edge, giving the module a dependency path to the prohibited namespace. Classification: false positive per the ADR text (a local configuration variable sharing a package's name is not a dependency on that package), the same name-collision family as the baseline 'logging' quirk but diff-introduced and guard-escapable. This case type records the guard's scope boundary for the benchmark report: the fix shape would be module-scope assignment awareness (seed scope_text with the module body or track module-level assignments); if that lands, the fire disappears and this case must be re-authored as type compliant_probe with zero documented false positives. Instance-disjoint from every other case (only case binding backend_var)."
+    },
+    {
       "case_id": "flowkit-probe-flowetl-out-of-scope",
       "type": "compliant_probe",
       "description": "New module in the flowetl package: outside every constraint subject (flowclient.flowclient.*, flowapi.flowapi.*, flowmachine.flowmachine.core.*)",
@@ -245,8 +306,8 @@
       "grading_note": "Verified empirically at the pin (2026-09-12): case-specific firings beyond the documented baseline are exactly zero \u2014 flowetl.* matches no constraint subject. Zero violations expected: flowetl.* is outside all seven gold constraint subjects (flowclient.flowclient.*, flowapi.flowapi.* x2 predicates, flowmachine.flowmachine.core.*; the flowapi.flowapi.* requires on quart/zmq/quart_jwt_extended and ADR-0006's JWT mandate all bind the API package, not the ETL sidecar), and ADR-0010 explicitly does NOT govern flowetl (its Airflow usage predates the AutoFlow Prefect decision, which targets the absent AutoFlow component). Any firing here is a subject-overreach false positive."
     }
   ],
-  "baseline_note": "EMPIRICAL BASELINE (verified at the pin 24d88247d, 2026-09-12, full-tree parse_repo: 2494 nodes / 7507 edges): the NameResolver suffix-index resolves the bare name 'logging' (logging.getLogger(...) calls) to flowmachine.flowmachine.core.logging \u2014 the only known FQN ending in '.logging' (python-tuf bare-json quirk). This pollutes the baseline graph with CALLS edges from HEAD modules in flowclient and flowapi to flowmachine.flowmachine.core.logging, so the two ADR-0003 structural prohibits fire on 13 HEAD module FQNs on EVERY run, diff-independent: flowclient.flowclient.{aggregates, async_api_query, async_client, async_connection, api_query, client, connection} and flowapi.flowapi.{api_spec, config, geography, main, query_endpoints, stream_results}. These 13 baseline firings accompany every case; expected_violations lists only the CASE-SPECIFIC firings beyond this baseline, and any firing outside (baseline + expected_violations) is an over-trigger false positive. The decisive true findings are unaffected: appended direct imports register verbatim IMPORTS targets and report at the import-owning module.",
-  "verification": "verified 2026-09-12: full-tree parse_repo at the pin, gold constraints injected in-memory (no Neo4j persistence, no LLM resolver), each case's Diff processed via services/cpt/diff_processor.process_diff and run through ADGPipeline().run_prepared; every expected_violation fired with the exact subject/object/matched_fqn recorded, and non-baseline extra firings were folded into the gold as documented expectations (ADR-0003 corrections in flowkit_gold.json note, transitive case expectations).",
+  "baseline_note": "EMPIRICAL BASELINE (verified at the pin 24d88247d, 2026-09-12, full-tree parse_repo: 2494 nodes / 7507 edges): the NameResolver suffix-index resolves the bare name 'logging' (logging.getLogger(...) calls) to flowmachine.flowmachine.core.logging \u2014 the only known FQN ending in '.logging' (python-tuf bare-json quirk). This pollutes the baseline graph with CALLS edges from HEAD modules in flowclient and flowapi to flowmachine.flowmachine.core.logging, so the two ADR-0003 structural prohibits fire on HEAD module FQNs on EVERY run, diff-independent. POST-#150 RECOUNT (2026-09-15, re-verified empirically): 12 baseline firings, not 13 \u2014 flowapi.flowapi.api_spec no longer reaches the flowmachine namespace (its path ran through a namespace import onto a package node whose CONTAINS descent issue #150 removed), so its baseline row is retired; the surviving 12 are flowclient.flowclient.{aggregates, async_api_query, async_client, async_connection, api_query, client, connection} and flowapi.flowapi.{config, geography, main, query_endpoints, stream_results}. These baseline firings accompany every case; expected_violations lists only the CASE-SPECIFIC firings beyond this baseline, and any firing outside (baseline + expected_violations) is an over-trigger false positive. The decisive true findings are unaffected: appended direct imports register verbatim IMPORTS targets and report at the import-owning module.",
+  "verification": "verified 2026-09-12: full-tree parse_repo at the pin, gold constraints injected in-memory (no Neo4j persistence, no LLM resolver), each case's Diff processed via services/cpt/diff_processor.process_diff and run through ADGPipeline().run_prepared; every expected_violation fired with the exact subject/object/matched_fqn recorded, and non-baseline extra firings were folded into the gold as documented expectations (ADR-0003 corrections in flowkit_gold.json note, transitive case expectations). RE-VERIFIED 2026-09-15 post-#150 under the run_case convention (parse_repo -> add_external_nodes -> merge_constraint_edges -> specificity -> augment_immutable -> process_diff -> detect): all cases pass; baseline recounted 13 -> 12 (flowapi.flowapi.api_spec retired, see baseline_note), and the flowapi-direct-flowmachine requires triple promoted from note-only documentation to expected units (subject breadth-by-design, matching the transitive case's convention). Two new cases authored and verified 2026-09-15 (decoy-name pair: function-local assignment guarded = silent; module-level assignment escapes the guard = documented false positive).",
   "baseline_firings": [
     [
       "ADR-0003",
@@ -296,13 +357,6 @@
       "flowclient.flowclient.*",
       "flowmachine",
       "flowclient.flowclient.connection"
-    ],
-    [
-      "ADR-0003",
-      "prohibits_dependency",
-      "flowapi.flowapi.*",
-      "flowmachine",
-      "flowapi.flowapi.api_spec"
     ],
     [
       "ADR-0003",
