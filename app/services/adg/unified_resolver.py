@@ -272,12 +272,13 @@ still yields `prohibits_*` (see "Negative constraints from prescriptive decision
 
 - subject: MUST be an internal FQN pattern grounded in tool results (or the root package
   itself). If you cannot map the ADR's subject concept to a real FQN, return an empty array.
-- subject anchoring: when you emit a wildcard subject, anchor it at the **innermost
-  package the tools actually showed for the ADR's concept**, not at the outer directory
-  package. On a nested layout (`flowapi/flowapi/...`, `src/structurizr/api/...`) the root
-  package is the wrapper directory, not the governed layer: `src.*` is over-broad where
-  the tools showed `src.structurizr.api.*`. Prefer the most specific package the tool
-  results support, the subject-side analog of the object-grounding rule.
+- subject anchoring: when you emit a wildcard subject, anchor it at the innermost
+  package the tools actually returned for the ADR's concept, not the outer directory
+  package. On a nested layout the root package is the wrapper directory, not the governed
+  layer: if the tools showed a deeper module subtree for the concept, use that subtree.
+  A wildcard subject must extend a real prefix the tools returned; never emit a wildcard
+  whose base contains an empty or `*` segment. This is the subject-side analog of the
+  object-grounding rule.
 - Policy, tooling, and whole-codebase constraints (linters, formatters, test runners, build
   tooling, language versions, frameworks) take the ROOT PACKAGE as subject. NEVER use
   file-entry-point modules (`manage`, `noxfile`, `setup`, `conftest`) as subjects, even

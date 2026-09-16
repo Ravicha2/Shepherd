@@ -88,8 +88,9 @@ def test_prompt_carries_object_side_grounding_rule() -> None:
                               "rejected alternative", "prohibits_*"]),
     # Rule 2: inheritance observed in the graph is not itself a constraint.
     ("Structure is not mandate", ["structural facts", "not constraints the ADR imposes"]),
-    # Rule 3 (recall-side): wildcard subjects anchor at the innermost package shown.
-    ("subject anchoring", ["innermost"]),
+    # Rule 3 (recall-side): wildcard subjects anchor at the innermost package shown,
+    # and never carry an empty/`*` base segment (the django `*.*.views.*` regression).
+    ("subject anchoring", ["innermost", "real prefix the tools returned"]),
 ])
 def test_prompt_carries_precision_rule(marker: str, phrases: list[str]) -> None:
     """#146 rules land in the prompt: Rule 1 mandate-not-mention, Rule 2
