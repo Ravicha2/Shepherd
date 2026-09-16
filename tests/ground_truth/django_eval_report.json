@@ -1,7 +1,7 @@
 {
   "_meta": {
-    "generated_at": "2026-09-08T13-06-27",
-    "git_commit": "8f27035",
+    "generated_at": "2026-09-16T15-16-40",
+    "git_commit": "e5e9fad",
     "arm": "baseline",
     "semble_version": "0.5.6",
     "semble_model": "minishlab/potion-code-16M-v2",
@@ -11,14 +11,8 @@
   "partial": 0,
   "miss": 1,
   "total": 4,
-  "false_positives": 2,
+  "false_positives": 1,
   "false_positive_edges": [
-    {
-      "adr_id": "ADR-001",
-      "subject": "project.*",
-      "predicate": "prohibits_dependency",
-      "object": "users.models.*"
-    },
     {
       "adr_id": "ADR-002",
       "subject": "users.views.*",
@@ -50,9 +44,9 @@
         "object": "users.services.*",
         "justification": "All data access must go through service functions; the service layer (users.services) is the sole gateway to the data layer"
       },
-      "score": "miss",
-      "resolved_subject": "users.services.*",
-      "resolved_object": "users.models.*"
+      "score": "exact_match",
+      "resolved_subject": "users.views.*",
+      "resolved_object": "users.services.*"
     },
     {
       "adr_id": "ADR-001",
@@ -62,9 +56,9 @@
         "object": "users.models.*",
         "justification": "Only the service layer may import from the data model module"
       },
-      "score": "exact_match",
-      "resolved_subject": "users.services.*",
-      "resolved_object": "users.models.*"
+      "score": "miss",
+      "resolved_subject": "users.views.*",
+      "resolved_object": "users.services.*"
     },
     {
       "adr_id": "ADR-002",

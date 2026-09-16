@@ -1,41 +1,23 @@
 {
   "_meta": {
-    "generated_at": "2026-09-08T13-06-27",
-    "git_commit": "8f27035",
+    "generated_at": "2026-09-16T15-16-40",
+    "git_commit": "e5e9fad",
     "arm": "baseline",
     "semble_version": "0.5.6",
     "semble_model": "minishlab/potion-code-16M-v2",
     "resolver_model": "google/gemini-3.1-flash-lite"
   },
-  "exact": 2,
+  "exact": 3,
   "partial": 6,
-  "miss": 2,
+  "miss": 1,
   "total": 10,
-  "false_positives": 9,
+  "false_positives": 5,
   "false_positive_edges": [
-    {
-      "adr_id": "ADR-0002",
-      "subject": "openlobby.*",
-      "predicate": "requires_dependency",
-      "object": "django_elasticsearch_dsl"
-    },
     {
       "adr_id": "ADR-0003",
       "subject": "openlobby.*",
       "predicate": "requires_dependency",
-      "object": "openlobby.core.api.*"
-    },
-    {
-      "adr_id": "ADR-0004",
-      "subject": "openlobby.*",
-      "predicate": "requires_dependency",
-      "object": "graphene_django"
-    },
-    {
-      "adr_id": "ADR-0004",
-      "subject": "openlobby.*",
-      "predicate": "requires_dependency",
-      "object": "graphql_relay"
+      "object": "graphene"
     },
     {
       "adr_id": "ADR-0006",
@@ -48,12 +30,6 @@
       "subject": "openlobby.core.api.*",
       "predicate": "requires_dependency",
       "object": "graphql_relay"
-    },
-    {
-      "adr_id": "ADR-0009",
-      "subject": "openlobby.*",
-      "predicate": "requires_dependency",
-      "object": "graphene"
     },
     {
       "adr_id": "ADR-0011",
@@ -79,17 +55,17 @@
     {
       "adr_id": "ADR-0008",
       "subject": "openlobby.*",
-      "predicate": "prohibits_dependency",
-      "object": "unittest"
+      "predicate": "requires_dependency",
+      "object": "pytest"
     },
     {
-      "adr_id": "ADR-0013",
+      "adr_id": "ADR-0008",
       "subject": "openlobby.*",
-      "predicate": "requires_dependency",
-      "object": "black"
+      "predicate": "prohibits_dependency",
+      "object": "unittest"
     }
   ],
-  "accuracy": 0.5,
+  "accuracy": 0.6,
   "per_constraint": [
     {
       "adr_id": "ADR-0002",
@@ -136,8 +112,8 @@
         "justification": "ADR-0006 mandates Flask as the web framework; superseded by ADR-0010"
       },
       "score": "miss",
-      "resolved_subject": null,
-      "resolved_object": null
+      "resolved_subject": "openlobby.*",
+      "resolved_object": "django"
     },
     {
       "adr_id": "ADR-0007",
@@ -147,9 +123,9 @@
         "object": "graphene.relay",
         "justification": "ADR-0007 mandates adopting GraphQL Relay specification for pagination and Node interface via Graphene Relay"
       },
-      "score": "miss",
+      "score": "exact_match",
       "resolved_subject": "openlobby.core.api.*",
-      "resolved_object": "graphene_django"
+      "resolved_object": "graphene.relay"
     },
     {
       "adr_id": "ADR-0009",
@@ -160,8 +136,8 @@
         "justification": "ADR-0009 mandates OpenID Connect for user authentication; openlobby/core/openid.py imports the oic package"
       },
       "score": "partial_match",
-      "resolved_subject": "openlobby.*",
-      "resolved_object": "oic"
+      "resolved_subject": "openlobby.core.*",
+      "resolved_object": "oic.oic"
     },
     {
       "adr_id": "ADR-0010",

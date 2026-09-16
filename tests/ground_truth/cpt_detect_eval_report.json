@@ -1,15 +1,19 @@
 {
   "_meta": {
-    "generated_at": "2026-09-05T22-32-06",
-    "git_commit": "40b1c9f"
+    "generated_at": "2026-09-16T15-23-01",
+    "git_commit": "e5e9fad",
+    "arm": "baseline",
+    "semble_version": "0.5.6",
+    "semble_model": "minishlab/potion-code-16M-v2",
+    "resolver_model": "google/gemini-3.1-flash-lite"
   },
   "flask": {
     "repo_id": "flask",
     "cases": [
       {
         "case_id": "flask-violating-route",
-        "exact": 2,
-        "partial": 1,
+        "exact": 3,
+        "partial": 0,
         "miss": 0,
         "total": 3,
         "false_positives": 0,
@@ -24,7 +28,7 @@
               "matched_fqn": "app.routes.users",
               "justification": "HEAD code in routes/users.py already imports the model directly, and the new route continues the pattern. Structural predicate, reported at module level after module-level dedup."
             },
-            "score": "partial_match",
+            "score": "exact_match",
             "justification": "HEAD code in routes/users.py already imports the model directly, and the new route continues the pattern. Structural predicate, reported at module level after module-level dedup."
           },
           {
@@ -55,8 +59,8 @@
       },
       {
         "case_id": "flask-compliant-service",
-        "exact": 0,
-        "partial": 1,
+        "exact": 1,
+        "partial": 0,
         "miss": 0,
         "total": 1,
         "false_positives": 0,
@@ -71,15 +75,15 @@
               "matched_fqn": "app.routes.users",
               "justification": "Baseline only: pre-existing routes/users.py imports the model directly (marked '# violation' in the fixture). The new service function itself is compliant: services are the sanctioned path and requires app.models.* is satisfied via the call to User.find."
             },
-            "score": "partial_match",
+            "score": "exact_match",
             "justification": "Baseline only: pre-existing routes/users.py imports the model directly (marked '# violation' in the fixture). The new service function itself is compliant: services are the sanctioned path and requires app.models.* is satisfied via the call to User.find."
           }
         ]
       },
       {
         "case_id": "flask-unauthenticated-route",
-        "exact": 0,
-        "partial": 1,
+        "exact": 1,
+        "partial": 0,
         "miss": 1,
         "total": 2,
         "false_positives": 1,
@@ -104,7 +108,7 @@
               "matched_fqn": "app.routes.users",
               "justification": "Baseline: pre-existing routes/users.py imports the model directly. The new status route touches no model."
             },
-            "score": "partial_match",
+            "score": "exact_match",
             "justification": "Baseline: pre-existing routes/users.py imports the model directly. The new status route touches no model."
           },
           {
@@ -123,8 +127,8 @@
       },
       {
         "case_id": "flask-auth-exempt-route",
-        "exact": 0,
-        "partial": 1,
+        "exact": 1,
+        "partial": 0,
         "miss": 1,
         "total": 2,
         "false_positives": 0,
@@ -139,7 +143,7 @@
               "matched_fqn": "app.routes.users",
               "justification": "Baseline only: pre-existing routes/users.py imports the model directly. The new route goes through the service layer and stays out of the model layer."
             },
-            "score": "partial_match",
+            "score": "exact_match",
             "justification": "Baseline only: pre-existing routes/users.py imports the model directly. The new route goes through the service layer and stays out of the model layer."
           },
           {
@@ -157,8 +161,8 @@
         ]
       }
     ],
-    "exact": 2,
-    "partial": 4,
+    "exact": 6,
+    "partial": 0,
     "miss": 2,
     "false_positives": 1,
     "total": 8,
@@ -166,7 +170,7 @@
       "adg_nodes": 28,
       "external_nodes": 2
     },
-    "accuracy": 0.5
+    "accuracy": 0.75
   },
   "django": {
     "repo_id": "django",
@@ -186,7 +190,7 @@
             "object": "users.models.*",
             "matched_fqn": "project.urls",
             "changed_fqn": "project.urls",
-            "evidence": "project.urls has dependency path to users.models.User.to_dict via IMPORTS users.views.user_list -> CALLS users.models.User -> CONTAINS users.models.User.to_dict"
+            "evidence": "project.urls has dependency path to users.models.User via IMPORTS users.views.user_list -> CALLS users.models.User"
           }
         ],
         "per_constraint": [
@@ -231,7 +235,7 @@
             "object": "users.models.*",
             "matched_fqn": "project.urls",
             "changed_fqn": "project.urls",
-            "evidence": "project.urls has dependency path to users.models.User.to_dict via IMPORTS users.views.user_list -> CALLS users.models.User -> CONTAINS users.models.User.to_dict"
+            "evidence": "project.urls has dependency path to users.models.User via IMPORTS users.views.user_list -> CALLS users.models.User"
           }
         ],
         "per_constraint": [
@@ -264,7 +268,7 @@
             "object": "users.models.*",
             "matched_fqn": "project.urls",
             "changed_fqn": "project.urls",
-            "evidence": "project.urls has dependency path to users.models.User.to_dict via IMPORTS users.views.user_list -> CALLS users.models.User -> CONTAINS users.models.User.to_dict"
+            "evidence": "project.urls has dependency path to users.models.User via IMPORTS users.views.user_list -> CALLS users.models.User"
           }
         ],
         "per_constraint": [

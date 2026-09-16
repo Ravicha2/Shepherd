@@ -22,13 +22,13 @@ GROUND_TRUTH_DIR = REPO_ROOT / "tests" / "ground_truth"
 REAL_CPT_REPOS = ("openlobby", "python-tuf", "tamr-client")
 REAL_INGESTION_REPOS = ("openlobby", "python_tuf", "tamr_client")
 
-# Frozen ratchet constants, read off the committed 2026-09-08T13-06-27
-# baseline run (git 8f27035). Move only together with a re-committed report,
-# per ADR 018's re-baseline protocol.
+# Frozen ratchet constants, read off the committed 2026-09-16T15-16-40
+# baseline run (git e5e9fad, worst of #146's k=2). Move only together with a
+# re-committed report, per ADR 018's re-baseline protocol.
 RETRIEVAL_MIN_MATCHED_SCORE = 12.0  # exact + 0.5*partial, of 14 expected
 RETRIEVAL_MAX_FP = 1
-INGESTION_MIN_BLENDED = 17 / 30  # (5 + 0.5*7)/15, kept symbolic so the baseline always passes exactly
-INGESTION_MAX_FP = 15
+INGESTION_MIN_BLENDED = 19 / 30  # (6 + 0.5*7)/15, kept symbolic so the baseline always passes exactly
+INGESTION_MAX_FP = 11
 
 pytestmark = [pytest.mark.cpt_eval]
 

@@ -1,7 +1,7 @@
 {
   "_meta": {
-    "generated_at": "2026-09-08T13-06-27",
-    "git_commit": "8f27035",
+    "generated_at": "2026-09-16T15-16-40",
+    "git_commit": "e5e9fad",
     "arm": "baseline",
     "semble_version": "0.5.6",
     "semble_model": "minishlab/potion-code-16M-v2",
@@ -23,7 +23,7 @@
       "adr_id": "ADR-0007",
       "subject": "tamr_client.*",
       "predicate": "requires_dependency",
-      "object": "TAMR_CLIENT_BETA"
+      "object": "os"
     }
   ],
   "credited_fragments": [
@@ -71,37 +71,13 @@
     },
     {
       "adr_id": "ADR-0009",
-      "subject": "tamr_client.primary_key.*",
-      "predicate": "requires_dependency",
-      "object": "tamr_client._types.*"
-    },
-    {
-      "adr_id": "ADR-0009",
       "subject": "tamr_client.project.*",
       "predicate": "requires_dependency",
       "object": "tamr_client._types.*"
     },
     {
       "adr_id": "ADR-0009",
-      "subject": "tamr_client.response.*",
-      "predicate": "requires_dependency",
-      "object": "tamr_client._types.*"
-    },
-    {
-      "adr_id": "ADR-0009",
-      "subject": "tamr_client.restore.*",
-      "predicate": "requires_dependency",
-      "object": "tamr_client._types.*"
-    },
-    {
-      "adr_id": "ADR-0009",
       "subject": "tamr_client.schema_mapping.*",
-      "predicate": "requires_dependency",
-      "object": "tamr_client._types.*"
-    },
-    {
-      "adr_id": "ADR-0009",
-      "subject": "tamr_client.session.*",
       "predicate": "requires_dependency",
       "object": "tamr_client._types.*"
     },
@@ -189,30 +165,6 @@
       "adr_id": "ADR-0003",
       "subject": "tamr_client.*",
       "predicate": "requires_dependency",
-      "object": "pyenv"
-    },
-    {
-      "adr_id": "ADR-0003",
-      "subject": "tamr_unify_client.*",
-      "predicate": "requires_dependency",
-      "object": "pyenv"
-    },
-    {
-      "adr_id": "ADR-0003",
-      "subject": "tamr_client.*",
-      "predicate": "requires_dependency",
-      "object": "poetry"
-    },
-    {
-      "adr_id": "ADR-0003",
-      "subject": "tamr_unify_client.*",
-      "predicate": "requires_dependency",
-      "object": "poetry"
-    },
-    {
-      "adr_id": "ADR-0003",
-      "subject": "tamr_client.*",
-      "predicate": "requires_dependency",
       "object": "nox"
     },
     {
@@ -220,18 +172,6 @@
       "subject": "tamr_unify_client.*",
       "predicate": "requires_dependency",
       "object": "nox"
-    },
-    {
-      "adr_id": "ADR-0004",
-      "subject": "tamr_client.*",
-      "predicate": "requires_dependency",
-      "object": "sphinx"
-    },
-    {
-      "adr_id": "ADR-0004",
-      "subject": "tamr_client.*",
-      "predicate": "requires_dependency",
-      "object": "recommonmark"
     },
     {
       "adr_id": "ADR-0006",

@@ -482,6 +482,44 @@ Match tallies identical to the #134 baseline on every repo; the change is FP-onl
 
 **Comparability:** unchanged — no tallies moved, no prompt/tool surface touched, committed baselines stay where they are. Cost fields are additive; old cell reports aggregate without them.
 
+### 2026-09-16: issue #146 precision prompt pass (mandate-not-mention + structure-is-not-mandate + subject anchoring, one shared re-baseline)
+
+**Change:** three prompt rules land together (one variable at a time is impossible here by construction, so the issue specifies ONE pass with ONE shared re-baseline). In `services/adg/unified_resolver.py`:
+- **Rule 1, "Mandate, not mention"** (class-A evidence): a `requires_*` edge needs mandate language for the chosen direction; a passing mention or hedged aspiration ("ideally over the GraphQL API") emits none. Root-package subject + external object is named as the highest-risk shape. The prohibition side is explicitly left unchanged (rejected-alternative → `prohibits_*`, per the existing "Negative constraints from prescriptive decisions" section).
+- **Rule 2, "Structure is not mandate"** (tuf payload family): inheritance/containment observed in the graph is a structural fact, not a constraint; `requires_/prohibits_implementation` need an ADR mandate.
+- **Rule 3, subject anchoring** (recall-side, added by the #149 pilot's retrieval diagnosis): wildcard subjects anchor at the innermost package the tools returned, never a base with an empty/`*` segment.
+Unit pins: `test_prompt_carries_precision_rule` (parametrized over the three markers/phrases) in `tests/services/adg/test_ablation_toggle.py`.
+
+**Two prompt bugs the pass caught mid-protocol (both fixed before the final runs, pre-registered honest record):**
+- **Rule 1 as first drafted killed a gold row.** It listed "a rejected alternative" as producing no edge, contradicting the existing prohibition-from-rejection section: openlobby ADR-0004's gold `prohibits_dependency rest_framework` (partial in every pre-#146 run) became a miss, consistent 2/2. Reworded to scope Rule 1 to `requires_*` only and preserve the rejection-derived prohibition; the row returns to partial.
+- **Rule 3 as first drafted regressed django.** Its literal doubled-segment examples (`flowapi.flowapi.*`, `src.structurizr.api.*`) baited the model into emitting a malformed `*.*.views.*` subject, deterministic only with all three rules present (3/3 causal trials + 2/2 eval runs); removing any single rule restored it, and a 2-trial variant test isolated the example strings. Reworded to state intent with no copyable pattern (and a "never emit an empty/`*` segment" clause). Django restored 3/3 causal trials and in both final runs.
+
+**Protocol:** two fresh `resolver_eval` runs at PYTHONHASHSEED=0 (k=2), report dirs `2026-09-16T15-12-00` (run1) and `2026-09-16T15-16-40` (run2, **committed** as the new baselines per ADR 018 decision 4 worst-run), trace dirs `logs/issue-146/run1|2`, `_meta.arm` baseline, git e5e9fad; retrieval `cpt_eval` re-run at `2026-09-16T15-23-01`. 74 LLM sessions, ~$0.2 (prompt 1.56M / completion 20k tokens total). Ratchet constants re-committed together in `tests/services/cpt/test_eval_gate.py` (ingestion blended 17/30 → 19/30, FP max 15 → 11; retrieval unchanged 12.0 / 1).
+
+**Numbers (ingestion, real repos; worst run = committed)**
+
+| repo      | exact | partial | miss | FP | acc  | vs prior committed (8f27035) |
+|-----------|-------|---------|------|----|------|------------------------------|
+| openlobby | 3     | 6       | 1    | 5  | 0.60 | FP 9→5; ADR-0007 miss→exact |
+| tuf       | 3     | 0       | 1    | 4  | 0.75 | FP 4→4 (class swaps below) |
+| tamr      | 0     | 1       | 0    | 2  | 0.50 | FP 2→2 (object churn) |
+| flask     | 1     | 1       | 2    | 0  | 0.375 | exact 2→1, partial 0→1, FP 1→0 |
+| django    | 3     | 0       | 1    | 1  | 0.75 | exact 3→3, FP 2→1 |
+
+Real-repo aggregate: exact 6 / partial 7 / miss 2, FP 10 (run1) vs 11 (run2); blended 0.6333 both runs (was 0.5667). Retrieval group unchanged on every real repo (openlobby 8/0/0/0, tuf 2/0/1/0, tamr 2/0/1/1); flask smoke row 2/4/2/1 → 6/0/2/1 (partial→exact on `app.routes.*`→`app.models.*`, no real-repo effect — retrieval runs on gold constraints and predates #146's prompt).
+
+**Expected-movement verdict (per-repo honesty, the #135 narrowing precedent):**
+- **Rule 1 fired in the expected direction on openlobby.** Class-A requires-with-root-subject family largely cleared: `django_elasticsearch_dsl` (ADR-0002), `graphene_django`/`graphql_relay` (ADR-0004), `openlobby.core.api.*` self-requires (ADR-0003), `graphene` (ADR-0009) all gone; FP 9→5. **But the ADR-0011/0012 `django.db` attribution edges survive (2 FP, both runs)** — the hard cases the issue flagged; gold attributes the ORM mandate to ADR-0010, and this pass did NOT kill them (they need cross-ADR attribution work, as predicted). One class-A edge remains re-rooted (`ADR-0003 requires graphene`), and the ADR-0007 object flip fixed (miss→exact).
+- **Rule 2 partially fired on tuf.** The three `prohibits_implementation` payload-family inventions are gone (the expected structure-as-mandate class), and the baseline's `requires_implementation Metadata → Signed` is gone. **But the class is not dead: run2 re-invented `requires_implementation tuf.api._payload.* → Signed`, and a new `ADR-0006 requires_implementation Metadata → MetadataSerializer` appears in both runs.** Net tuf FP unchanged (4→4, membership swapped). Tally loss: none (exact still 3/0/1 both runs) — consistent with children_off having shown tallies hold when these edges vanish.
+- **Rule 3 not measurable on this set.** The legacy eval repos are flat/outer-anchored (`openlobby`, `tuf`, `tamr_client` all anchor at their real root), so the nested-layout recall movement the rule targets (flowkit `flowapi.*` vs `flowapi.flowapi.*`, experimenter, structurizr) cannot show here; it is pre-registered for the benchmark denominator, not this set. Recorded as expected-no-movement on this gold rather than iterated.
+- **Not in expected direction:** tamr object churn (`TAMR_CLIENT_BETA` → `os`, both documented zero-constraint-gold policy classes) and flask smoke exact→partial — the resolver variance/omission classes the #135 row already documented, not new classes.
+
+**Impact:** first prompt-side FP cleanup with a net real-repo gain (blended 0.5667→0.6333, openlobby FP 9→5) while holding every match tally on real repos (Rule 2's tuf tally-neutrallness and Rule 1's ADR-0004 restoration both confirmed). Two of the four measured failure classes are moved; the django.db cross-ADR attribution (Rule 1's hard case) and the tuf payload re-invention remain open and are recorded as such rather than iterated (iteration cap per #135 precedent).
+
+**Baseline status:** new committed ingestion baselines = the 2026-09-16T15-16-40 run (worst of k=2); retrieval baseline re-stamped at 2026-09-16T15-23-01 with byte-identical real-repo tallies; gate constants re-committed together (ADR 018).
+
+**Comparability: NON-COMPARABLE for ingestion against every prior row** (prompt surface changed; the resolver's tool surface is unchanged from #143). #146's numbers ARE comparable to the #149 pilot's quality rows for the benchmark denominator (same protocol), which is where Rule 3's expected recall movement is judged. Retrieval group real-repo tallies are identical to the 2026-09-05 committed baseline, so retrieval is diffable across this row.
+
 ## Curation mode
 
 
