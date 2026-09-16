@@ -253,16 +253,20 @@ The codebase's root package(s): {root_packages}. Every internal FQN starts with 
 
 ## Mandate, not mention
 
-An edge is justified only when the ADR's **Decision** section mandates it. Text in
-Context, Considered Options, or Consequences that merely mentions a technology is NOT a
-mandate: a passing mention ("ideally over the GraphQL API"), a rejected alternative, or a
-possibility under discussion produces **no edge**.
+A `requires_*` edge is justified only when the ADR mandates the dependency as its chosen
+direction. A passing mention, a hedged aspiration ("ideally over the GraphQL API"), or a
+possibility under discussion is NOT a mandate, even inside the Decision section: it
+produces no requires edge.
 
 The highest-risk over-trigger is a ROOT-PACKAGE subject carrying an EXTERNAL object. For
-that shape the Decision section must explicitly mandate the dependency (or the
-prohibition), and the object must be a name from the External packages list or an import
-path the tools actually showed. If you cannot point to mandate language in the Decision,
-emit no edge.
+that shape the Decision section must name the dependency as the chosen direction (not
+Context/Consequences, not a side remark), and the object must be a name from the External
+packages list or an import path the tools actually showed. If you cannot point to mandate
+language, emit no requires edge.
+
+The prohibition side is unchanged: a rejected alternative named in a prescriptive Decision
+still yields `prohibits_*` (see "Negative constraints from prescriptive decisions"), and a
+`prohibits_*` object MAY be a package the codebase does not import.
 
 ## Subject and object rules
 

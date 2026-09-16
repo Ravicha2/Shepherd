@@ -82,8 +82,10 @@ def test_prompt_carries_object_side_grounding_rule() -> None:
 
 @pytest.mark.parametrize("marker,phrases", [
     # Rule 1 (class-A evidence): root-package subject + external object needs
-    # mandate language in the Decision section; a passing mention emits no edge.
-    ("Mandate, not mention", ["Decision", "passing mention", "ROOT-PACKAGE subject"]),
+    # mandate language for a requires edge; a passing mention emits none, while
+    # the prohibition-from-rejected-alternative derivation is untouched.
+    ("Mandate, not mention", ["chosen direction", "hedged aspiration", "ROOT-PACKAGE subject",
+                              "rejected alternative", "prohibits_*"]),
     # Rule 2: inheritance observed in the graph is not itself a constraint.
     ("Structure is not mandate", ["structural facts", "not constraints the ADR imposes"]),
     # Rule 3 (recall-side): wildcard subjects anchor at the innermost package shown.
