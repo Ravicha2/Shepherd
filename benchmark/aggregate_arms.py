@@ -22,6 +22,22 @@ from pathlib import Path
 
 REPOS = ["python-tuf", "flowkit", "experimenter", "structurizr-python"]
 
+COST_FIELDS = ("parse_seconds", "resolve_seconds", "detect_seconds",
+               "prompt_tokens", "completion_tokens", "sessions")
+
+
+def _cost_means(runs: dict[int, dict]) -> dict[str, float]:
+    """#153: mean cost fields over an arm's runs (nan when no run carries a
+    field, so pre-instrument reports are tolerated); per_case_detect_seconds
+    flattens across runs to a per-case mean."""
+    means: dict[str, float] = {}
+    for cost_field in COST_FIELDS:
+        values = [run[cost_field] for run in runs.values() if cost_field in run]
+        means[cost_field] = sum(values) / len(values) if values else float("nan")
+    cases = [c for run in runs.values() for c in run.get("per_case_detect_seconds", [])]
+    means["per_case_detect_seconds"] = sum(cases) / len(cases) if cases else float("nan")
+    return means
+
 
 def _metrics(report: dict) -> dict[str, float]:
     ing, det = report["ingestion"], report["detection"]
@@ -39,16 +55,37 @@ def _metrics(report: dict) -> dict[str, float]:
     return flat
 
 
-def load_cells(report_dir: Path) -> dict:
+def load_cells(report_dir: Path) -> tuple[dict, dict]:
     cells: dict[str, dict[int, dict[str, dict[str, float]]]] = defaultdict(dict)
+    costs: dict[str, dict[str, dict[int, dict]]] = defaultdict(dict)
     for path in sorted(report_dir.glob("*_run*.json")):
         report = json.loads(path.read_text())
-        cells[report["repo_id"]].setdefault(report["arm"], {})[report["run_index"]] = _metrics(report)
-    return cells
+        repo, arm, run_index = report["repo_id"], report["arm"], report["run_index"]
+        cells[repo].setdefault(arm, {})[run_index] = _metrics(report)
+        costs[repo].setdefault(arm, {})[run_index] = report.get("cost", {})
+    return cells, costs
+
+
+def _print_cost_table(repo_costs: dict[str, dict[int, dict]]) -> None:
+    """#153 cost table per arm (mean over that arm's runs), alongside quality."""
+    if not any(any(runs.values()) for runs in repo_costs.values()):
+        return
+    print("\ncost (mean over that arm's runs):")
+    print("| arm | parse_s | resolve_s | detect_s | case_detect_s | prompt_tok | completion_tok | sessions |")
+    print("|---|---|---|---|---|---|---|---|")
+    for arm in ("node_on", "node_off"):
+        arm_costs = repo_costs.get(arm, {})
+        if not any(arm_costs.values()):
+            continue
+        means = _cost_means(arm_costs)
+        print(f"| {arm} | {means['parse_seconds']:.1f} | {means['resolve_seconds']:.1f} | "
+              f"{means['detect_seconds']:.1f} | {means['per_case_detect_seconds']:.2f} | "
+              f"{means['prompt_tokens']:.0f} | {means['completion_tokens']:.0f} | "
+              f"{means['sessions']:.1f} |")
 
 
 def aggregate(report_dir: Path) -> None:
-    cells = load_cells(report_dir)
+    cells, costs = load_cells(report_dir)
     print(f"# {report_dir}\n")
     for repo in REPOS:
         if repo not in cells:
@@ -64,6 +101,8 @@ def aggregate(report_dir: Path) -> None:
                     print("| arm run | " + " | ".join(header) + " |")
                     print("|---" * (len(header) + 1) + "|")
                 print(f"| {arm} {run_index} | " + " | ".join(str(row[m]) for m in header) + " |")
+
+        _print_cost_table(costs.get(repo, {}))
 
         on_runs = arms.get("node_on", {})
         off_runs = arms.get("node_off", {})

@@ -30,6 +30,7 @@ import json
 import os
 import subprocess
 import tempfile
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -218,6 +219,26 @@ def _empty_diff_result() -> DiffResult:
     return DiffResult(to_sha="baseline")
 
 
+def _cost_block(
+    trace_records: list[dict],
+    parse_seconds: float,
+    resolve_seconds: float,
+    detect_seconds: float,
+    case_reports: list[dict],
+) -> dict:
+    """#153 cost block: stage wall times + resolver token totals read back from
+    this cell's trace records (sessions = ADR sessions = trace records)."""
+    return {
+        "parse_seconds": round(parse_seconds, 3),
+        "resolve_seconds": round(resolve_seconds, 3),
+        "detect_seconds": round(detect_seconds, 3),
+        "per_case_detect_seconds": [round(case["detect_seconds"], 3) for case in case_reports],
+        "prompt_tokens": sum(r.get("usage", {}).get("prompt_tokens", 0) for r in trace_records),
+        "completion_tokens": sum(r.get("usage", {}).get("completion_tokens", 0) for r in trace_records),
+        "sessions": len(trace_records),
+    }
+
+
 # -- Cell runner (LLM; CLI-driven, one cell per invocation) --------------------
 
 
@@ -229,6 +250,7 @@ def _run_detection(instances: dict, repo_root: Path, all_edges: list) -> list[di
     seed = None  # pin-tree seed, built lazily (diff cases only)
     pin_baseline: list[dict] | None = None
     for case in instances["cases"]:
+        case_start = time.perf_counter()  # #153: wall time attributable to this case
         if case.get("type") == "historical" and "diff" not in case:
             with tempfile.TemporaryDirectory() as tmp:
                 worktree = Path(tmp) / "wt"
@@ -261,6 +283,7 @@ def _run_detection(instances: dict, repo_root: Path, all_edges: list) -> list[di
         case_reports.append({
             "case_id": case["case_id"],
             "type": case.get("type", ""),
+            "detect_seconds": time.perf_counter() - case_start,
             "per_unit": rows,
             "exact": sum(1 for r in rows if r["score"] == "exact_match"),
             "partial": sum(1 for r in rows if r["score"] == "partial_match"),
@@ -289,7 +312,9 @@ def _class_split_summary(per_constraint: list[dict], fp_edges: list[dict]) -> di
 def run_cell(repo_id: str, arm: str, run_index: int, report_dir: Path) -> dict:
     gold, instances = _load_gold(repo_id)
     repo_root = _repo_root(repo_id)
+    parse_start = time.perf_counter()  # #153: stage timing, parse = repo tree-sitter pass
     adg = parse_repo(repo_root)
+    parse_seconds = time.perf_counter() - parse_start
     roots = _repo_roots(adg)
 
     trace_dir_env = os.environ.get("RESOLVER_TRACE_DIR")
@@ -300,7 +325,9 @@ def run_cell(repo_id: str, arm: str, run_index: int, report_dir: Path) -> dict:
     # Ingestion side: the #140 instrument loop (arm surface, scoring, FP
     # itemization) with the benchmark gold as ground truth; resolved edges
     # come back on the result for the detection side.
+    resolve_start = time.perf_counter()  # #153: resolve = the LLM session loop
     result = run_eval(gold, adg, repo_id)
+    resolve_seconds = time.perf_counter() - resolve_start
 
     # Provenance join + class split (registered metric: fail loud, never silent).
     trace_records = [json.loads(line) for line in trace_path.read_text().splitlines() if line.strip()]
@@ -324,7 +351,9 @@ def run_cell(repo_id: str, arm: str, run_index: int, report_dir: Path) -> dict:
         entry["class"] = _class_of(entry["adr_id"], entry["subject"], entry["predicate"], entry["object"])
 
     all_edges = result.resolved_edges
+    detect_start = time.perf_counter()  # #153: detect = seed builds + per-case detection
     case_reports = _run_detection(instances, repo_root, all_edges)
+    detect_seconds = time.perf_counter() - detect_start
 
     report = {
         "repo_id": repo_id,
@@ -345,6 +374,7 @@ def run_cell(repo_id: str, arm: str, run_index: int, report_dir: Path) -> dict:
             "merge_mechanism": sum(len(c["fires"]["merge_mechanism"]) for c in case_reports),
             "arm_candidates": sum(len(c["fires"]["arm_candidates"]) for c in case_reports),
         },
+        "cost": _cost_block(trace_records, parse_seconds, resolve_seconds, detect_seconds, case_reports),
     }
     report_dir.mkdir(parents=True, exist_ok=True)
     write_report(report_dir / f"{repo_id.replace('-', '_')}_{arm}_run{run_index}.json", report)
@@ -454,6 +484,54 @@ def test_class_split_summary_buckets() -> None:
     }
 
 
+def test_cost_block_sums_usage_across_sessions() -> None:
+    """#153 cost block: token totals + session count come from the trace records
+    (a pre-instrument trace with no usage key must not crash the report), the
+    three stage timings pass through rounded, per-case timings as a list."""
+    records = [
+        {"adr_id": "ADR-1", "usage": {"prompt_tokens": 100, "completion_tokens": 50, "llm_calls": 3}},
+        {"adr_id": "ADR-2", "usage": {"prompt_tokens": 10, "completion_tokens": 5, "llm_calls": 1}},
+        {"adr_id": "ADR-3"},  # pre-#153 trace shape
+    ]
+    cases = [{"case_id": "c1", "detect_seconds": 1.23456}, {"case_id": "c2", "detect_seconds": 0.4}]
+    cost = _cost_block(records, 2.0, 100.567, 7.25, cases)
+    assert cost == {
+        "parse_seconds": 2.0,
+        "resolve_seconds": 100.567,
+        "detect_seconds": 7.25,
+        "per_case_detect_seconds": [1.235, 0.4],
+        "prompt_tokens": 110,
+        "completion_tokens": 55,
+        "sessions": 3,
+    }
+
+
+def test_aggregator_cost_means() -> None:
+    """#153 aggregator: cost fields mean over an arm's runs (runs without cost
+    data tolerated), per_case_detect_seconds flattens to a per-case mean."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("aggregate_arms", REPO_ROOT / "benchmark" / "aggregate_arms.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    means = module._cost_means({
+        1: {"parse_seconds": 2.0, "resolve_seconds": 100.0, "detect_seconds": 8.0,
+            "per_case_detect_seconds": [1.0, 3.0], "prompt_tokens": 1000,
+            "completion_tokens": 500, "sessions": 9},
+        2: {"parse_seconds": 4.0, "resolve_seconds": 200.0, "detect_seconds": 4.0,
+            "per_case_detect_seconds": [2.0, 2.0], "prompt_tokens": 2000,
+            "completion_tokens": 1500, "sessions": 10},
+        3: {},  # pre-#153 report: no cost block
+    })
+    assert means == {
+        "parse_seconds": 3.0, "resolve_seconds": 150.0, "detect_seconds": 6.0,
+        "per_case_detect_seconds": 2.0, "prompt_tokens": 1500.0,
+        "completion_tokens": 1000.0, "sessions": 9.5,
+    }
+    empty = module._cost_means({1: {}})
+    assert empty["parse_seconds"] != empty["parse_seconds"]  # nan when no run carries the field
+
+
 # -- CLI -----------------------------------------------------------------------
 
 
@@ -470,4 +548,7 @@ if __name__ == "__main__":
           f"ingestion e/p/m={ing['exact']}/{ing['partial']}/{ing['miss']} FP={ing['false_positives']} "
           f"class_split={ing['class_split']} | "
           f"detection e/p/m={det['exact']}/{det['partial']}/{det['miss']} "
-          f"fires struct/mech/arm={det['structural']}/{det['merge_mechanism']}/{det['arm_candidates']}")
+          f"fires struct/mech/arm={det['structural']}/{det['merge_mechanism']}/{det['arm_candidates']} | "
+          f"cost parse/resolve/detect={report['cost']['parse_seconds']}/{report['cost']['resolve_seconds']}/"
+          f"{report['cost']['detect_seconds']}s tokens p/c={report['cost']['prompt_tokens']}/"
+          f"{report['cost']['completion_tokens']} sessions={report['cost']['sessions']}")

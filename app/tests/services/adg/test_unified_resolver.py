@@ -356,6 +356,38 @@ class TestToolCalling:
         assert json.loads(tool_messages[0]["content"]) == list_children("app.api", sample_adg)
 
 
+# -- Test: cost instrument (#153) ---------------------------------------------
+
+class TestCostInstrument:
+    def test_usage_accumulates_and_trace_records_it(self, sample_adg: ADG, tmp_path) -> None:
+        """#153: prompt/completion tokens accumulate over every LLM call of the
+        session (main loop + best-effort), and the trace record carries usage +
+        wall_seconds alongside the #137 provenance fields."""
+        responses = [
+            _make_mock_response(tool_calls=[_tool_call("tc1", "list_children", {"fqn": "app.api"})]),
+            _make_mock_response(content="[]"),
+        ]
+        for response, prompt_tokens, completion_tokens in zip(responses, (100, 40), (10, 5)):
+            response.usage.prompt_tokens = prompt_tokens
+            response.usage.completion_tokens = completion_tokens
+        mock_client = MagicMock()
+        responses_iter = iter(responses)
+        mock_client.chat.completions.create.side_effect = lambda **kwargs: next(responses_iter)
+
+        with patch("services.adg.unified_resolver.OpenAI", return_value=mock_client), \
+             patch.dict("os.environ", {"TEST_API_KEY": "test-key",
+                                       "RESOLVER_TRACE_DIR": str(tmp_path)}):
+            edges = resolve_adr_constraints(
+                ADR_PROHIBIT_DEP, "ADR-001", "docs/adr/001.md", sample_adg,
+                _make_config(), _stub_backend,
+            )
+
+        assert edges == []
+        record = json.loads((tmp_path / "resolver_traces.jsonl").read_text().splitlines()[-1])
+        assert record["usage"] == {"prompt_tokens": 140, "completion_tokens": 15, "llm_calls": 2}
+        assert record["wall_seconds"] > 0
+
+
 # -- Test: wildcard fallback ------------------------------------------------
 
 class TestWildcardFallback:

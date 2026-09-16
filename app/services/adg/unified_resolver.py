@@ -12,6 +12,7 @@ import json
 import logging
 import os
 import re
+import time
 from dataclasses import dataclass, field
 
 from openai import OpenAI
@@ -177,6 +178,10 @@ class ResolutionTrace:
     hit_cap: bool = False
     parse_failed: bool = False
     pre_validation_edges: list[dict] = field(default_factory=list)
+    # #153 cost instrument, same change class as the #137 provenance: per-session
+    # totals {"prompt_tokens", "completion_tokens", "llm_calls"} and session wall time.
+    usage: dict = field(default_factory=dict)
+    wall_seconds: float = 0.0
 
 
 # #137 attribution instrument: the trace records what each tool call returned
@@ -564,6 +569,8 @@ def _log_trace(
         "pre_validation_edges": trace.pre_validation_edges,
         "hit_cap": trace.hit_cap,
         "parse_failed": trace.parse_failed,
+        "usage": trace.usage,
+        "wall_seconds": trace.wall_seconds,
         "tool_calls": trace.tool_calls,
     }
     with open(trace_path, "a") as f:
@@ -616,13 +623,30 @@ def resolve_adr_constraints(
     last_tool_signature: tuple[str, str] | None = None
     hit_cap = False
 
-    while tool_call_count < TOOL_CALL_CAP:
+    # #153 cost instrument: one choke point for every LLM call of the session,
+    # so usage accumulates on every exit path (main loop + best-effort).
+    session_start = time.perf_counter()
+    usage_totals = {"prompt_tokens": 0, "completion_tokens": 0, "llm_calls": 0}
+
+    def _complete(**kwargs):
         response = client.chat.completions.create(
-            model=config.model_id,
-            messages=messages,
-            tools=_TOOLS,
-            temperature=config.temperature,
+            model=config.model_id, temperature=config.temperature, **kwargs
         )
+        usage_totals["llm_calls"] += 1
+        usage = getattr(response, "usage", None)
+        if usage is not None:
+            for key in ("prompt_tokens", "completion_tokens"):
+                # isinstance guard: mocks/tests without a usage payload are skipped, not crashed
+                value = getattr(usage, key, None)
+                if isinstance(value, int):
+                    usage_totals[key] += value
+        return response
+
+    def _session_cost() -> dict:
+        return {"usage": dict(usage_totals), "wall_seconds": time.perf_counter() - session_start}
+
+    while tool_call_count < TOOL_CALL_CAP:
+        response = _complete(messages=messages, tools=_TOOLS)
         choice = response.choices[0]
         msg = choice.message
 
@@ -654,11 +678,11 @@ def resolve_adr_constraints(
                     dropped = [e for e in edges if e not in valid_edges]
                     log.warning("unified_resolver: dropped %d edges with nonexistent FQNs for %s", len(dropped), adr_id)
                 pre_val = [{"subject": e.subject, "object": e.object, "predicate": e.predicate.value, "valid": e in valid_edges} for e in edges]
-                trace = ResolutionTrace(tool_calls=tool_call_trace, hit_cap=False, parse_failed=False, pre_validation_edges=pre_val)
+                trace = ResolutionTrace(tool_calls=tool_call_trace, hit_cap=False, parse_failed=False, pre_validation_edges=pre_val, **_session_cost())
                 _log_trace(adr_id, adr_path, valid_edges, trace)
                 return valid_edges
             log.warning("unified_resolver: LLM returned empty response for %s", adr_id)
-            trace = ResolutionTrace(tool_calls=tool_call_trace, hit_cap=False, parse_failed=True)
+            trace = ResolutionTrace(tool_calls=tool_call_trace, hit_cap=False, parse_failed=True, **_session_cost())
             _log_trace(adr_id, adr_path, [], trace)
             return []
 
@@ -690,7 +714,7 @@ def resolve_adr_constraints(
         "content": "You have reached the tool call limit. Based on the graph context you have already gathered, provide your best-effort constraints now as a JSON array. Do not make any more tool calls.",
     })
     try:
-        response = client.chat.completions.create(model=config.model_id, messages=messages, temperature=config.temperature)
+        response = _complete(messages=messages)
         content = response.choices[0].message.content
         if content:
             # #135: per-edge wildcarding with self-loop guard, same as the
@@ -715,13 +739,13 @@ def resolve_adr_constraints(
                 dropped = [e for e in edges if e not in valid_edges]
                 log.warning("unified_resolver: dropped %d edges with nonexistent FQNs for %s", len(dropped), adr_id)
             pre_val = [{"subject": e.subject, "object": e.object, "predicate": e.predicate.value, "valid": e in valid_edges} for e in edges]
-            trace = ResolutionTrace(tool_calls=tool_call_trace, hit_cap=True, parse_failed=False, pre_validation_edges=pre_val)
+            trace = ResolutionTrace(tool_calls=tool_call_trace, hit_cap=True, parse_failed=False, pre_validation_edges=pre_val, **_session_cost())
             _log_trace(adr_id, adr_path, valid_edges, trace)
             return valid_edges
     except Exception:
         log.warning("unified_resolver: best-effort request failed for %s", adr_id)
 
-    trace = ResolutionTrace(tool_calls=tool_call_trace, hit_cap=hit_cap, parse_failed=True)
+    trace = ResolutionTrace(tool_calls=tool_call_trace, hit_cap=hit_cap, parse_failed=True, **_session_cost())
     _log_trace(adr_id, adr_path, [], trace)
     return []
 

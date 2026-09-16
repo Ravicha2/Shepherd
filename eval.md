@@ -472,6 +472,16 @@ Match tallies identical to the #134 baseline on every repo; the change is FP-onl
 
 **Comparability:** re-framed as a PILOT 2026-09-16 (metrics incomplete: no token/time; #149 comment 5688694516) — quality findings and the KEEP decision stand, but the baseline of record is the instrumented re-run after #153 (same frozen registration). #146's expected movement is still judged against these quality rows. Not comparable to any legacy eval-set ingestion row (different denominator, different gold).
 
+### 2026-09-16: issue #153 cost instrument (per-step tokens + wall time)
+
+**Change:** trace/report-only, no tallies moved (ADR 018-clean; same change class as the #137 provenance instrument). Resolver (`services/adg/unified_resolver.py`): every LLM call of a session funnels through one `_complete` choke point accumulating `response.usage` prompt/completion tokens (plus `llm_calls`); session wall time via `perf_counter`; trace records gain `usage` + `wall_seconds` (accumulation covers every exit path: main loop, empty response, hit-cap best-effort). Harness (`tests/services/adg/test_benchmark_arms_eval.py`): `perf_counter` around the parse / resolve / detect stages and around each case; cell reports gain a `cost` block `{parse_seconds, resolve_seconds, detect_seconds, per_case_detect_seconds, prompt_tokens, completion_tokens, sessions}` — token totals and sessions read back from this cell's trace records, so a pre-instrument trace (no usage key) is tolerated, not crashed. Aggregator (`benchmark/aggregate_arms.py`): cost table per repo x arm (mean over that arm's k runs, per-case seconds flattened to a per-case mean) printed alongside the quality tables; pre-#153 reports print no table. Zero-LLM verification: full suite 646 passed (+3 pins: trace usage accumulation, cost block sums, aggregator cost means; 643 before this change).
+
+**Numbers:** none — instrument only, no run this issue. The #149 pilot batch stays metric-incomplete as re-framed; the instrumented unoptimized re-run under the same frozen #149 registration becomes the baseline of record (quality AND cost). #146's shared re-baseline lands after this and carries cost for free.
+
+**Impact:** every later run (re-baselines, optimization arms) records per-step cost. Measurement split (ledger note per the issue): research-exp-setup records Pi-side cost only; CPT-side (`cpt violation list`) subprocess wall time/tokens get tracked there, cross-referenced from here — this repo's cost block covers the Shepherd-side stages (parse/resolve/detect), not the Pi baseline side. #155's parked latency arithmetic can read candidate counts plus per-case detect seconds from these blocks.
+
+**Comparability:** unchanged — no tallies moved, no prompt/tool surface touched, committed baselines stay where they are. Cost fields are additive; old cell reports aggregate without them.
+
 ## Curation mode
 
 
