@@ -77,6 +77,28 @@ def test_prompt_carries_object_side_grounding_rule() -> None:
     assert "external_import" in prompt
 
 
+# -- #146 precision prompt rules ------------------------------------------------
+
+
+@pytest.mark.parametrize("marker,phrases", [
+    # Rule 1 (class-A evidence): root-package subject + external object needs
+    # mandate language in the Decision section; a passing mention emits no edge.
+    ("Mandate, not mention", ["Decision", "passing mention", "ROOT-PACKAGE subject"]),
+    # Rule 2: inheritance observed in the graph is not itself a constraint.
+    ("Structure is not mandate", ["structural facts", "not constraints the ADR imposes"]),
+    # Rule 3 (recall-side): wildcard subjects anchor at the innermost package shown.
+    ("subject anchoring", ["innermost"]),
+])
+def test_prompt_carries_precision_rule(marker: str, phrases: list[str]) -> None:
+    """#146 rules land in the prompt: Rule 1 mandate-not-mention, Rule 2
+    structure-is-not-mandate, Rule 3 subject anchoring at the innermost
+    package the tools showed."""
+    prompt = unified_resolver._SYSTEM_PROMPT_TEMPLATE
+    assert marker in prompt
+    for phrase in phrases:
+        assert phrase in prompt, phrase
+
+
 def test_search_backend_branch_selects_the_stub_only_when_flagged(monkeypatch) -> None:
     monkeypatch.setenv("ABLATION_SEARCH_OFF", "1")
     assert harness._select_search_backend("repo_root_unused", "adg_unused") is harness._empty_search_backend

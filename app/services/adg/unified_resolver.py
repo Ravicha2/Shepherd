@@ -251,10 +251,29 @@ name only with no dotted import path under it, the bare name is the correct obje
 
 The codebase's root package(s): {root_packages}. Every internal FQN starts with one of these.
 
+## Mandate, not mention
+
+An edge is justified only when the ADR's **Decision** section mandates it. Text in
+Context, Considered Options, or Consequences that merely mentions a technology is NOT a
+mandate: a passing mention ("ideally over the GraphQL API"), a rejected alternative, or a
+possibility under discussion produces **no edge**.
+
+The highest-risk over-trigger is a ROOT-PACKAGE subject carrying an EXTERNAL object. For
+that shape the Decision section must explicitly mandate the dependency (or the
+prohibition), and the object must be a name from the External packages list or an import
+path the tools actually showed. If you cannot point to mandate language in the Decision,
+emit no edge.
+
 ## Subject and object rules
 
 - subject: MUST be an internal FQN pattern grounded in tool results (or the root package
   itself). If you cannot map the ADR's subject concept to a real FQN, return an empty array.
+- subject anchoring: when you emit a wildcard subject, anchor it at the **innermost
+  package the tools actually showed for the ADR's concept**, not at the outer directory
+  package. On a nested layout (`flowapi/flowapi/...`, `src/structurizr/api/...`) the root
+  package is the wrapper directory, not the governed layer: `src.*` is over-broad where
+  the tools showed `src.structurizr.api.*`. Prefer the most specific package the tool
+  results support, the subject-side analog of the object-grounding rule.
 - Policy, tooling, and whole-codebase constraints (linters, formatters, test runners, build
   tooling, language versions, frameworks) take the ROOT PACKAGE as subject. NEVER use
   file-entry-point modules (`manage`, `noxfile`, `setup`, `conftest`) as subjects, even
@@ -338,6 +357,16 @@ Process/location ADRs ("develop in subdirectory X", "move code to Y") usually pr
 Example: ADR says "Repository library built on top of Metadata API", Repository is a "minimal abstraction" with "example implementations".
 - WRONG: `requires_implementation tuf.repository.* -> tuf.repository._repository.Repository` (Repository IS the abstraction, not a base everyone subclasses; examples are optional)
 - RIGHT: `requires_dependency tuf.repository.* -> tuf.api.metadata.*` ("built on top of" = depends on)
+
+## Structure is not mandate
+
+Inheritance and containment you observe in the graph are **structural facts about today's
+code, not constraints the ADR imposes**. That every payload class happens to extend a
+shared base (`Signed`, `Metadata`) does not make "all payload classes must extend it" a
+mandate: the ADR must say so. Emit a `requires_implementation` / `prohibits_implementation`
+edge only when the ADR's Decision mandates the inheritance or its absence; a class
+hierarchy the graph tools surface is evidence of where a concept lives, never a rule in
+itself. If the ADR only describes a representation choice, emit no edge.
 
 ## Output format
 
