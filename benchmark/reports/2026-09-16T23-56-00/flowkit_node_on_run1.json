@@ -1,0 +1,2880 @@
+{
+  "_meta": {
+    "generated_at": "2026-09-16T23-59-00",
+    "git_commit": "edfa8ba",
+    "arm": "baseline",
+    "semble_version": "0.5.6",
+    "semble_model": "minishlab/potion-code-16M-v2",
+    "resolver_model": "google/gemini-3.1-flash-lite"
+  },
+  "repo_id": "flowkit",
+  "arm": "node_on",
+  "run_index": 1,
+  "pin_commit": "24d88247d57987fe33f6b8915540d7bf09b58033",
+  "ingestion": {
+    "exact": 0,
+    "partial": 4,
+    "miss": 2,
+    "total": 6,
+    "false_positives": 45,
+    "false_positive_edges": [
+      {
+        "adr_id": "ADR-0001",
+        "subject": "docs.*",
+        "predicate": "prohibits_dependency",
+        "object": "pip",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0001",
+        "subject": "flowapi.*",
+        "predicate": "prohibits_dependency",
+        "object": "pip",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0001",
+        "subject": "flowauth.*",
+        "predicate": "prohibits_dependency",
+        "object": "pip",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0001",
+        "subject": "flowclient.*",
+        "predicate": "prohibits_dependency",
+        "object": "pip",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0001",
+        "subject": "flowdb.*",
+        "predicate": "prohibits_dependency",
+        "object": "pip",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0001",
+        "subject": "flowetl.*",
+        "predicate": "prohibits_dependency",
+        "object": "pip",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0001",
+        "subject": "flowkit_jwt_generator.*",
+        "predicate": "prohibits_dependency",
+        "object": "pip",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0001",
+        "subject": "flowmachine.*",
+        "predicate": "prohibits_dependency",
+        "object": "pip",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0001",
+        "subject": "docs.*",
+        "predicate": "prohibits_dependency",
+        "object": "conda",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0001",
+        "subject": "flowapi.*",
+        "predicate": "prohibits_dependency",
+        "object": "conda",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0001",
+        "subject": "flowauth.*",
+        "predicate": "prohibits_dependency",
+        "object": "conda",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0001",
+        "subject": "flowclient.*",
+        "predicate": "prohibits_dependency",
+        "object": "conda",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0001",
+        "subject": "flowdb.*",
+        "predicate": "prohibits_dependency",
+        "object": "conda",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0001",
+        "subject": "flowetl.*",
+        "predicate": "prohibits_dependency",
+        "object": "conda",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0001",
+        "subject": "flowkit_jwt_generator.*",
+        "predicate": "prohibits_dependency",
+        "object": "conda",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0001",
+        "subject": "flowmachine.*",
+        "predicate": "prohibits_dependency",
+        "object": "conda",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0002",
+        "subject": "docs.*",
+        "predicate": "requires_dependency",
+        "object": "pytest",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0002",
+        "subject": "flowapi.*",
+        "predicate": "requires_dependency",
+        "object": "pytest",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0002",
+        "subject": "flowauth.*",
+        "predicate": "requires_dependency",
+        "object": "pytest",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0002",
+        "subject": "flowclient.*",
+        "predicate": "requires_dependency",
+        "object": "pytest",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0002",
+        "subject": "flowdb.*",
+        "predicate": "requires_dependency",
+        "object": "pytest",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0002",
+        "subject": "flowetl.*",
+        "predicate": "requires_dependency",
+        "object": "pytest",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0002",
+        "subject": "flowkit_jwt_generator.*",
+        "predicate": "requires_dependency",
+        "object": "pytest",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0002",
+        "subject": "flowmachine.*",
+        "predicate": "requires_dependency",
+        "object": "pytest",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0002",
+        "subject": "docs.*",
+        "predicate": "prohibits_dependency",
+        "object": "nose",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0002",
+        "subject": "flowapi.*",
+        "predicate": "prohibits_dependency",
+        "object": "nose",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0002",
+        "subject": "flowauth.*",
+        "predicate": "prohibits_dependency",
+        "object": "nose",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0002",
+        "subject": "flowclient.*",
+        "predicate": "prohibits_dependency",
+        "object": "nose",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0002",
+        "subject": "flowdb.*",
+        "predicate": "prohibits_dependency",
+        "object": "nose",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0002",
+        "subject": "flowetl.*",
+        "predicate": "prohibits_dependency",
+        "object": "nose",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0002",
+        "subject": "flowkit_jwt_generator.*",
+        "predicate": "prohibits_dependency",
+        "object": "nose",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0002",
+        "subject": "flowmachine.*",
+        "predicate": "prohibits_dependency",
+        "object": "nose",
+        "class": "A"
+      },
+      {
+        "adr_id": "ADR-0003",
+        "subject": "flowapi.*",
+        "predicate": "requires_dependency",
+        "object": "flowmachine.*",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0004",
+        "subject": "flowapi.*",
+        "predicate": "prohibits_dependency",
+        "object": "flask",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0007",
+        "subject": "docs.*",
+        "predicate": "requires_dependency",
+        "object": "mapboxgl",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0007",
+        "subject": "docs.*",
+        "predicate": "prohibits_dependency",
+        "object": "folium",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0007",
+        "subject": "docs.*",
+        "predicate": "prohibits_dependency",
+        "object": "geoviews",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0008",
+        "subject": "flowmachine.*",
+        "predicate": "requires_dependency",
+        "object": "papermill",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0008",
+        "subject": "flowmachine.*",
+        "predicate": "requires_dependency",
+        "object": "scrapbook",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0009",
+        "subject": "flowmachine.*",
+        "predicate": "requires_dependency",
+        "object": "nbconvert",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0010",
+        "subject": "flowetl.*",
+        "predicate": "requires_dependency",
+        "object": "prefect",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0010",
+        "subject": "flowetl.*",
+        "predicate": "prohibits_dependency",
+        "object": "airflow",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0011",
+        "subject": "flowmachine.flowmachine.features.location.labelled_spatial_aggregate.LabelledSpatialAggregate",
+        "predicate": "requires_implementation",
+        "object": "flowmachine.flowmachine.features.location.redacted_labelled_spatial_aggregate.RedactedLabelledSpatialAggregate",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0012",
+        "subject": "flowauth.backend.flowauth.*",
+        "predicate": "requires_implementation",
+        "object": "flowauth.backend.flowauth.models.Role",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0012",
+        "subject": "flowauth.backend.flowauth.*",
+        "predicate": "prohibits_implementation",
+        "object": "flowauth.backend.flowauth.models.Scope",
+        "class": "B/C"
+      }
+    ],
+    "credited_fragments": [],
+    "excluded_tooling_edges": [],
+    "accuracy": 0.3333,
+    "per_constraint": [
+      {
+        "adr_id": "ADR-0003",
+        "expected": {
+          "subject": "flowclient.flowclient.*",
+          "predicate": "prohibits_dependency",
+          "object": "flowmachine",
+          "justification": "ADR-0003: clients reach the single query library only through the language neutral HTTP API; a direct flowclient -> flowmachine import bypasses the single access point"
+        },
+        "score": "miss",
+        "resolved_subject": null,
+        "resolved_object": null
+      },
+      {
+        "adr_id": "ADR-0003",
+        "expected": {
+          "subject": "flowapi.flowapi.*",
+          "predicate": "prohibits_dependency",
+          "object": "flowmachine",
+          "justification": "ADR-0003 Decision: 'FlowMachine will be wrapped by an HTTP API.' The wrapper layer must not import the wrapped library directly; they communicate over zmq per ADR-0005"
+        },
+        "score": "miss",
+        "resolved_subject": null,
+        "resolved_object": null
+      },
+      {
+        "adr_id": "ADR-0004",
+        "expected": {
+          "subject": "flowapi.flowapi.*",
+          "predicate": "requires_dependency",
+          "object": "quart",
+          "justification": "ADR-0004 Decision: 'The FlowKit API will make use of the Quart framework.' \u2014 the API layer is built on Quart"
+        },
+        "score": "partial_match",
+        "resolved_subject": "flowapi.*",
+        "resolved_object": "quart",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0005",
+        "expected": {
+          "subject": "flowapi.flowapi.*",
+          "predicate": "requires_dependency",
+          "object": "zmq",
+          "justification": "ADR-0005 Decision: 'API-backend communication will be via zeromq' \u2014 the API side of the IPC channel depends on zeromq"
+        },
+        "score": "partial_match",
+        "resolved_subject": "flowapi.*",
+        "resolved_object": "zmq",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0005",
+        "expected": {
+          "subject": "flowmachine.flowmachine.core.*",
+          "predicate": "requires_dependency",
+          "object": "redis",
+          "justification": "ADR-0005 Decision: 'IPC in the backend will be mediated by redis' \u2014 backend IPC/state code depends on redis"
+        },
+        "score": "partial_match",
+        "resolved_subject": "flowmachine.*",
+        "resolved_object": "redis",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0006",
+        "expected": {
+          "subject": "flowapi.flowapi.*",
+          "predicate": "requires_dependency",
+          "object": "quart_jwt_extended",
+          "justification": "ADR-0006 Decision: 'API authentication and access control will use JWTs.' \u2014 the API's auth/access-control surface depends on the JWT machinery (quart_jwt_extended)"
+        },
+        "score": "partial_match",
+        "resolved_subject": "flowapi.*",
+        "resolved_object": "quart_jwt_extended",
+        "class": "B/C"
+      }
+    ],
+    "class_split": {
+      "B/C": {
+        "matched": 4,
+        "false_positive_edges": 25
+      },
+      "A": {
+        "matched": 0,
+        "false_positive_edges": 20
+      }
+    }
+  },
+  "detection": {
+    "cases": [
+      {
+        "case_id": "flowkit-client-direct-flowmachine",
+        "type": "injected",
+        "detect_seconds": 8.86305979208555,
+        "per_unit": [
+          {
+            "expected_fqn": "flowclient.flowclient.legacy_query",
+            "score": "miss",
+            "subject": "flowclient.flowclient.*",
+            "object": "flowmachine",
+            "pattern_score": "miss"
+          }
+        ],
+        "exact": 0,
+        "partial": 0,
+        "miss": 1,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 1,
+        "total": 1,
+        "diagnostics": {
+          "expected_triples": 266699,
+          "actual_triples": 310,
+          "overlap": 0,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.operators.analyze_operator",
+              "changed_fqn": "flowetl.flowetl.flowetl.operators.analyze_operator.AnalyzeOperator",
+              "evidence": "flowetl.flowetl.flowetl.operators.analyze_operator has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin",
+              "changed_fqn": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin.WrappingSQLMixin",
+              "evidence": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.deployment_example.mounts.dags.calls",
+              "changed_fqn": "flowetl.deployment_example.mounts.dags.calls",
+              "evidence": "flowetl.deployment_example.mounts.dags.calls has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.util",
+              "changed_fqn": "flowetl.flowetl.flowetl.util.create_dag",
+              "evidence": "flowetl.flowetl.flowetl.util has dependency path to airflow via IMPORTS airflow.models.dag",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.mounts.dags.remote_table_dag",
+              "changed_fqn": "flowetl.mounts.dags",
+              "evidence": "flowetl.mounts.dags.remote_table_dag has dependency path to airflow via CONTAINS flowetl.mounts.dags.remote_table_dag -> IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.deployment_example.mounts.dags.sms",
+              "changed_fqn": "flowetl.deployment_example.mounts.dags.sms",
+              "evidence": "flowetl.deployment_example.mounts.dags.sms has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator",
+              "changed_fqn": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator",
+              "evidence": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.sensors.file_flux_sensor",
+              "changed_fqn": "flowetl.flowetl.flowetl.sensors",
+              "evidence": "flowetl.flowetl.flowetl.sensors.file_flux_sensor has dependency path to airflow via CONTAINS flowetl.flowetl.flowetl.sensors.file_flux_sensor -> IMPORTS airflow.sensors.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.mounts.dags.filesystem_dag",
+              "changed_fqn": "flowetl.mounts.dags.filesystem_dag",
+              "evidence": "flowetl.mounts.dags.filesystem_dag has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.roles",
+              "changed_fqn": "flowauth.backend.flowauth.roles.edit_role",
+              "evidence": "flowauth.backend.flowauth.roles implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.cli",
+              "changed_fqn": "flowauth.backend.flowauth.cli.demo_data",
+              "evidence": "flowauth.backend.flowauth.cli implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.make_demodata -> CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.main",
+              "changed_fqn": "flowauth.backend.flowauth.main.create_app",
+              "evidence": "flowauth.backend.flowauth.main implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.make_demodata -> CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.servers",
+              "changed_fqn": "flowauth.backend.flowauth.servers.add_server",
+              "evidence": "flowauth.backend.flowauth.servers implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.models",
+              "changed_fqn": "flowauth.backend.flowauth.models",
+              "evidence": "flowauth.backend.flowauth.models implements flowauth.backend.flowauth.models.Scope via CONTAINS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "flowkit-flowapi-direct-flowmachine",
+        "type": "injected",
+        "detect_seconds": 2.2338139170315117,
+        "per_unit": [
+          {
+            "expected_fqn": "flowapi.flowapi.legacy_backend",
+            "score": "miss",
+            "subject": "flowapi.flowapi.*",
+            "object": "flowmachine",
+            "pattern_score": "miss"
+          },
+          {
+            "expected_fqn": "flowapi.flowapi.legacy_backend.run_query_locally",
+            "score": "exact_match",
+            "subject": "flowapi.flowapi.*",
+            "object": "quart",
+            "pattern_score": "miss"
+          },
+          {
+            "expected_fqn": "flowapi.flowapi.legacy_backend.run_query_locally",
+            "score": "exact_match",
+            "subject": "flowapi.flowapi.*",
+            "object": "zmq",
+            "pattern_score": "miss"
+          },
+          {
+            "expected_fqn": "flowapi.flowapi.legacy_backend.run_query_locally",
+            "score": "exact_match",
+            "subject": "flowapi.flowapi.*",
+            "object": "quart_jwt_extended",
+            "pattern_score": "miss"
+          }
+        ],
+        "exact": 3,
+        "partial": 0,
+        "miss": 1,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 4,
+        "total": 4,
+        "diagnostics": {
+          "expected_triples": 182400,
+          "actual_triples": 264310,
+          "overlap": 342,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.operators.analyze_operator",
+              "changed_fqn": "flowetl.flowetl.flowetl.operators.analyze_operator.AnalyzeOperator",
+              "evidence": "flowetl.flowetl.flowetl.operators.analyze_operator has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin",
+              "changed_fqn": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin.WrappingSQLMixin",
+              "evidence": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.deployment_example.mounts.dags.calls",
+              "changed_fqn": "flowetl.deployment_example.mounts.dags.calls",
+              "evidence": "flowetl.deployment_example.mounts.dags.calls has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.util",
+              "changed_fqn": "flowetl.flowetl.flowetl.util.create_dag",
+              "evidence": "flowetl.flowetl.flowetl.util has dependency path to airflow via IMPORTS airflow.models.dag",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.mounts.dags.remote_table_dag",
+              "changed_fqn": "flowetl.mounts.dags",
+              "evidence": "flowetl.mounts.dags.remote_table_dag has dependency path to airflow via CONTAINS flowetl.mounts.dags.remote_table_dag -> IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.deployment_example.mounts.dags.sms",
+              "changed_fqn": "flowetl.deployment_example.mounts.dags.sms",
+              "evidence": "flowetl.deployment_example.mounts.dags.sms has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator",
+              "changed_fqn": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator",
+              "evidence": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.sensors.file_flux_sensor",
+              "changed_fqn": "flowetl.flowetl.flowetl.sensors",
+              "evidence": "flowetl.flowetl.flowetl.sensors.file_flux_sensor has dependency path to airflow via CONTAINS flowetl.flowetl.flowetl.sensors.file_flux_sensor -> IMPORTS airflow.sensors.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.mounts.dags.filesystem_dag",
+              "changed_fqn": "flowetl.mounts.dags.filesystem_dag",
+              "evidence": "flowetl.mounts.dags.filesystem_dag has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.roles",
+              "changed_fqn": "flowauth.backend.flowauth.roles.edit_role",
+              "evidence": "flowauth.backend.flowauth.roles implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.cli",
+              "changed_fqn": "flowauth.backend.flowauth.cli.demo_data",
+              "evidence": "flowauth.backend.flowauth.cli implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.make_demodata -> CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.main",
+              "changed_fqn": "flowauth.backend.flowauth.main.create_app",
+              "evidence": "flowauth.backend.flowauth.main implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.make_demodata -> CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.servers",
+              "changed_fqn": "flowauth.backend.flowauth.servers.add_server",
+              "evidence": "flowauth.backend.flowauth.servers implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.models",
+              "changed_fqn": "flowauth.backend.flowauth.models",
+              "evidence": "flowauth.backend.flowauth.models implements flowauth.backend.flowauth.models.Scope via CONTAINS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "requires_dependency",
+              "subject": "flowapi.*",
+              "object": "flowmachine.*",
+              "matched_fqn": "flowapi.flowapi.legacy_backend.run_query_locally",
+              "changed_fqn": "flowapi.flowapi.legacy_backend.run_query_locally",
+              "evidence": "flowapi.flowapi.legacy_backend.run_query_locally has no dependency on any module matching flowmachine.*",
+              "change_type": "added"
+            }
+          ],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "flowkit-flowapi-endpoint-without-jwt",
+        "type": "injected",
+        "detect_seconds": 1.2456262080231681,
+        "per_unit": [
+          {
+            "expected_fqn": "flowapi.flowapi.legacy_endpoints.run_legacy_query",
+            "score": "exact_match",
+            "subject": "flowapi.flowapi.*",
+            "object": "quart_jwt_extended",
+            "pattern_score": "miss"
+          },
+          {
+            "expected_fqn": "flowapi.flowapi.legacy_endpoints.run_legacy_query",
+            "score": "exact_match",
+            "subject": "flowapi.flowapi.*",
+            "object": "zmq",
+            "pattern_score": "miss"
+          }
+        ],
+        "exact": 2,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 2,
+        "total": 2,
+        "diagnostics": {
+          "expected_triples": 228,
+          "actual_triples": 264145,
+          "overlap": 228,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.operators.analyze_operator",
+              "changed_fqn": "flowetl.flowetl.flowetl.operators.analyze_operator.AnalyzeOperator",
+              "evidence": "flowetl.flowetl.flowetl.operators.analyze_operator has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin",
+              "changed_fqn": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin.WrappingSQLMixin",
+              "evidence": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.deployment_example.mounts.dags.calls",
+              "changed_fqn": "flowetl.deployment_example.mounts.dags.calls",
+              "evidence": "flowetl.deployment_example.mounts.dags.calls has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.util",
+              "changed_fqn": "flowetl.flowetl.flowetl.util.create_dag",
+              "evidence": "flowetl.flowetl.flowetl.util has dependency path to airflow via IMPORTS airflow.models.dag",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.mounts.dags.remote_table_dag",
+              "changed_fqn": "flowetl.mounts.dags",
+              "evidence": "flowetl.mounts.dags.remote_table_dag has dependency path to airflow via CONTAINS flowetl.mounts.dags.remote_table_dag -> IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.deployment_example.mounts.dags.sms",
+              "changed_fqn": "flowetl.deployment_example.mounts.dags.sms",
+              "evidence": "flowetl.deployment_example.mounts.dags.sms has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator",
+              "changed_fqn": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator",
+              "evidence": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.sensors.file_flux_sensor",
+              "changed_fqn": "flowetl.flowetl.flowetl.sensors",
+              "evidence": "flowetl.flowetl.flowetl.sensors.file_flux_sensor has dependency path to airflow via CONTAINS flowetl.flowetl.flowetl.sensors.file_flux_sensor -> IMPORTS airflow.sensors.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.mounts.dags.filesystem_dag",
+              "changed_fqn": "flowetl.mounts.dags.filesystem_dag",
+              "evidence": "flowetl.mounts.dags.filesystem_dag has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.roles",
+              "changed_fqn": "flowauth.backend.flowauth.roles.edit_role",
+              "evidence": "flowauth.backend.flowauth.roles implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.cli",
+              "changed_fqn": "flowauth.backend.flowauth.cli.demo_data",
+              "evidence": "flowauth.backend.flowauth.cli implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.make_demodata -> CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.main",
+              "changed_fqn": "flowauth.backend.flowauth.main.create_app",
+              "evidence": "flowauth.backend.flowauth.main implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.make_demodata -> CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.servers",
+              "changed_fqn": "flowauth.backend.flowauth.servers.add_server",
+              "evidence": "flowauth.backend.flowauth.servers implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.models",
+              "changed_fqn": "flowauth.backend.flowauth.models",
+              "evidence": "flowauth.backend.flowauth.models implements flowauth.backend.flowauth.models.Scope via CONTAINS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "requires_dependency",
+              "subject": "flowapi.*",
+              "object": "flowmachine.*",
+              "matched_fqn": "flowapi.flowapi.legacy_endpoints.run_legacy_query",
+              "changed_fqn": "flowapi.flowapi.legacy_endpoints.run_legacy_query",
+              "evidence": "flowapi.flowapi.legacy_endpoints.run_legacy_query has no dependency on any module matching flowmachine.*",
+              "change_type": "added"
+            }
+          ],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "flowkit-flowmachine-core-without-redis",
+        "type": "injected",
+        "detect_seconds": 1.10603112494573,
+        "per_unit": [
+          {
+            "expected_fqn": "flowmachine.flowmachine.core.in_memory_state.InMemoryQueryState",
+            "score": "exact_match",
+            "subject": "flowmachine.flowmachine.core.*",
+            "object": "redis",
+            "pattern_score": "miss"
+          }
+        ],
+        "exact": 1,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 1,
+        "total": 1,
+        "diagnostics": {
+          "expected_triples": 809,
+          "actual_triples": 6698,
+          "overlap": 809,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.operators.analyze_operator",
+              "changed_fqn": "flowetl.flowetl.flowetl.operators.analyze_operator.AnalyzeOperator",
+              "evidence": "flowetl.flowetl.flowetl.operators.analyze_operator has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin",
+              "changed_fqn": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin.WrappingSQLMixin",
+              "evidence": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.deployment_example.mounts.dags.calls",
+              "changed_fqn": "flowetl.deployment_example.mounts.dags.calls",
+              "evidence": "flowetl.deployment_example.mounts.dags.calls has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.util",
+              "changed_fqn": "flowetl.flowetl.flowetl.util.create_dag",
+              "evidence": "flowetl.flowetl.flowetl.util has dependency path to airflow via IMPORTS airflow.models.dag",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.mounts.dags.remote_table_dag",
+              "changed_fqn": "flowetl.mounts.dags",
+              "evidence": "flowetl.mounts.dags.remote_table_dag has dependency path to airflow via CONTAINS flowetl.mounts.dags.remote_table_dag -> IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.deployment_example.mounts.dags.sms",
+              "changed_fqn": "flowetl.deployment_example.mounts.dags.sms",
+              "evidence": "flowetl.deployment_example.mounts.dags.sms has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator",
+              "changed_fqn": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator",
+              "evidence": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.sensors.file_flux_sensor",
+              "changed_fqn": "flowetl.flowetl.flowetl.sensors",
+              "evidence": "flowetl.flowetl.flowetl.sensors.file_flux_sensor has dependency path to airflow via CONTAINS flowetl.flowetl.flowetl.sensors.file_flux_sensor -> IMPORTS airflow.sensors.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.mounts.dags.filesystem_dag",
+              "changed_fqn": "flowetl.mounts.dags.filesystem_dag",
+              "evidence": "flowetl.mounts.dags.filesystem_dag has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.roles",
+              "changed_fqn": "flowauth.backend.flowauth.roles.edit_role",
+              "evidence": "flowauth.backend.flowauth.roles implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.cli",
+              "changed_fqn": "flowauth.backend.flowauth.cli.demo_data",
+              "evidence": "flowauth.backend.flowauth.cli implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.make_demodata -> CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.main",
+              "changed_fqn": "flowauth.backend.flowauth.main.create_app",
+              "evidence": "flowauth.backend.flowauth.main implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.make_demodata -> CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.servers",
+              "changed_fqn": "flowauth.backend.flowauth.servers.add_server",
+              "evidence": "flowauth.backend.flowauth.servers implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.models",
+              "changed_fqn": "flowauth.backend.flowauth.models",
+              "evidence": "flowauth.backend.flowauth.models implements flowauth.backend.flowauth.models.Scope via CONTAINS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0008",
+              "predicate": "requires_dependency",
+              "subject": "flowmachine.*",
+              "object": "papermill",
+              "matched_fqn": "flowmachine.flowmachine.core.in_memory_state.InMemoryQueryState",
+              "changed_fqn": "flowmachine.flowmachine.core.in_memory_state.InMemoryQueryState",
+              "evidence": "flowmachine.flowmachine.core.in_memory_state.InMemoryQueryState has no dependency on any module matching papermill",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0008",
+              "predicate": "requires_dependency",
+              "subject": "flowmachine.*",
+              "object": "scrapbook",
+              "matched_fqn": "flowmachine.flowmachine.core.in_memory_state.InMemoryQueryState",
+              "changed_fqn": "flowmachine.flowmachine.core.in_memory_state.InMemoryQueryState",
+              "evidence": "flowmachine.flowmachine.core.in_memory_state.InMemoryQueryState has no dependency on any module matching scrapbook",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0009",
+              "predicate": "requires_dependency",
+              "subject": "flowmachine.*",
+              "object": "nbconvert",
+              "matched_fqn": "flowmachine.flowmachine.core.in_memory_state.InMemoryQueryState",
+              "changed_fqn": "flowmachine.flowmachine.core.in_memory_state.InMemoryQueryState",
+              "evidence": "flowmachine.flowmachine.core.in_memory_state.InMemoryQueryState has no dependency on any module matching nbconvert",
+              "change_type": "added"
+            }
+          ],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "flowkit-transitive-flowapi-via-flowclient",
+        "type": "injected",
+        "detect_seconds": 1.0881492081098258,
+        "per_unit": [
+          {
+            "expected_fqn": "flowapi.flowapi.client_proxy",
+            "score": "miss",
+            "subject": "flowapi.flowapi.*",
+            "object": "flowmachine",
+            "pattern_score": "miss"
+          },
+          {
+            "expected_fqn": "flowapi.flowapi.client_proxy.submit_query_via_client",
+            "score": "exact_match",
+            "subject": "flowapi.flowapi.*",
+            "object": "quart",
+            "pattern_score": "miss"
+          },
+          {
+            "expected_fqn": "flowapi.flowapi.client_proxy.submit_query_via_client",
+            "score": "exact_match",
+            "subject": "flowapi.flowapi.*",
+            "object": "zmq",
+            "pattern_score": "miss"
+          },
+          {
+            "expected_fqn": "flowapi.flowapi.client_proxy.submit_query_via_client",
+            "score": "exact_match",
+            "subject": "flowapi.flowapi.*",
+            "object": "quart_jwt_extended",
+            "pattern_score": "miss"
+          }
+        ],
+        "exact": 3,
+        "partial": 0,
+        "miss": 1,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 4,
+        "total": 4,
+        "diagnostics": {
+          "expected_triples": 182400,
+          "actual_triples": 805,
+          "overlap": 342,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.operators.analyze_operator",
+              "changed_fqn": "flowetl.flowetl.flowetl.operators.analyze_operator.AnalyzeOperator",
+              "evidence": "flowetl.flowetl.flowetl.operators.analyze_operator has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin",
+              "changed_fqn": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin.WrappingSQLMixin",
+              "evidence": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.deployment_example.mounts.dags.calls",
+              "changed_fqn": "flowetl.deployment_example.mounts.dags.calls",
+              "evidence": "flowetl.deployment_example.mounts.dags.calls has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.util",
+              "changed_fqn": "flowetl.flowetl.flowetl.util.create_dag",
+              "evidence": "flowetl.flowetl.flowetl.util has dependency path to airflow via IMPORTS airflow.models.dag",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.mounts.dags.remote_table_dag",
+              "changed_fqn": "flowetl.mounts.dags",
+              "evidence": "flowetl.mounts.dags.remote_table_dag has dependency path to airflow via CONTAINS flowetl.mounts.dags.remote_table_dag -> IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.deployment_example.mounts.dags.sms",
+              "changed_fqn": "flowetl.deployment_example.mounts.dags.sms",
+              "evidence": "flowetl.deployment_example.mounts.dags.sms has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator",
+              "changed_fqn": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator",
+              "evidence": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.sensors.file_flux_sensor",
+              "changed_fqn": "flowetl.flowetl.flowetl.sensors",
+              "evidence": "flowetl.flowetl.flowetl.sensors.file_flux_sensor has dependency path to airflow via CONTAINS flowetl.flowetl.flowetl.sensors.file_flux_sensor -> IMPORTS airflow.sensors.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.mounts.dags.filesystem_dag",
+              "changed_fqn": "flowetl.mounts.dags.filesystem_dag",
+              "evidence": "flowetl.mounts.dags.filesystem_dag has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.roles",
+              "changed_fqn": "flowauth.backend.flowauth.roles.edit_role",
+              "evidence": "flowauth.backend.flowauth.roles implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.cli",
+              "changed_fqn": "flowauth.backend.flowauth.cli.demo_data",
+              "evidence": "flowauth.backend.flowauth.cli implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.make_demodata -> CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.main",
+              "changed_fqn": "flowauth.backend.flowauth.main.create_app",
+              "evidence": "flowauth.backend.flowauth.main implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.make_demodata -> CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.servers",
+              "changed_fqn": "flowauth.backend.flowauth.servers.add_server",
+              "evidence": "flowauth.backend.flowauth.servers implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.models",
+              "changed_fqn": "flowauth.backend.flowauth.models",
+              "evidence": "flowauth.backend.flowauth.models implements flowauth.backend.flowauth.models.Scope via CONTAINS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "flowkit-probe-client-httpx-only",
+        "type": "compliant_probe",
+        "detect_seconds": 0.993020833004266,
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 0,
+        "diagnostics": {
+          "expected_triples": 0,
+          "actual_triples": 310,
+          "overlap": 0,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.operators.analyze_operator",
+              "changed_fqn": "flowetl.flowetl.flowetl.operators.analyze_operator.AnalyzeOperator",
+              "evidence": "flowetl.flowetl.flowetl.operators.analyze_operator has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin",
+              "changed_fqn": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin.WrappingSQLMixin",
+              "evidence": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.deployment_example.mounts.dags.calls",
+              "changed_fqn": "flowetl.deployment_example.mounts.dags.calls",
+              "evidence": "flowetl.deployment_example.mounts.dags.calls has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.util",
+              "changed_fqn": "flowetl.flowetl.flowetl.util.create_dag",
+              "evidence": "flowetl.flowetl.flowetl.util has dependency path to airflow via IMPORTS airflow.models.dag",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.mounts.dags.remote_table_dag",
+              "changed_fqn": "flowetl.mounts.dags",
+              "evidence": "flowetl.mounts.dags.remote_table_dag has dependency path to airflow via CONTAINS flowetl.mounts.dags.remote_table_dag -> IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.deployment_example.mounts.dags.sms",
+              "changed_fqn": "flowetl.deployment_example.mounts.dags.sms",
+              "evidence": "flowetl.deployment_example.mounts.dags.sms has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator",
+              "changed_fqn": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator",
+              "evidence": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.sensors.file_flux_sensor",
+              "changed_fqn": "flowetl.flowetl.flowetl.sensors",
+              "evidence": "flowetl.flowetl.flowetl.sensors.file_flux_sensor has dependency path to airflow via CONTAINS flowetl.flowetl.flowetl.sensors.file_flux_sensor -> IMPORTS airflow.sensors.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.mounts.dags.filesystem_dag",
+              "changed_fqn": "flowetl.mounts.dags.filesystem_dag",
+              "evidence": "flowetl.mounts.dags.filesystem_dag has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.roles",
+              "changed_fqn": "flowauth.backend.flowauth.roles.edit_role",
+              "evidence": "flowauth.backend.flowauth.roles implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.cli",
+              "changed_fqn": "flowauth.backend.flowauth.cli.demo_data",
+              "evidence": "flowauth.backend.flowauth.cli implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.make_demodata -> CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.main",
+              "changed_fqn": "flowauth.backend.flowauth.main.create_app",
+              "evidence": "flowauth.backend.flowauth.main implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.make_demodata -> CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.servers",
+              "changed_fqn": "flowauth.backend.flowauth.servers.add_server",
+              "evidence": "flowauth.backend.flowauth.servers implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.models",
+              "changed_fqn": "flowauth.backend.flowauth.models",
+              "evidence": "flowauth.backend.flowauth.models implements flowauth.backend.flowauth.models.Scope via CONTAINS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "flowkit-probe-endpoint-sanctioned",
+        "type": "compliant_probe",
+        "detect_seconds": 1.2661662499886006,
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 0,
+        "diagnostics": {
+          "expected_triples": 0,
+          "actual_triples": 263815,
+          "overlap": 0,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.operators.analyze_operator",
+              "changed_fqn": "flowetl.flowetl.flowetl.operators.analyze_operator.AnalyzeOperator",
+              "evidence": "flowetl.flowetl.flowetl.operators.analyze_operator has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin",
+              "changed_fqn": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin.WrappingSQLMixin",
+              "evidence": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.deployment_example.mounts.dags.calls",
+              "changed_fqn": "flowetl.deployment_example.mounts.dags.calls",
+              "evidence": "flowetl.deployment_example.mounts.dags.calls has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.util",
+              "changed_fqn": "flowetl.flowetl.flowetl.util.create_dag",
+              "evidence": "flowetl.flowetl.flowetl.util has dependency path to airflow via IMPORTS airflow.models.dag",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.mounts.dags.remote_table_dag",
+              "changed_fqn": "flowetl.mounts.dags",
+              "evidence": "flowetl.mounts.dags.remote_table_dag has dependency path to airflow via CONTAINS flowetl.mounts.dags.remote_table_dag -> IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.deployment_example.mounts.dags.sms",
+              "changed_fqn": "flowetl.deployment_example.mounts.dags.sms",
+              "evidence": "flowetl.deployment_example.mounts.dags.sms has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator",
+              "changed_fqn": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator",
+              "evidence": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.sensors.file_flux_sensor",
+              "changed_fqn": "flowetl.flowetl.flowetl.sensors",
+              "evidence": "flowetl.flowetl.flowetl.sensors.file_flux_sensor has dependency path to airflow via CONTAINS flowetl.flowetl.flowetl.sensors.file_flux_sensor -> IMPORTS airflow.sensors.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.mounts.dags.filesystem_dag",
+              "changed_fqn": "flowetl.mounts.dags.filesystem_dag",
+              "evidence": "flowetl.mounts.dags.filesystem_dag has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.roles",
+              "changed_fqn": "flowauth.backend.flowauth.roles.edit_role",
+              "evidence": "flowauth.backend.flowauth.roles implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.cli",
+              "changed_fqn": "flowauth.backend.flowauth.cli.demo_data",
+              "evidence": "flowauth.backend.flowauth.cli implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.make_demodata -> CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.main",
+              "changed_fqn": "flowauth.backend.flowauth.main.create_app",
+              "evidence": "flowauth.backend.flowauth.main implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.make_demodata -> CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.servers",
+              "changed_fqn": "flowauth.backend.flowauth.servers.add_server",
+              "evidence": "flowauth.backend.flowauth.servers implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.models",
+              "changed_fqn": "flowauth.backend.flowauth.models",
+              "evidence": "flowauth.backend.flowauth.models implements flowauth.backend.flowauth.models.Scope via CONTAINS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "requires_dependency",
+              "subject": "flowapi.*",
+              "object": "flowmachine.*",
+              "matched_fqn": "flowapi.flowapi.date_endpoints.get_available_dates",
+              "changed_fqn": "flowapi.flowapi.date_endpoints.get_available_dates",
+              "evidence": "flowapi.flowapi.date_endpoints.get_available_dates has no dependency on any module matching flowmachine.*",
+              "change_type": "added"
+            }
+          ],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "flowkit-probe-core-redis-proper",
+        "type": "compliant_probe",
+        "detect_seconds": 0.8907458330504596,
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 0,
+        "diagnostics": {
+          "expected_triples": 0,
+          "actual_triples": 5101,
+          "overlap": 0,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.operators.analyze_operator",
+              "changed_fqn": "flowetl.flowetl.flowetl.operators.analyze_operator.AnalyzeOperator",
+              "evidence": "flowetl.flowetl.flowetl.operators.analyze_operator has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin",
+              "changed_fqn": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin.WrappingSQLMixin",
+              "evidence": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.deployment_example.mounts.dags.calls",
+              "changed_fqn": "flowetl.deployment_example.mounts.dags.calls",
+              "evidence": "flowetl.deployment_example.mounts.dags.calls has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.util",
+              "changed_fqn": "flowetl.flowetl.flowetl.util.create_dag",
+              "evidence": "flowetl.flowetl.flowetl.util has dependency path to airflow via IMPORTS airflow.models.dag",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.mounts.dags.remote_table_dag",
+              "changed_fqn": "flowetl.mounts.dags",
+              "evidence": "flowetl.mounts.dags.remote_table_dag has dependency path to airflow via CONTAINS flowetl.mounts.dags.remote_table_dag -> IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.deployment_example.mounts.dags.sms",
+              "changed_fqn": "flowetl.deployment_example.mounts.dags.sms",
+              "evidence": "flowetl.deployment_example.mounts.dags.sms has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator",
+              "changed_fqn": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator",
+              "evidence": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.sensors.file_flux_sensor",
+              "changed_fqn": "flowetl.flowetl.flowetl.sensors",
+              "evidence": "flowetl.flowetl.flowetl.sensors.file_flux_sensor has dependency path to airflow via CONTAINS flowetl.flowetl.flowetl.sensors.file_flux_sensor -> IMPORTS airflow.sensors.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.mounts.dags.filesystem_dag",
+              "changed_fqn": "flowetl.mounts.dags.filesystem_dag",
+              "evidence": "flowetl.mounts.dags.filesystem_dag has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.roles",
+              "changed_fqn": "flowauth.backend.flowauth.roles.edit_role",
+              "evidence": "flowauth.backend.flowauth.roles implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.cli",
+              "changed_fqn": "flowauth.backend.flowauth.cli.demo_data",
+              "evidence": "flowauth.backend.flowauth.cli implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.make_demodata -> CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.main",
+              "changed_fqn": "flowauth.backend.flowauth.main.create_app",
+              "evidence": "flowauth.backend.flowauth.main implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.make_demodata -> CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.servers",
+              "changed_fqn": "flowauth.backend.flowauth.servers.add_server",
+              "evidence": "flowauth.backend.flowauth.servers implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.models",
+              "changed_fqn": "flowauth.backend.flowauth.models",
+              "evidence": "flowauth.backend.flowauth.models implements flowauth.backend.flowauth.models.Scope via CONTAINS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0008",
+              "predicate": "requires_dependency",
+              "subject": "flowmachine.*",
+              "object": "papermill",
+              "matched_fqn": "flowmachine.flowmachine.core.redis_coordinator.RedisCoordinator",
+              "changed_fqn": "flowmachine.flowmachine.core.redis_coordinator.RedisCoordinator",
+              "evidence": "flowmachine.flowmachine.core.redis_coordinator.RedisCoordinator has no dependency on any module matching papermill",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0008",
+              "predicate": "requires_dependency",
+              "subject": "flowmachine.*",
+              "object": "scrapbook",
+              "matched_fqn": "flowmachine.flowmachine.core.redis_coordinator.RedisCoordinator",
+              "changed_fqn": "flowmachine.flowmachine.core.redis_coordinator.RedisCoordinator",
+              "evidence": "flowmachine.flowmachine.core.redis_coordinator.RedisCoordinator has no dependency on any module matching scrapbook",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0009",
+              "predicate": "requires_dependency",
+              "subject": "flowmachine.*",
+              "object": "nbconvert",
+              "matched_fqn": "flowmachine.flowmachine.core.redis_coordinator.RedisCoordinator",
+              "changed_fqn": "flowmachine.flowmachine.core.redis_coordinator.RedisCoordinator",
+              "evidence": "flowmachine.flowmachine.core.redis_coordinator.RedisCoordinator has no dependency on any module matching nbconvert",
+              "change_type": "added"
+            }
+          ],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "flowkit-probe-features-no-redis",
+        "type": "compliant_probe",
+        "detect_seconds": 1.798932750010863,
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 0,
+        "diagnostics": {
+          "expected_triples": 0,
+          "actual_triples": 6698,
+          "overlap": 0,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.operators.analyze_operator",
+              "changed_fqn": "flowetl.flowetl.flowetl.operators.analyze_operator.AnalyzeOperator",
+              "evidence": "flowetl.flowetl.flowetl.operators.analyze_operator has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin",
+              "changed_fqn": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin.WrappingSQLMixin",
+              "evidence": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.deployment_example.mounts.dags.calls",
+              "changed_fqn": "flowetl.deployment_example.mounts.dags.calls",
+              "evidence": "flowetl.deployment_example.mounts.dags.calls has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.util",
+              "changed_fqn": "flowetl.flowetl.flowetl.util.create_dag",
+              "evidence": "flowetl.flowetl.flowetl.util has dependency path to airflow via IMPORTS airflow.models.dag",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.mounts.dags.remote_table_dag",
+              "changed_fqn": "flowetl.mounts.dags",
+              "evidence": "flowetl.mounts.dags.remote_table_dag has dependency path to airflow via CONTAINS flowetl.mounts.dags.remote_table_dag -> IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.deployment_example.mounts.dags.sms",
+              "changed_fqn": "flowetl.deployment_example.mounts.dags.sms",
+              "evidence": "flowetl.deployment_example.mounts.dags.sms has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator",
+              "changed_fqn": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator",
+              "evidence": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.sensors.file_flux_sensor",
+              "changed_fqn": "flowetl.flowetl.flowetl.sensors",
+              "evidence": "flowetl.flowetl.flowetl.sensors.file_flux_sensor has dependency path to airflow via CONTAINS flowetl.flowetl.flowetl.sensors.file_flux_sensor -> IMPORTS airflow.sensors.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.mounts.dags.filesystem_dag",
+              "changed_fqn": "flowetl.mounts.dags.filesystem_dag",
+              "evidence": "flowetl.mounts.dags.filesystem_dag has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.roles",
+              "changed_fqn": "flowauth.backend.flowauth.roles.edit_role",
+              "evidence": "flowauth.backend.flowauth.roles implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.cli",
+              "changed_fqn": "flowauth.backend.flowauth.cli.demo_data",
+              "evidence": "flowauth.backend.flowauth.cli implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.make_demodata -> CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.main",
+              "changed_fqn": "flowauth.backend.flowauth.main.create_app",
+              "evidence": "flowauth.backend.flowauth.main implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.make_demodata -> CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.servers",
+              "changed_fqn": "flowauth.backend.flowauth.servers.add_server",
+              "evidence": "flowauth.backend.flowauth.servers implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.models",
+              "changed_fqn": "flowauth.backend.flowauth.models",
+              "evidence": "flowauth.backend.flowauth.models implements flowauth.backend.flowauth.models.Scope via CONTAINS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0005",
+              "predicate": "requires_dependency",
+              "subject": "flowmachine.*",
+              "object": "redis",
+              "matched_fqn": "flowmachine.flowmachine.features.location.legacy_aggregate.aggregate_locations",
+              "changed_fqn": "flowmachine.flowmachine.features.location.legacy_aggregate.aggregate_locations",
+              "evidence": "flowmachine.flowmachine.features.location.legacy_aggregate.aggregate_locations has no dependency on any module matching redis",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0008",
+              "predicate": "requires_dependency",
+              "subject": "flowmachine.*",
+              "object": "papermill",
+              "matched_fqn": "flowmachine.flowmachine.features.location.legacy_aggregate.aggregate_locations",
+              "changed_fqn": "flowmachine.flowmachine.features.location.legacy_aggregate.aggregate_locations",
+              "evidence": "flowmachine.flowmachine.features.location.legacy_aggregate.aggregate_locations has no dependency on any module matching papermill",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0008",
+              "predicate": "requires_dependency",
+              "subject": "flowmachine.*",
+              "object": "scrapbook",
+              "matched_fqn": "flowmachine.flowmachine.features.location.legacy_aggregate.aggregate_locations",
+              "changed_fqn": "flowmachine.flowmachine.features.location.legacy_aggregate.aggregate_locations",
+              "evidence": "flowmachine.flowmachine.features.location.legacy_aggregate.aggregate_locations has no dependency on any module matching scrapbook",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0009",
+              "predicate": "requires_dependency",
+              "subject": "flowmachine.*",
+              "object": "nbconvert",
+              "matched_fqn": "flowmachine.flowmachine.features.location.legacy_aggregate.aggregate_locations",
+              "changed_fqn": "flowmachine.flowmachine.features.location.legacy_aggregate.aggregate_locations",
+              "evidence": "flowmachine.flowmachine.features.location.legacy_aggregate.aggregate_locations has no dependency on any module matching nbconvert",
+              "change_type": "added"
+            }
+          ],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "flowkit-probe-flowapi-utils-assignment",
+        "type": "compliant_probe",
+        "detect_seconds": 2.080711790942587,
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 0,
+        "diagnostics": {
+          "expected_triples": 0,
+          "actual_triples": 264145,
+          "overlap": 0,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.operators.analyze_operator",
+              "changed_fqn": "flowetl.flowetl.flowetl.operators.analyze_operator.AnalyzeOperator",
+              "evidence": "flowetl.flowetl.flowetl.operators.analyze_operator has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin",
+              "changed_fqn": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin.WrappingSQLMixin",
+              "evidence": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.deployment_example.mounts.dags.calls",
+              "changed_fqn": "flowetl.deployment_example.mounts.dags.calls",
+              "evidence": "flowetl.deployment_example.mounts.dags.calls has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.util",
+              "changed_fqn": "flowetl.flowetl.flowetl.util.create_dag",
+              "evidence": "flowetl.flowetl.flowetl.util has dependency path to airflow via IMPORTS airflow.models.dag",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.mounts.dags.remote_table_dag",
+              "changed_fqn": "flowetl.mounts.dags",
+              "evidence": "flowetl.mounts.dags.remote_table_dag has dependency path to airflow via CONTAINS flowetl.mounts.dags.remote_table_dag -> IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.deployment_example.mounts.dags.sms",
+              "changed_fqn": "flowetl.deployment_example.mounts.dags.sms",
+              "evidence": "flowetl.deployment_example.mounts.dags.sms has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator",
+              "changed_fqn": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator",
+              "evidence": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.sensors.file_flux_sensor",
+              "changed_fqn": "flowetl.flowetl.flowetl.sensors",
+              "evidence": "flowetl.flowetl.flowetl.sensors.file_flux_sensor has dependency path to airflow via CONTAINS flowetl.flowetl.flowetl.sensors.file_flux_sensor -> IMPORTS airflow.sensors.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.mounts.dags.filesystem_dag",
+              "changed_fqn": "flowetl.mounts.dags.filesystem_dag",
+              "evidence": "flowetl.mounts.dags.filesystem_dag has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.roles",
+              "changed_fqn": "flowauth.backend.flowauth.roles.edit_role",
+              "evidence": "flowauth.backend.flowauth.roles implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.cli",
+              "changed_fqn": "flowauth.backend.flowauth.cli.demo_data",
+              "evidence": "flowauth.backend.flowauth.cli implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.make_demodata -> CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.main",
+              "changed_fqn": "flowauth.backend.flowauth.main.create_app",
+              "evidence": "flowauth.backend.flowauth.main implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.make_demodata -> CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.servers",
+              "changed_fqn": "flowauth.backend.flowauth.servers.add_server",
+              "evidence": "flowauth.backend.flowauth.servers implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.models",
+              "changed_fqn": "flowauth.backend.flowauth.models",
+              "evidence": "flowauth.backend.flowauth.models implements flowauth.backend.flowauth.models.Scope via CONTAINS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0003",
+              "predicate": "requires_dependency",
+              "subject": "flowapi.*",
+              "object": "flowmachine.*",
+              "matched_fqn": "flowapi.flowapi.utils",
+              "changed_fqn": "flowapi.flowapi.utils",
+              "evidence": "flowapi.flowapi.utils has no dependency on any module matching flowmachine.*",
+              "change_type": "modified"
+            },
+            {
+              "adr_id": "ADR-0005",
+              "predicate": "requires_dependency",
+              "subject": "flowapi.*",
+              "object": "zmq",
+              "matched_fqn": "flowapi.flowapi.utils",
+              "changed_fqn": "flowapi.flowapi.utils",
+              "evidence": "flowapi.flowapi.utils has no dependency on any module matching zmq",
+              "change_type": "modified"
+            },
+            {
+              "adr_id": "ADR-0006",
+              "predicate": "requires_dependency",
+              "subject": "flowapi.*",
+              "object": "quart_jwt_extended",
+              "matched_fqn": "flowapi.flowapi.utils",
+              "changed_fqn": "flowapi.flowapi.utils",
+              "evidence": "flowapi.flowapi.utils has no dependency on any module matching quart_jwt_extended",
+              "change_type": "modified"
+            }
+          ],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "flowkit-probe-decoy-local-name",
+        "type": "compliant_probe",
+        "detect_seconds": 1.7856099160853773,
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 0,
+        "diagnostics": {
+          "expected_triples": 0,
+          "actual_triples": 310,
+          "overlap": 0,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.operators.analyze_operator",
+              "changed_fqn": "flowetl.flowetl.flowetl.operators.analyze_operator.AnalyzeOperator",
+              "evidence": "flowetl.flowetl.flowetl.operators.analyze_operator has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin",
+              "changed_fqn": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin.WrappingSQLMixin",
+              "evidence": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.deployment_example.mounts.dags.calls",
+              "changed_fqn": "flowetl.deployment_example.mounts.dags.calls",
+              "evidence": "flowetl.deployment_example.mounts.dags.calls has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.util",
+              "changed_fqn": "flowetl.flowetl.flowetl.util.create_dag",
+              "evidence": "flowetl.flowetl.flowetl.util has dependency path to airflow via IMPORTS airflow.models.dag",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.mounts.dags.remote_table_dag",
+              "changed_fqn": "flowetl.mounts.dags",
+              "evidence": "flowetl.mounts.dags.remote_table_dag has dependency path to airflow via CONTAINS flowetl.mounts.dags.remote_table_dag -> IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.deployment_example.mounts.dags.sms",
+              "changed_fqn": "flowetl.deployment_example.mounts.dags.sms",
+              "evidence": "flowetl.deployment_example.mounts.dags.sms has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator",
+              "changed_fqn": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator",
+              "evidence": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.sensors.file_flux_sensor",
+              "changed_fqn": "flowetl.flowetl.flowetl.sensors",
+              "evidence": "flowetl.flowetl.flowetl.sensors.file_flux_sensor has dependency path to airflow via CONTAINS flowetl.flowetl.flowetl.sensors.file_flux_sensor -> IMPORTS airflow.sensors.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.mounts.dags.filesystem_dag",
+              "changed_fqn": "flowetl.mounts.dags.filesystem_dag",
+              "evidence": "flowetl.mounts.dags.filesystem_dag has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.roles",
+              "changed_fqn": "flowauth.backend.flowauth.roles.edit_role",
+              "evidence": "flowauth.backend.flowauth.roles implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.cli",
+              "changed_fqn": "flowauth.backend.flowauth.cli.demo_data",
+              "evidence": "flowauth.backend.flowauth.cli implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.make_demodata -> CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.main",
+              "changed_fqn": "flowauth.backend.flowauth.main.create_app",
+              "evidence": "flowauth.backend.flowauth.main implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.make_demodata -> CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.servers",
+              "changed_fqn": "flowauth.backend.flowauth.servers.add_server",
+              "evidence": "flowauth.backend.flowauth.servers implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.models",
+              "changed_fqn": "flowauth.backend.flowauth.models",
+              "evidence": "flowauth.backend.flowauth.models implements flowauth.backend.flowauth.models.Scope via CONTAINS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "flowkit-decoy-module-var",
+        "type": "known_limitation",
+        "detect_seconds": 1.1211485000094399,
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 0,
+        "diagnostics": {
+          "expected_triples": 0,
+          "actual_triples": 310,
+          "overlap": 0,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.operators.analyze_operator",
+              "changed_fqn": "flowetl.flowetl.flowetl.operators.analyze_operator.AnalyzeOperator",
+              "evidence": "flowetl.flowetl.flowetl.operators.analyze_operator has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin",
+              "changed_fqn": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin.WrappingSQLMixin",
+              "evidence": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.deployment_example.mounts.dags.calls",
+              "changed_fqn": "flowetl.deployment_example.mounts.dags.calls",
+              "evidence": "flowetl.deployment_example.mounts.dags.calls has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.util",
+              "changed_fqn": "flowetl.flowetl.flowetl.util.create_dag",
+              "evidence": "flowetl.flowetl.flowetl.util has dependency path to airflow via IMPORTS airflow.models.dag",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.mounts.dags.remote_table_dag",
+              "changed_fqn": "flowetl.mounts.dags",
+              "evidence": "flowetl.mounts.dags.remote_table_dag has dependency path to airflow via CONTAINS flowetl.mounts.dags.remote_table_dag -> IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.deployment_example.mounts.dags.sms",
+              "changed_fqn": "flowetl.deployment_example.mounts.dags.sms",
+              "evidence": "flowetl.deployment_example.mounts.dags.sms has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator",
+              "changed_fqn": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator",
+              "evidence": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.sensors.file_flux_sensor",
+              "changed_fqn": "flowetl.flowetl.flowetl.sensors",
+              "evidence": "flowetl.flowetl.flowetl.sensors.file_flux_sensor has dependency path to airflow via CONTAINS flowetl.flowetl.flowetl.sensors.file_flux_sensor -> IMPORTS airflow.sensors.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.mounts.dags.filesystem_dag",
+              "changed_fqn": "flowetl.mounts.dags.filesystem_dag",
+              "evidence": "flowetl.mounts.dags.filesystem_dag has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.roles",
+              "changed_fqn": "flowauth.backend.flowauth.roles.edit_role",
+              "evidence": "flowauth.backend.flowauth.roles implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.cli",
+              "changed_fqn": "flowauth.backend.flowauth.cli.demo_data",
+              "evidence": "flowauth.backend.flowauth.cli implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.make_demodata -> CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.main",
+              "changed_fqn": "flowauth.backend.flowauth.main.create_app",
+              "evidence": "flowauth.backend.flowauth.main implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.make_demodata -> CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.servers",
+              "changed_fqn": "flowauth.backend.flowauth.servers.add_server",
+              "evidence": "flowauth.backend.flowauth.servers implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.models",
+              "changed_fqn": "flowauth.backend.flowauth.models",
+              "evidence": "flowauth.backend.flowauth.models implements flowauth.backend.flowauth.models.Scope via CONTAINS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "flowkit-probe-flowetl-out-of-scope",
+        "type": "compliant_probe",
+        "detect_seconds": 1.3205684579443187,
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 0,
+        "diagnostics": {
+          "expected_triples": 0,
+          "actual_triples": 444,
+          "overlap": 0,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.operators.analyze_operator",
+              "changed_fqn": "flowetl.flowetl.flowetl.operators.analyze_operator.AnalyzeOperator",
+              "evidence": "flowetl.flowetl.flowetl.operators.analyze_operator has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin",
+              "changed_fqn": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin.WrappingSQLMixin",
+              "evidence": "flowetl.flowetl.flowetl.mixins.wrapping_sql_mixin has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.deployment_example.mounts.dags.calls",
+              "changed_fqn": "flowetl.deployment_example.mounts.dags.calls",
+              "evidence": "flowetl.deployment_example.mounts.dags.calls has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.util",
+              "changed_fqn": "flowetl.flowetl.flowetl.util.create_dag",
+              "evidence": "flowetl.flowetl.flowetl.util has dependency path to airflow via IMPORTS airflow.models.dag",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.mounts.dags.remote_table_dag",
+              "changed_fqn": "flowetl.mounts.dags",
+              "evidence": "flowetl.mounts.dags.remote_table_dag has dependency path to airflow via CONTAINS flowetl.mounts.dags.remote_table_dag -> IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.deployment_example.mounts.dags.sms",
+              "changed_fqn": "flowetl.deployment_example.mounts.dags.sms",
+              "evidence": "flowetl.deployment_example.mounts.dags.sms has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator",
+              "changed_fqn": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator",
+              "evidence": "flowetl.flowetl.flowetl.operators.create_foreign_staging_table_operator has dependency path to airflow via IMPORTS airflow.providers.common.sql.operators.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.flowetl.flowetl.sensors.file_flux_sensor",
+              "changed_fqn": "flowetl.flowetl.flowetl.sensors",
+              "evidence": "flowetl.flowetl.flowetl.sensors.file_flux_sensor has dependency path to airflow via CONTAINS flowetl.flowetl.flowetl.sensors.file_flux_sensor -> IMPORTS airflow.sensors.sql",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "prohibits_dependency",
+              "subject": "flowetl.*",
+              "object": "airflow",
+              "matched_fqn": "flowetl.mounts.dags.filesystem_dag",
+              "changed_fqn": "flowetl.mounts.dags.filesystem_dag",
+              "evidence": "flowetl.mounts.dags.filesystem_dag has dependency path to airflow via IMPORTS airflow",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.roles",
+              "changed_fqn": "flowauth.backend.flowauth.roles.edit_role",
+              "evidence": "flowauth.backend.flowauth.roles implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.cli",
+              "changed_fqn": "flowauth.backend.flowauth.cli.demo_data",
+              "evidence": "flowauth.backend.flowauth.cli implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.make_demodata -> CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.main",
+              "changed_fqn": "flowauth.backend.flowauth.main.create_app",
+              "evidence": "flowauth.backend.flowauth.main implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.make_demodata -> CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.servers",
+              "changed_fqn": "flowauth.backend.flowauth.servers.add_server",
+              "evidence": "flowauth.backend.flowauth.servers implements flowauth.backend.flowauth.models.Scope via CALLS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0012",
+              "predicate": "prohibits_implementation",
+              "subject": "flowauth.backend.flowauth.*",
+              "object": "flowauth.backend.flowauth.models.Scope",
+              "matched_fqn": "flowauth.backend.flowauth.models",
+              "changed_fqn": "flowauth.backend.flowauth.models",
+              "evidence": "flowauth.backend.flowauth.models implements flowauth.backend.flowauth.models.Scope via CONTAINS flowauth.backend.flowauth.models.Scope",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0010",
+              "predicate": "requires_dependency",
+              "subject": "flowetl.*",
+              "object": "prefect",
+              "matched_fqn": "flowetl.flowetl.legacy_migration.migrate_legacy_tables",
+              "changed_fqn": "flowetl.flowetl.legacy_migration.migrate_legacy_tables",
+              "evidence": "flowetl.flowetl.legacy_migration.migrate_legacy_tables has no dependency on any module matching prefect",
+              "change_type": "added"
+            }
+          ],
+          "arm_candidates": []
+        }
+      }
+    ],
+    "exact": 9,
+    "partial": 0,
+    "miss": 3,
+    "total": 12,
+    "pattern_exact": 0,
+    "pattern_partial": 0,
+    "pattern_miss": 12,
+    "stale_gold_units": 0,
+    "diagnostic_overlap": 1721,
+    "structural": 182,
+    "merge_mechanism": 17,
+    "arm_candidates": 0
+  },
+  "cost": {
+    "parse_seconds": 3.789,
+    "resolve_seconds": 128.273,
+    "detect_seconds": 25.798,
+    "per_case_detect_seconds": [
+      8.863,
+      2.234,
+      1.246,
+      1.106,
+      1.088,
+      0.993,
+      1.266,
+      0.891,
+      1.799,
+      2.081,
+      1.786,
+      1.121,
+      1.321
+    ],
+    "prompt_tokens": 385203,
+    "completion_tokens": 6371,
+    "sessions": 12
+  }
+}

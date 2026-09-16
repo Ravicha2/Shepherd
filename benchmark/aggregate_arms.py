@@ -49,6 +49,11 @@ def _metrics(report: dict) -> dict[str, float]:
         "cls_BC_matched": ing["class_split"].get("B/C", {}).get("matched", 0),
         "cls_BC_fp": ing["class_split"].get("B/C", {}).get("false_positive_edges", 0),
         "det_exact": det["exact"], "det_partial": det["partial"], "det_miss": det["miss"],
+        "det_pattern_exact": det.get("pattern_exact", 0),
+        "det_pattern_partial": det.get("pattern_partial", 0),
+        "det_pattern_miss": det.get("pattern_miss", 0),
+        "det_diag_overlap": det.get("diagnostic_overlap", 0),
+        "det_stale_gold": det.get("stale_gold_units", 0),
         "fires_structural": det["structural"], "fires_merge_mech": det["merge_mechanism"],
         "fires_arm_candidates": det["arm_candidates"],
     }
@@ -138,11 +143,15 @@ def aggregate(report_dir: Path) -> None:
         # Registered decision routing, direction-aware: node_on helping = load
         # metrics up or miss metrics down beyond floor; node_on only hurting
         # (FP or miss up beyond floor, no helping anywhere) = cut candidate.
-        helps = any(e and ((m in ("ing_miss", "det_miss")) != (d > 0))
+        # #154 pattern/diagnostic columns are informational (key-comparability
+        # and the wrong-scoped-constraint signal): they never move #149 routing.
+        routing_exempt = {"det_pattern_exact", "det_pattern_partial", "det_pattern_miss",
+                          "det_diag_overlap", "det_stale_gold"}
+        helps = any(e and m not in routing_exempt and ((m in ("ing_miss", "det_miss")) != (d > 0))
                     for m, (e, d) in effects.items())
         hurts = [m for m, (e, d) in effects.items() if e and d > 0
                  and m not in ("ing_exact", "ing_partial", "cls_A_matched", "cls_BC_matched",
-                               "det_exact", "det_partial", "fires_structural")]
+                               "det_exact", "det_partial", "fires_structural") | routing_exempt]
         if helps:
             routing = "KEEP (gold-matching load moved beyond floor)"
         elif hurts:

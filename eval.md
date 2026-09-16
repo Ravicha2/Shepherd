@@ -520,6 +520,25 @@ Real-repo aggregate: exact 6 / partial 7 / miss 2, FP 10 (run1) vs 11 (run2); bl
 
 **Comparability: NON-COMPARABLE for ingestion against every prior row** (prompt surface changed; the resolver's tool surface is unchanged from #143). #146's numbers ARE comparable to the #149 pilot's quality rows for the benchmark denominator (same protocol), which is where Rule 3's expected recall movement is judged. Retrieval group real-repo tallies are identical to the 2026-09-05 committed baseline, so retrieval is diffable across this row.
 
+### 2026-09-16: issue #154 detection-scorer convention (violation-level key + pattern/diagnostic columns, post-#146 node_on k=1 read)
+
+**Change:** the detection scorer's comparison unit, harness-side only (no engine, no gold, no resolver behavior). In `tests/services/adg/test_benchmark_arms_eval.py`, `_score_case_units` now matches each expected unit to an actual violation on `(adr_id, predicate, matched_fqn exact/partial, object)`; **subject-pattern string equality is DROPPED from the key** because `matched_fqn` is the materialized subject the engine fired on and the engine forgives wildcard granularity at fire time (`flowapi.*` vs gold `flowapi.flowapi.*` scored MISS on pattern strings although the violation fired at the right FQN/adr/predicate — the 13-unit subject-anchoring family reading as 0% recall). Object convention: external objects = literal string equality (object grounding stays #146's scope), internal patterns = expansion overlap against the pinned ADG's node set (`_expand_triples`/`_object_matches`, namespace-inclusive base-or-under). Over-breadth is still charged: an over-broad subject fires on out-of-scope FQNs -> extra fires -> classified FP. Two diagnostic columns kept alongside so pilot rows stay comparable: per-unit `pattern_score` (the old pattern-equality read) and per-case constraint-level expansion `{expected_triples, actual_triples, overlap, stale_gold_units}` (the one place that can see "right violation, wrong-scoped constraint"; a gold pattern matching zero nodes is a counted stale-gold signal, never dropped). Aggregator `benchmark/aggregate_arms.py` surfaces `det_pattern_*` and `det_diag_overlap`/`det_stale_gold` as informational (routing-exempt so #149's decision rules are untouched). 8 new TDD pins (15 in the module): subject-equality drop, exact/partial still graded, wrong adr/predicate/object still miss, external-equality vs internal-expansion, namespace-inclusive expansion, stale-gold diagnostic.
+
+**Protocol:** post-#146 read, **node_on only, k=1** (4 cells, `benchmark/reports/2026-09-16T23-56-00/`, traces `logs/benchmark-arms-154/`), same #149 registration otherwise. Not the ADR-018 k=3 re-baseline — that is the instrumented unoptimized re-run this convention now feeds (the #154 decision-gate sequencing).
+
+**Numbers (violation-level key vs pattern-equality column, same runs):**
+
+| repo | violation e/p/m | pattern e/p/m | diag overlap | stale |
+|---|---|---|---|---|
+| python-tuf | 6/0/0 | 6/0/0 | 1064 | 0 |
+| flowkit | 9/0/3 | 0/0/12 | 1721 | 0 |
+| experimenter | 0/0/18 | 0/0/18 | 0 | 0 |
+| structurizr-python | 4/0/2 | 0/0/6 | 60 | 0 |
+
+**Impact / Decision: ADOPT (not moot).** The #154 moot clause needed Rule 3 to make the resolver emit gold-anchored patterns; post-#146 the pattern column is still 0 on flowkit and structurizr, so the two keys do **not** agree and the switch is not eval-neutral — it recovers the subject-anchoring units honestly without touching the FP side. Movement matches the pre-registered counterfactual direction: flowkit 0→9/12, structurizr 0→4/6, tuf unchanged 6/6; **experimenter stays 0/18**, confirming the pilot's split — the subject-side 13-unit family recovers, the object-side 17-unit family (wrong external grounding, `pydantic`/`google.auth` vs gold) does not, because external objects stay literal string equality by design. Over-breadth discipline holds: the recovered units are exact fires at the gold FQN, and flowkit's 45-FP mass (merge-mechanism + decoy residue) is unchanged and charged as before. Precision/recall now reflect the declared contract (diff -> violations), which the old key did not.
+
+**Comparability:** the violation-level column is a NEW convention — not diffable against #149-pilot detection tallies (the pilot's 0% rows were the pattern-equality key). The `det_pattern_*` columns ARE the bridge: they reproduce the pilot's pattern-equality reading, so the shift is attributable to the key alone. No engine/gold/resolver surface moved; legacy committed baselines (ADR 018) are untouched and this read does not re-commit them.
+
 ## Curation mode
 
 

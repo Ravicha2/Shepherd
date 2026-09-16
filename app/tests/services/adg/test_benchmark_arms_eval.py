@@ -89,6 +89,50 @@ def _repo_roots(adg) -> set[str]:
     }
 
 
+def _internal_fqns(adg) -> set[str]:
+    """The expansion universe (#154): concrete ADG node FQNs at the repo pin,
+    external nodes excluded (they have no node to expand against)."""
+    return {str(node.fqn) for node in adg.nodes if node.kind != FQNKind.EXTERNAL}
+
+
+def _expand_pattern(pattern: str, internal_fqns: set[str]) -> set[str]:
+    """Expand one constraint pattern into the concrete internal FQNs it covers.
+
+    Namespace-root inclusive: `X.*` covers the X namespace root and everything
+    under it. This mirrors the ingestion scorer's object-side convention
+    (`tests/services/adg/test_resolver_eval_scorer.py`: `X.*` vs bare `X` is a
+    wildcard-granularity partial, not a miss) so the two legs agree on what
+    "the X namespace" means. An exact pattern covers only itself."""
+    base = pattern[:-2] if pattern.endswith(".*") else pattern
+    return {fqn for fqn in internal_fqns if fqn == base or fqn.startswith(base + ".")}
+
+
+def _is_internal_pattern(pattern: str, roots: set[str]) -> bool:
+    return pattern.rstrip(".*").split(".")[0] in roots
+
+
+def _expand_triples(subject: str, predicate: str, object_: str,
+                    roots: set[str], internal_fqns: set[str]) -> set[tuple]:
+    """Expand a constraint into concrete (subject, predicate, object) triples
+    against the pinned ADG. Internal objects expand; external objects have no
+    node, so their side is literal string equality (object grounding is #146's
+    scope, not a tolerance the scorer grants)."""
+    subjects = _expand_pattern(subject, internal_fqns)
+    objects = (_expand_pattern(object_, internal_fqns)
+               if _is_internal_pattern(object_, roots) else {object_})
+    return {(s, predicate, o) for s in subjects for o in objects}
+
+
+def _object_matches(expected_object: str, actual_object: str,
+                    roots: set[str], internal_fqns: set[str]) -> bool:
+    """#154 object convention: external = string equality; internal pattern =
+    expansion overlap against the pinned ADG."""
+    if _is_internal_pattern(expected_object, roots):
+        return bool(_expand_pattern(expected_object, internal_fqns)
+                    & _expand_pattern(actual_object, internal_fqns))
+    return expected_object == actual_object
+
+
 def _edge_class(provenance: dict, subject: str, object_: str, roots: set[str]) -> str:
     """Pre-registered class split: B/C if either side is tool-grounded, else
     A when the object is external (prompt-instructed anchor), else other."""
@@ -183,12 +227,14 @@ def _fire_summary(violation) -> dict:
     return {**_violation_summary(violation), "change_type": violation.change_type}
 
 
-def _score_case_units(case: dict, violations) -> tuple[list[dict], set[int]]:
-    """Per expected unit, best match by (adr_id, predicate, subject, object)
-    with matched_fqn scored exact/partial (ancestor tolerance). Returns
-    (per-unit rows, indices of matched actual fires)."""
+def _pattern_equality_scores(case: dict, violations) -> list[str]:
+    """#154 bridge column: the OLD key, reproduced verbatim so pilot rows stay
+    comparable. Match on (adr_id, predicate, subject, object) with strict string
+    equality on subject and object, matched_fqn scored exact/partial, one actual
+    fire per expected unit in expectation order. Kept purely so the shift is
+    attributable to the key alone, never to a run-to-run difference."""
     used: set[int] = set()
-    rows: list[dict] = []
+    scores: list[str] = []
     for exp in case.get("expected_violations", []):
         best, best_index = "miss", None
         for index, violation in enumerate(violations):
@@ -204,8 +250,81 @@ def _score_case_units(case: dict, violations) -> tuple[list[dict], set[int]]:
                     best, best_index = score, index
         if best_index is not None:
             used.add(best_index)
-        rows.append({"expected_fqn": exp["matched_fqn"], "score": best})
+        scores.append(best)
+    return scores
+
+
+def _score_case_units(case: dict, violations, roots: set[str],
+                      internal_fqns: set[str]) -> tuple[list[dict], set[int]]:
+    """#154 violation-level key: match each expected unit to an actual violation
+    on (adr_id, predicate, object), then score matched_fqn exact/partial.
+
+    Subject-pattern string equality is DROPPED from the key: `matched_fqn` is the
+    materialized subject the engine actually fired on, and the engine forgives
+    wildcard granularity at fire time. Scoring `subject == subject` after the fact
+    made a violation fired at the right FQN, right adr_id, right predicate score
+    MISS because `flowapi.* != flowapi.flowapi.*` as strings (the 13-unit
+    subject-anchoring family reading as 0% recall). Over-breadth is still charged:
+    an over-broad subject fires on out-of-scope FQNs -> extra fires -> FP.
+
+    Object: external = string equality; internal pattern = expansion overlap
+    against the pinned ADG. Each row also carries the old key's score
+    (`pattern_score`) so pilot rows stay comparable (kept alongside, per the issue
+    body). Returns (per-unit rows, indices of matched actual fires)."""
+    pattern_scores = _pattern_equality_scores(case, violations)
+    used: set[int] = set()
+    rows: list[dict] = []
+    for position, exp in enumerate(case.get("expected_violations", [])):
+        best, best_index = "miss", None
+        for index, violation in enumerate(violations):
+            if index in used:
+                continue
+            constraint = violation.constraint
+            if (constraint.adr_id != exp["adr_id"]
+                    or constraint.predicate.value != exp["predicate"]
+                    or not _object_matches(exp["object"], constraint.object, roots, internal_fqns)):
+                continue
+            score = _score_fqn(str(violation.matched_fqn), exp["matched_fqn"])
+            if _SCORE_RANK[score] > _SCORE_RANK[best]:
+                best, best_index = score, index
+        if best_index is not None:
+            used.add(best_index)
+        rows.append({"expected_fqn": exp["matched_fqn"], "score": best,
+                     "subject": exp["subject"], "object": exp["object"],
+                     "pattern_score": pattern_scores[position]})
     return rows, used
+
+
+def _constraint_level_score(case: dict, violations, roots: set[str],
+                            internal_fqns: set[str]) -> dict:
+    """#154 diagnostic columns: constraint-level expansion, set overlap per repo.
+
+    The one place that can see "right violation, wrong-scoped constraint" (a
+    violation fired at the right FQN from a scope that only coincidentally covers
+    it), which the violation-level key is blind to by construction. Universe =
+    ADG node set at the repo pin; internal objects expand, external objects stay
+    literal. A gold pattern matching zero graph nodes is a stale-gold signal,
+    reported (never silently dropped): zero-relevant per rag-eval."""
+    expected_triples: set[tuple] = set()
+    stale = 0
+    for exp in case.get("expected_violations", []):
+        triples = _expand_triples(exp["subject"], exp["predicate"], exp["object"],
+                                  roots, internal_fqns)
+        if not triples:
+            stale += 1
+        expected_triples |= triples
+    actual_triples: set[tuple] = set()
+    for violation in violations:
+        constraint = violation.constraint
+        actual_triples |= _expand_triples(constraint.subject, constraint.predicate.value,
+                                          constraint.object, roots, internal_fqns)
+    overlap = expected_triples & actual_triples
+    return {
+        "expected_triples": len(expected_triples),
+        "actual_triples": len(actual_triples),
+        "overlap": len(overlap),
+        "stale_gold_units": stale,
+    }
 
 
 def _prepared_seed(repo_root: Path, constraint_edges: list[ConstraintEdge]):
@@ -242,13 +361,15 @@ def _cost_block(
 # -- Cell runner (LLM; CLI-driven, one cell per invocation) --------------------
 
 
-def _run_detection(instances: dict, repo_root: Path, all_edges: list) -> list[dict]:
+def _run_detection(instances: dict, repo_root: Path, all_edges: list,
+                   roots: set[str]) -> list[dict]:
     """Every instance case through the verification convention on this run's
     resolved edges: pin-tree diff cases share one seed; historical cases get a
     detached worktree seed with expected-module probe scopes."""
     case_reports: list[dict] = []
     seed = None  # pin-tree seed, built lazily (diff cases only)
     pin_baseline: list[dict] | None = None
+    pin_internal: set[str] = set()
     for case in instances["cases"]:
         case_start = time.perf_counter()  # #153: wall time attributable to this case
         if case.get("type") == "historical" and "diff" not in case:
@@ -264,6 +385,7 @@ def _run_detection(instances: dict, repo_root: Path, all_edges: list) -> list[di
                     modules = sorted({exp["matched_fqn"] for exp in case.get("expected_violations", [])})
                     diff_result = DiffResult(to_sha="historical", changed_fqns=_module_scopes_changed(hist_seed, modules))
                     violations = detect(diff_result, hist_seed).violations
+                    case_internal = _internal_fqns(hist_seed)
                 finally:
                     subprocess.run(
                         ["git", "worktree", "remove", "--force", str(worktree)],
@@ -273,11 +395,14 @@ def _run_detection(instances: dict, repo_root: Path, all_edges: list) -> list[di
             if seed is None:
                 seed = _prepared_seed(repo_root, all_edges)
                 pin_baseline = [_fire_summary(v) for v in detect(_empty_diff_result(), seed).violations]
+                pin_internal = _internal_fqns(seed)
             diff = _build_case_diff(repo_root, case)
             violations = detect(process_diff(diff), augment_immutable(seed, diff)).violations
             empirical = pin_baseline
+            case_internal = pin_internal
 
-        rows, used = _score_case_units(case, violations)
+        rows, used = _score_case_units(case, violations, roots, case_internal)
+        diagnostics = _constraint_level_score(case, violations, roots, case_internal)
         extra = [_fire_summary(v) for index, v in enumerate(violations) if index not in used]
         fires = _classify_extra_fires(extra, _structural_keys(instances, case, empirical))
         case_reports.append({
@@ -288,7 +413,11 @@ def _run_detection(instances: dict, repo_root: Path, all_edges: list) -> list[di
             "exact": sum(1 for r in rows if r["score"] == "exact_match"),
             "partial": sum(1 for r in rows if r["score"] == "partial_match"),
             "miss": sum(1 for r in rows if r["score"] == "miss"),
+            "pattern_exact": sum(1 for r in rows if r["pattern_score"] == "exact_match"),
+            "pattern_partial": sum(1 for r in rows if r["pattern_score"] == "partial_match"),
+            "pattern_miss": sum(1 for r in rows if r["pattern_score"] == "miss"),
             "total": len(rows),
+            "diagnostics": diagnostics,
             "fires": fires,
         })
     return case_reports
@@ -352,7 +481,7 @@ def run_cell(repo_id: str, arm: str, run_index: int, report_dir: Path) -> dict:
 
     all_edges = result.resolved_edges
     detect_start = time.perf_counter()  # #153: detect = seed builds + per-case detection
-    case_reports = _run_detection(instances, repo_root, all_edges)
+    case_reports = _run_detection(instances, repo_root, all_edges, roots)
     detect_seconds = time.perf_counter() - detect_start
 
     report = {
@@ -370,6 +499,11 @@ def run_cell(repo_id: str, arm: str, run_index: int, report_dir: Path) -> dict:
             "partial": sum(c["partial"] for c in case_reports),
             "miss": sum(c["miss"] for c in case_reports),
             "total": sum(c["total"] for c in case_reports),
+            "pattern_exact": sum(c["pattern_exact"] for c in case_reports),
+            "pattern_partial": sum(c["pattern_partial"] for c in case_reports),
+            "pattern_miss": sum(c["pattern_miss"] for c in case_reports),
+            "stale_gold_units": sum(c["diagnostics"]["stale_gold_units"] for c in case_reports),
+            "diagnostic_overlap": sum(c["diagnostics"]["overlap"] for c in case_reports),
             "structural": sum(len(c["fires"]["structural"]) for c in case_reports),
             "merge_mechanism": sum(len(c["fires"]["merge_mechanism"]) for c in case_reports),
             "arm_candidates": sum(len(c["fires"]["arm_candidates"]) for c in case_reports),
@@ -482,6 +616,136 @@ def test_class_split_summary_buckets() -> None:
         "A": {"matched": 1, "false_positive_edges": 1},
         "unattributed": {"matched": 0, "false_positive_edges": 1},
     }
+
+
+# -- #154 detection-scorer convention: violation-level key + diagnostics -------
+
+
+def _violation(adr_id: str, predicate: str, subject: str, object_: str, matched_fqn: str):
+    from services.cpt.resolution import Violation
+    from services.fqn import FQN
+    from services.models import ConstraintEdge, PredicateType
+    from services.resolver import MatchStatus
+
+    constraint = ConstraintEdge(
+        subject=subject, predicate=PredicateType(predicate), object=object_,
+        justification="pin fixture", adr_id=adr_id, adr_path="docs/adr/x.md",
+    )
+    return Violation(
+        constraint=constraint, changed_fqn=FQN.from_dotted(matched_fqn),
+        matched_fqn=FQN.from_dotted(matched_fqn), match_status=MatchStatus.WILDCARD,
+        evidence="pin fixture", change_type="modified",
+    )
+
+
+def test_violation_level_key_drops_subject_pattern_equality() -> None:
+    """#154: the 13-unit subject-anchoring family. A violation fired at the right
+    matched_fqn, right adr_id, right predicate, right object must score on
+    matched_fqn even when the constraint subject pattern differs in granularity
+    (`flowapi.*` vs gold `flowapi.flowapi.*`). The old key demanded string
+    equality on subject and scored this MISS."""
+    case = {"expected_violations": [{
+        "adr_id": "ADR-0004", "predicate": "requires_dependency",
+        "subject": "flowapi.flowapi.*", "object": "quart",
+        "matched_fqn": "flowapi.flowapi.legacy_backend.run_query_locally",
+    }]}
+    violations = [_violation("ADR-0004", "requires_dependency", "flowapi.*", "quart",
+                             "flowapi.flowapi.legacy_backend.run_query_locally")]
+    rows, used = _score_case_units(case, violations, {"flowapi", "flowclient", "flowmachine"},
+                                   {"flowapi.flowapi.legacy_backend.run_query_locally"})
+    assert rows[0]["score"] == "exact_match"
+    assert rows[0]["pattern_score"] == "miss"  # the demoted column still records the old read
+    assert used == {0}
+
+
+def test_violation_level_key_still_scores_matched_fqn_exact_partial() -> None:
+    """The key change drops subject pattern equality, NOT the matched_fqn
+    exact/partial grading: a fire at an ancestor of the gold FQN is partial."""
+    case = {"expected_violations": [{
+        "adr_id": "ADR-0003", "predicate": "prohibits_dependency",
+        "subject": "flowapi.flowapi.*", "object": "flowmachine",
+        "matched_fqn": "flowapi.flowapi.client_proxy",
+    }]}
+    exact = _violation("ADR-0003", "prohibits_dependency", "flowapi.*", "flowmachine",
+                       "flowapi.flowapi.client_proxy")
+    ancestor = _violation("ADR-0003", "prohibits_dependency", "flowapi.*", "flowmachine",
+                          "flowapi")
+    rows, _ = _score_case_units(case, [exact], {"flowapi"}, {"flowapi.flowapi.client_proxy"})
+    assert rows[0]["score"] == "exact_match"
+    rows, _ = _score_case_units(case, [ancestor], {"flowapi"}, {"flowapi.flowapi.client_proxy"})
+    assert rows[0]["score"] == "partial_match"
+
+
+def test_violation_level_key_rejects_wrong_adr_predicate_or_object() -> None:
+    """Over-breadth is still charged: a right-FQN fire under the wrong adr_id,
+    wrong predicate, or wrong external object is not credited."""
+    case = {"expected_violations": [{
+        "adr_id": "ADR-0004", "predicate": "requires_dependency",
+        "subject": "flowapi.flowapi.*", "object": "quart",
+        "matched_fqn": "flowapi.flowapi.legacy_backend.run_query_locally",
+    }]}
+    fqn = "flowapi.flowapi.legacy_backend.run_query_locally"
+    roots, internal = {"flowapi"}, {fqn}
+    wrong_adr = _violation("ADR-0005", "requires_dependency", "flowapi.*", "quart", fqn)
+    wrong_pred = _violation("ADR-0004", "requires_dependency", "flowapi.*", "zmq", fqn)
+    wrong_obj = _violation("ADR-0004", "requires_dependency", "flowapi.*", "redis", fqn)
+    for v in (wrong_adr, wrong_pred, wrong_obj):
+        rows, used = _score_case_units(case, [v], roots, internal)
+        assert rows[0]["score"] == "miss", v.constraint.object
+        assert used == set()
+
+
+def test_object_match_internal_expansion_external_equality() -> None:
+    """#154 object convention: internal objects compare by expansion overlap
+    against the pinned ADG; external objects (no node) are literal string
+    equality, so wrong external grounding stays a miss (object grounding is
+    #146's scope)."""
+    internal = {"tuf.repository", "tuf.repository.writer", "tuf.api.metadata"}
+    roots = {"tuf"}
+    # internal pattern overlaps a concrete internal object (exact vs .* base)
+    assert _object_matches("tuf.api.metadata.*", "tuf.api.metadata", roots, internal)
+    assert _object_matches("tuf.repository.*", "tuf.repository.writer", roots, internal)
+    # external objects are literal
+    assert _object_matches("mozilla_nimbus_schemas.*", "mozilla_nimbus_schemas.*", roots - {"tuf"}, internal)
+    assert not _object_matches("pydantic", "mozilla_nimbus_schemas.*", {"experimenter"}, internal)
+    # no overlap -> no credit
+    assert not _object_matches("tuf.api.metadata.*", "tuf.repository", roots, internal)
+
+
+def test_expand_pattern_includes_namespace_root() -> None:
+    """Expansion is namespace-inclusive base-or-under for both forms (mirroring
+    the ingestion scorer's ancestor tolerance: `X.*` vs bare `X` is a
+    wildcard-granularity partial, and a bare `X` object is satisfied by any
+    reachable under X per the engine's requires semantics). A pattern with no
+    node at or under it expands to the empty set (the stale-gold signal)."""
+    internal = {"a.b", "a.b.c", "a.bc", "z"}
+    assert _expand_pattern("a.b.*", internal) == {"a.b", "a.b.c"}
+    assert _expand_pattern("a.b", internal) == {"a.b", "a.b.c"}
+    assert _expand_pattern("a.bc.*", internal) == {"a.bc"}
+    assert _expand_pattern("missing.*", internal) == set()
+
+
+def test_constraint_level_diagnostic_reports_stale_gold() -> None:
+    """#154 diagnostics: constraint-level expansion overlap is reported
+    alongside, and a gold pattern matching zero graph nodes is a stale-gold
+    signal counted, never silently dropped (zero-relevant N/A per rag-eval)."""
+    case = {"expected_violations": [
+        {"adr_id": "ADR-0008", "predicate": "prohibits_dependency",
+         "subject": "examples.*", "object": "structurizr.api.*",
+         "matched_fqn": "examples.direct_api_client"},
+        {"adr_id": "ADR-0009", "predicate": "requires_dependency",
+         "subject": "gone.*", "object": "also_gone.*",
+         "matched_fqn": "gone.thing"},
+    ]}
+    roots = {"examples", "src", "structurizr"}
+    internal = {"examples.direct_api_client", "structurizr.api",
+                "src.structurizr.api", "src.structurizr.api.parse"}
+    violations = [_violation("ADR-0008", "prohibits_dependency", "examples.*",
+                             "structurizr.api.*", "examples.direct_api_client")]
+    diag = _constraint_level_score(case, violations, roots, internal)
+    assert diag["stale_gold_units"] == 1  # the `gone.*` gold object has no node
+    assert diag["overlap"] >= 1
+
 
 
 def test_cost_block_sums_usage_across_sessions() -> None:

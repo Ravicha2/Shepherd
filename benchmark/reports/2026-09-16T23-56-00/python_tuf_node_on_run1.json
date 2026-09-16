@@ -1,0 +1,814 @@
+{
+  "_meta": {
+    "generated_at": "2026-09-16T23-56-05",
+    "git_commit": "edfa8ba",
+    "arm": "baseline",
+    "semble_version": "0.5.6",
+    "semble_model": "minishlab/potion-code-16M-v2",
+    "resolver_model": "google/gemini-3.1-flash-lite"
+  },
+  "repo_id": "python-tuf",
+  "arm": "node_on",
+  "run_index": 1,
+  "pin_commit": "6889cfbffbb90a17930fbdedf12ae050be775fe3",
+  "ingestion": {
+    "exact": 3,
+    "partial": 0,
+    "miss": 1,
+    "total": 4,
+    "false_positives": 4,
+    "false_positive_edges": [
+      {
+        "adr_id": "ADR-0002",
+        "subject": "tuf.*",
+        "predicate": "prohibits_dependency",
+        "object": "python2.7",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0004",
+        "subject": "tuf.*",
+        "predicate": "prohibits_dependency",
+        "object": "securesystemslib.formats",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0006",
+        "subject": "tuf.api.metadata.*",
+        "predicate": "requires_implementation",
+        "object": "tuf.api.serialization.MetadataSerializer",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0008",
+        "subject": "tuf.api._payload.*",
+        "predicate": "requires_implementation",
+        "object": "tuf.api._payload.Signed",
+        "class": "B/C"
+      }
+    ],
+    "credited_fragments": [],
+    "excluded_tooling_edges": [],
+    "accuracy": 0.75,
+    "per_constraint": [
+      {
+        "adr_id": "ADR-0001",
+        "expected": {
+          "subject": "tuf.*",
+          "predicate": "prohibits_dependency",
+          "object": "python2.7",
+          "justification": "ADR-0001 chooses Python 3.6+ only; Python 2.7 is named as end-of-life and explicitly rejected"
+        },
+        "score": "exact_match",
+        "resolved_subject": "tuf.*",
+        "resolved_object": "python2.7",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0001",
+        "expected": {
+          "subject": "tuf.*",
+          "predicate": "prohibits_dependency",
+          "object": "python3.5",
+          "justification": "ADR-0001 chooses Python 3.6+ only; Python 3.5 is named as end-of-life and explicitly rejected"
+        },
+        "score": "exact_match",
+        "resolved_subject": "tuf.*",
+        "resolved_object": "python3.5",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0006",
+        "expected": {
+          "subject": "tuf.api.metadata.*",
+          "predicate": "requires_dependency",
+          "object": "tuf.api.serialization.*",
+          "justification": "ADR-0006 separates serialization from the metadata class model; metadata classes depend on the serialization package (tuf.api.serialization), not the other way around"
+        },
+        "score": "miss",
+        "resolved_subject": null,
+        "resolved_object": null
+      },
+      {
+        "adr_id": "ADR-0010",
+        "expected": {
+          "subject": "tuf.repository.*",
+          "predicate": "requires_dependency",
+          "object": "tuf.api.metadata.*",
+          "justification": "ADR-0010 states the repository library is built on top of the Metadata API; this is a dependency, not an inheritance rule"
+        },
+        "score": "exact_match",
+        "resolved_subject": "tuf.repository.*",
+        "resolved_object": "tuf.api.metadata.*",
+        "class": "B/C"
+      }
+    ],
+    "class_split": {
+      "B/C": {
+        "matched": 3,
+        "false_positive_edges": 4
+      }
+    }
+  },
+  "detection": {
+    "cases": [
+      {
+        "case_id": "tuf-bench-legacy-json-store",
+        "type": "injected",
+        "detect_seconds": 0.826040375046432,
+        "per_unit": [
+          {
+            "expected_fqn": "tuf.repository._legacy.read_role_file",
+            "score": "exact_match",
+            "subject": "tuf.repository.*",
+            "object": "tuf.api.metadata.*",
+            "pattern_score": "exact_match"
+          },
+          {
+            "expected_fqn": "tuf.repository._legacy.write_role_file",
+            "score": "exact_match",
+            "subject": "tuf.repository.*",
+            "object": "tuf.api.metadata.*",
+            "pattern_score": "exact_match"
+          },
+          {
+            "expected_fqn": "tuf.repository._legacy.LegacyRoleStore",
+            "score": "exact_match",
+            "subject": "tuf.repository.*",
+            "object": "tuf.api.metadata.*",
+            "pattern_score": "exact_match"
+          }
+        ],
+        "exact": 3,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 3,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 3,
+        "diagnostics": {
+          "expected_triples": 266,
+          "actual_triples": 521,
+          "overlap": 266,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.dsse",
+              "changed_fqn": "tuf.api.dsse.SimpleEnvelope",
+              "evidence": "tuf.api.dsse has dependency path to securesystemslib.formats via CALLS tuf.api.serialization.json -> IMPORTS securesystemslib.formats",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.serialization.json",
+              "changed_fqn": "tuf.api.serialization",
+              "evidence": "tuf.api.serialization.json has dependency path to securesystemslib.formats via CONTAINS tuf.api.serialization.json -> IMPORTS securesystemslib.formats",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "tuf-bench-legacy-repo-client",
+        "type": "injected",
+        "detect_seconds": 0.1695297909900546,
+        "per_unit": [
+          {
+            "expected_fqn": "tuf.repository._writer.LegacyRepoClient",
+            "score": "exact_match",
+            "subject": "tuf.repository.*",
+            "object": "tuf.api.metadata.*",
+            "pattern_score": "exact_match"
+          }
+        ],
+        "exact": 1,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 1,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 1,
+        "diagnostics": {
+          "expected_triples": 266,
+          "actual_triples": 521,
+          "overlap": 266,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.dsse",
+              "changed_fqn": "tuf.api.dsse.SimpleEnvelope",
+              "evidence": "tuf.api.dsse has dependency path to securesystemslib.formats via CALLS tuf.api.serialization.json -> IMPORTS securesystemslib.formats",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.serialization.json",
+              "changed_fqn": "tuf.api.serialization",
+              "evidence": "tuf.api.serialization.json has dependency path to securesystemslib.formats via CONTAINS tuf.api.serialization.json -> IMPORTS securesystemslib.formats",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "tuf-bench-hist-pre-repository-compliant",
+        "type": "historical",
+        "detect_seconds": 3.4028545829933137,
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 0,
+        "diagnostics": {
+          "expected_triples": 0,
+          "actual_triples": 464,
+          "overlap": 0,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.serialization.json",
+              "changed_fqn": "tuf.api.serialization",
+              "evidence": "tuf.api.serialization.json has dependency path to securesystemslib.formats via CONTAINS tuf.api.serialization.json -> IMPORTS securesystemslib.formats",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.repository_lib",
+              "changed_fqn": "tuf.repository_lib._get_written_metadata",
+              "evidence": "tuf.repository_lib has dependency path to securesystemslib.formats via CALLS tuf.api.serialization.json -> IMPORTS securesystemslib.formats",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.repository_tool",
+              "changed_fqn": "tuf.repository_tool.append_signature",
+              "evidence": "tuf.repository_tool has dependency path to securesystemslib.formats via CALLS tuf.api.serialization.json -> IMPORTS securesystemslib.formats",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.developer_tool",
+              "changed_fqn": "tuf.developer_tool._save_project_configuration",
+              "evidence": "tuf.developer_tool has dependency path to securesystemslib.formats via CALLS tuf.api.serialization.json -> IMPORTS securesystemslib.formats",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "tuf-bench-probe-repository-metadata-import",
+        "type": "compliant_probe",
+        "detect_seconds": 0.4096265420084819,
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 0,
+        "diagnostics": {
+          "expected_triples": 0,
+          "actual_triples": 255,
+          "overlap": 0,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.dsse",
+              "changed_fqn": "tuf.api.dsse.SimpleEnvelope",
+              "evidence": "tuf.api.dsse has dependency path to securesystemslib.formats via CALLS tuf.api.serialization.json -> IMPORTS securesystemslib.formats",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.serialization.json",
+              "changed_fqn": "tuf.api.serialization",
+              "evidence": "tuf.api.serialization.json has dependency path to securesystemslib.formats via CONTAINS tuf.api.serialization.json -> IMPORTS securesystemslib.formats",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "tuf-bench-probe-repository-dotted-import",
+        "type": "compliant_probe",
+        "detect_seconds": 0.25257954094558954,
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 0,
+        "diagnostics": {
+          "expected_triples": 0,
+          "actual_triples": 255,
+          "overlap": 0,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.dsse",
+              "changed_fqn": "tuf.api.dsse.SimpleEnvelope",
+              "evidence": "tuf.api.dsse has dependency path to securesystemslib.formats via CALLS tuf.api.serialization.json -> IMPORTS securesystemslib.formats",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.serialization.json",
+              "changed_fqn": "tuf.api.serialization",
+              "evidence": "tuf.api.serialization.json has dependency path to securesystemslib.formats via CONTAINS tuf.api.serialization.json -> IMPORTS securesystemslib.formats",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "tuf-bench-probe-sanctioned-serializer",
+        "type": "compliant_probe",
+        "detect_seconds": 0.20062366698402911,
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 0,
+        "diagnostics": {
+          "expected_triples": 0,
+          "actual_triples": 255,
+          "overlap": 0,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.serialization.json",
+              "changed_fqn": "tuf.api.serialization.json.CompactJSONSerializer",
+              "evidence": "tuf.api.serialization.json has dependency path to securesystemslib.formats via IMPORTS securesystemslib.formats",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.dsse",
+              "changed_fqn": "tuf.api.dsse.SimpleEnvelope",
+              "evidence": "tuf.api.dsse has dependency path to securesystemslib.formats via CALLS tuf.api.serialization.json -> IMPORTS securesystemslib.formats",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "tuf-bench-probe-payload-out-of-scope",
+        "type": "compliant_probe",
+        "detect_seconds": 0.6472896250197664,
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 0,
+        "diagnostics": {
+          "expected_triples": 0,
+          "actual_triples": 1542,
+          "overlap": 0,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.dsse",
+              "changed_fqn": "tuf.api.dsse.SimpleEnvelope",
+              "evidence": "tuf.api.dsse has dependency path to securesystemslib.formats via CALLS tuf.api.serialization.json -> IMPORTS securesystemslib.formats",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.serialization.json",
+              "changed_fqn": "tuf.api.serialization",
+              "evidence": "tuf.api.serialization.json has dependency path to securesystemslib.formats via CONTAINS tuf.api.serialization.json -> IMPORTS securesystemslib.formats",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0008",
+              "predicate": "requires_implementation",
+              "subject": "tuf.api._payload.*",
+              "object": "tuf.api._payload.Signed",
+              "matched_fqn": "tuf.api._payload._wire_json_fallback",
+              "changed_fqn": "tuf.api._payload._wire_json_fallback",
+              "evidence": "tuf.api._payload._wire_json_fallback does not implement any module matching tuf.api._payload.Signed",
+              "change_type": "added"
+            }
+          ],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "tuf-bench-repository-class-import",
+        "type": "injected",
+        "detect_seconds": 0.36867583298590034,
+        "per_unit": [
+          {
+            "expected_fqn": "tuf.repository._via_repository.MaintenanceRepository",
+            "score": "exact_match",
+            "subject": "tuf.repository.*",
+            "object": "tuf.api.metadata.*",
+            "pattern_score": "exact_match"
+          }
+        ],
+        "exact": 1,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 1,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 1,
+        "diagnostics": {
+          "expected_triples": 266,
+          "actual_triples": 521,
+          "overlap": 266,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.dsse",
+              "changed_fqn": "tuf.api.dsse.SimpleEnvelope",
+              "evidence": "tuf.api.dsse has dependency path to securesystemslib.formats via CALLS tuf.api.serialization.json -> IMPORTS securesystemslib.formats",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.serialization.json",
+              "changed_fqn": "tuf.api.serialization",
+              "evidence": "tuf.api.serialization.json has dependency path to securesystemslib.formats via CONTAINS tuf.api.serialization.json -> IMPORTS securesystemslib.formats",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "tuf-bench-repository-facade-import",
+        "type": "injected",
+        "detect_seconds": 0.18228604190517217,
+        "per_unit": [
+          {
+            "expected_fqn": "tuf.repository._via_package.describe_repository_layout",
+            "score": "exact_match",
+            "subject": "tuf.repository.*",
+            "object": "tuf.api.metadata.*",
+            "pattern_score": "exact_match"
+          }
+        ],
+        "exact": 1,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 1,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 1,
+        "diagnostics": {
+          "expected_triples": 266,
+          "actual_triples": 521,
+          "overlap": 266,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.dsse",
+              "changed_fqn": "tuf.api.dsse.SimpleEnvelope",
+              "evidence": "tuf.api.dsse has dependency path to securesystemslib.formats via CALLS tuf.api.serialization.json -> IMPORTS securesystemslib.formats",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.serialization.json",
+              "changed_fqn": "tuf.api.serialization",
+              "evidence": "tuf.api.serialization.json has dependency path to securesystemslib.formats via CONTAINS tuf.api.serialization.json -> IMPORTS securesystemslib.formats",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "tuf-bench-probe-repository-sibling-import",
+        "type": "compliant_probe",
+        "detect_seconds": 0.21936108299996704,
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 0,
+        "diagnostics": {
+          "expected_triples": 0,
+          "actual_triples": 255,
+          "overlap": 0,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.dsse",
+              "changed_fqn": "tuf.api.dsse.SimpleEnvelope",
+              "evidence": "tuf.api.dsse has dependency path to securesystemslib.formats via CALLS tuf.api.serialization.json -> IMPORTS securesystemslib.formats",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.serialization.json",
+              "changed_fqn": "tuf.api.serialization",
+              "evidence": "tuf.api.serialization.json has dependency path to securesystemslib.formats via CONTAINS tuf.api.serialization.json -> IMPORTS securesystemslib.formats",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "tuf-bench-serialization-deleted",
+        "type": "known_limitation",
+        "detect_seconds": 0.18883174995426089,
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 0,
+        "diagnostics": {
+          "expected_triples": 0,
+          "actual_triples": 255,
+          "overlap": 0,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.dsse",
+              "changed_fqn": "tuf.api.dsse.SimpleEnvelope",
+              "evidence": "tuf.api.dsse has dependency path to securesystemslib.formats via CALLS tuf.api.serialization.json -> IMPORTS securesystemslib.formats",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.serialization.json",
+              "changed_fqn": "tuf.api.serialization",
+              "evidence": "tuf.api.serialization.json has dependency path to securesystemslib.formats via CONTAINS tuf.api.serialization.json -> IMPORTS securesystemslib.formats",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "tuf-bench-probe-metadata-seeded",
+        "type": "compliant_probe",
+        "detect_seconds": 0.34449291706550866,
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 0,
+        "diagnostics": {
+          "expected_triples": 0,
+          "actual_triples": 255,
+          "overlap": 0,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.dsse",
+              "changed_fqn": "tuf.api.dsse.SimpleEnvelope",
+              "evidence": "tuf.api.dsse has dependency path to securesystemslib.formats via CALLS tuf.api.serialization.json -> IMPORTS securesystemslib.formats",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.serialization.json",
+              "changed_fqn": "tuf.api.serialization",
+              "evidence": "tuf.api.serialization.json has dependency path to securesystemslib.formats via CONTAINS tuf.api.serialization.json -> IMPORTS securesystemslib.formats",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "tuf-bench-probe-repository-json-satisfied",
+        "type": "compliant_probe",
+        "detect_seconds": 0.24708916689269245,
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 0,
+        "diagnostics": {
+          "expected_triples": 0,
+          "actual_triples": 255,
+          "overlap": 0,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.dsse",
+              "changed_fqn": "tuf.api.dsse.SimpleEnvelope",
+              "evidence": "tuf.api.dsse has dependency path to securesystemslib.formats via CALLS tuf.api.serialization.json -> IMPORTS securesystemslib.formats",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib.formats",
+              "matched_fqn": "tuf.api.serialization.json",
+              "changed_fqn": "tuf.api.serialization",
+              "evidence": "tuf.api.serialization.json has dependency path to securesystemslib.formats via CONTAINS tuf.api.serialization.json -> IMPORTS securesystemslib.formats",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      }
+    ],
+    "exact": 6,
+    "partial": 0,
+    "miss": 0,
+    "total": 6,
+    "pattern_exact": 6,
+    "pattern_partial": 0,
+    "pattern_miss": 0,
+    "stale_gold_units": 0,
+    "diagnostic_overlap": 1064,
+    "structural": 28,
+    "merge_mechanism": 1,
+    "arm_candidates": 0
+  },
+  "cost": {
+    "parse_seconds": 0.932,
+    "resolve_seconds": 81.116,
+    "detect_seconds": 7.462,
+    "per_case_detect_seconds": [
+      0.826,
+      0.17,
+      3.403,
+      0.41,
+      0.253,
+      0.201,
+      0.647,
+      0.369,
+      0.182,
+      0.219,
+      0.189,
+      0.344,
+      0.247
+    ],
+    "prompt_tokens": 237525,
+    "completion_tokens": 2177,
+    "sessions": 10
+  }
+}
