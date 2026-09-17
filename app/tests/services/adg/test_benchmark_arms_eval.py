@@ -57,9 +57,11 @@ REPO_ROOT = Path(__file__).resolve().parents[4]
 BENCHMARK_GOLD_DIR = REPO_ROOT / "benchmark" / "gold"
 BENCHMARK_REPORTS_DIR = REPO_ROOT / "benchmark" / "reports"
 
-# #149 scope, fixed by the issue body + 2026-09-15 comment: home-assistant
-# stays out until its detect perf problem is resolved (#138 item 4).
-BENCHMARK_REPOS = ["python-tuf", "flowkit", "experimenter", "structurizr-python"]
+# #160: home-assistant joins the denominator (gold un-parked 2026-09-15, 14/14
+# PASS post-#150) after the measured full-graph cell put its detect cost on the
+# record; see the cell report's convention note.
+BENCHMARK_REPOS = ["python-tuf", "flowkit", "experimenter", "structurizr-python",
+                   "home-assistant"]
 
 HAS_API_KEY = bool(os.environ.get("OPENROUTER_API_KEY"))
 
@@ -519,7 +521,7 @@ def run_cell(repo_id: str, arm: str, run_index: int, report_dir: Path) -> dict:
 
 
 def test_benchmark_gold_shape() -> None:
-    """#149 scope pin (2026-09-15 comment): 4 repos, 46 cases, 42 expected units."""
+    """#160 scope pin: 5 repos, 60 cases, 63 expected units (census 2026-09-15)."""
     cases = units = 0
     for repo_id in BENCHMARK_REPOS:
         _, instances = _load_gold(repo_id)
@@ -528,7 +530,7 @@ def test_benchmark_gold_shape() -> None:
         cases += len(ids)
         units += sum(len(case.get("expected_violations", [])) for case in instances["cases"])
         assert instances["pin_commit"], f"{repo_id}: missing pin_commit"
-    assert (len(BENCHMARK_REPOS), cases, units) == (4, 46, 42)
+    assert (len(BENCHMARK_REPOS), cases, units) == (5, 60, 63)
 
 
 def test_edge_class_split() -> None:

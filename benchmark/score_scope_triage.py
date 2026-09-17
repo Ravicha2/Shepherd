@@ -61,7 +61,10 @@ def parse_trace_dir(trace_dir: Path, only_run: str | None = None) -> dict[tuple[
     if not files:
         files = sorted(Path(trace_dir).glob("**/*.jsonl"))
     for path in files:
+        # Label repo ids use hyphens; cell dirs use the report file-stem form
+        # (home_assistant_node_on_run1), so normalize before keying.
         repo_id = path.parent.name.split("_node_on_run")[0] if path.parent != Path(trace_dir) else path.stem
+        repo_id = repo_id.replace("_", "-")
         run = path.parent.name.rsplit("run", 1)[-1] if "_node_on_run" in path.parent.name else ""
         if only_run is not None and run != only_run:
             continue

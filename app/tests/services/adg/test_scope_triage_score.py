@@ -6,6 +6,7 @@ the k>=2 benchmark batch, not from here.
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -91,3 +92,30 @@ def test_trace_dir_repo_id_comes_from_the_cell_dir_name(tmp_path) -> None:
     parsed = score_scope_triage.parse_trace_dir(tmp_path)
     assert parsed[("python-tuf", "ADR-0001")]["verdicts"] == ["tooling"]
     assert parsed[("python-tuf", "ADR-0001")]["runs"] == {"2"}
+
+
+def test_trace_dir_repo_id_normalizes_underscores_to_label_hyphens(tmp_path) -> None:
+    """#160: the report-file stem form (`home_assistant_node_on_run1`) must key
+    back to the labels' hyphenated repo id, or the scorer silently skips the repo."""
+    cell = tmp_path / "home_assistant_node_on_run1"
+    cell.mkdir()
+    (cell / "resolver_traces.jsonl").write_text(
+        '{"adr_id": "ADR-0019", "edges": [{"scope": "runtime"}], "none_verdict_edges": []}\n'
+    )
+    parsed = score_scope_triage.parse_trace_dir(tmp_path)
+    assert parsed[("home-assistant", "ADR-0019")]["verdicts"] == ["runtime"]
+
+
+def test_every_benchmark_gold_adr_is_labeled() -> None:
+    """#160 AC: no benchmark ADR is left unlabeled (an unlabeled row is scored
+    nowhere, i.e. a silent skip, not a zero)."""
+    from tests.services.adg.test_benchmark_arms_eval import BENCHMARK_REPOS, _load_gold
+
+    labels = score_scope_triage.load_labels(score_scope_triage.DEFAULT_LABELS)
+    for repo_id in BENCHMARK_REPOS:
+        gold, _ = _load_gold(repo_id)
+        missing = [g["adr_id"] for g in gold if (repo_id, g["adr_id"]) not in labels]
+        assert not missing, f"{repo_id}: unlabeled {missing}"
+    ha = [r for r in json.loads(score_scope_triage.DEFAULT_LABELS.read_text())["adrs"]
+          if r["repo_id"] == "home-assistant"]
+    assert len(ha) == 22 and not any(r["contested"] for r in ha)

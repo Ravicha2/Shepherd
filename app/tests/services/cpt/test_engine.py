@@ -1772,3 +1772,148 @@ class TestProhibitsReportsAtEvidenceOwner:
         result = detect(diff, adg)
         assert len(result.violations) == 1
         assert str(result.violations[0].matched_fqn) == "app.core.admin"
+
+
+# ===========================================================================
+# #165: reverse-reachability skip-filter on structural prohibits
+# ===========================================================================
+
+
+def _reverse_filter_adg() -> ADG:
+    """The reach shapes the skip-filter must not mistake for "cannot fire":
+
+        app.pkg CONTAINS app.pkg.a   -> CONTAINS-first descent
+        app.pkg.a IMPORTS ext        -> app.pkg.a.f (FUNCTION, no own edges)
+                                        fires only via the seeded module edge
+        app.cyc1 CALLS app.cyc2, app.cyc2 CALLS app.cyc1,
+        app.cyc2 IMPORTS ext.deep    -> cycle + deep-prefix object target
+        app.twin IMPORTS app.twin    -> self-referential node (no reach to ext)
+        app.quiet                    -> no edges at all
+    """
+    def node(fqn: str, kind: FQNKind, path: str = "app/x.py") -> FQNNode:
+        return FQNNode(fqn=FQN.from_dotted(fqn), kind=kind, file_path=path,
+                       line_start=0, line_end=20, start_byte=0, end_byte=0)
+
+    nodes = [
+        node("app", FQNKind.MODULE, "app/__init__.py"),
+        node("app.pkg", FQNKind.MODULE, "app/pkg/__init__.py"),
+        node("app.pkg.a", FQNKind.MODULE, "app/pkg/a.py"),
+        node("app.pkg.a.f", FQNKind.FUNCTION, "app/pkg/a.py"),
+        node("app.cyc1", FQNKind.MODULE),
+        node("app.cyc2", FQNKind.MODULE),
+        node("app.twin", FQNKind.MODULE),
+        node("app.quiet", FQNKind.MODULE),
+        node("ext", FQNKind.EXTERNAL, ""),
+        node("ext.deep", FQNKind.EXTERNAL, ""),
+    ]
+    edges = [
+        Edge(source="app", target="app.pkg", kind="CONTAINS"),
+        Edge(source="app", target="app.cyc1", kind="CONTAINS"),
+        Edge(source="app", target="app.cyc2", kind="CONTAINS"),
+        Edge(source="app", target="app.twin", kind="CONTAINS"),
+        Edge(source="app", target="app.quiet", kind="CONTAINS"),
+        Edge(source="app.pkg", target="app.pkg.a", kind="CONTAINS"),
+        Edge(source="app.pkg.a", target="app.pkg.a.f", kind="CONTAINS"),
+        Edge(source="app.pkg.a", target="ext", kind="IMPORTS"),
+        Edge(source="app.cyc1", target="app.cyc2", kind="CALLS"),
+        Edge(source="app.cyc2", target="app.cyc1", kind="CALLS"),
+        Edge(source="app.cyc2", target="ext.deep", kind="IMPORTS"),
+        Edge(source="app.twin", target="app.twin", kind="IMPORTS"),
+    ]
+    return ADG(nodes=nodes, edges=edges)
+
+
+def _reverse_filter_constraints() -> list[ConstraintEdge]:
+    return [
+        # A: subject is a wide wildcard, object an external package with a deep sibling
+        ConstraintEdge(subject="app.*", predicate=PredicateType.PROHIBITS_DEPENDENCY,
+                       object="ext", justification="ext is banned.", adr_id="ADR-165",
+                       adr_path="docs/adr/165.md"),
+        # B: the object node is itself a subject match (subject==object shape)
+        ConstraintEdge(subject="app.*", predicate=PredicateType.PROHIBITS_DEPENDENCY,
+                       object="app.quiet", justification="quiet is reserved.", adr_id="ADR-166",
+                       adr_path="docs/adr/166.md"),
+    ]
+
+
+def _violation_projection(violations: list) -> list[tuple]:
+    return [
+        (v.constraint.adr_id, v.constraint.subject, str(v.changed_fqn), str(v.matched_fqn),
+         v.evidence, v.change_type, tuple((h["kind"], h["target"]) for h in (v.path_hops or ())))
+        for v in violations
+    ]
+
+
+def _reverse_filter_matched() -> tuple:
+    import services.cpt.engine as engine
+
+    adg = _reverse_filter_adg()
+    matched = engine.match_constraints(
+        ADG(nodes=adg.nodes, edges=adg.edges, constraint_edges=_reverse_filter_constraints())
+    )
+    assert matched, "fixture must produce matched constraints"
+    return adg, matched, engine._build_adjacency(adg.edges), engine._enclosing_module_map(adg)
+
+
+def test_reverse_filter_is_a_no_op_on_structural_violations(monkeypatch) -> None:
+    """#165 contract: the filter only SKIPS subjects whose forward BFS provably
+    cannot fire, so every violation, its evidence string, its recorded path and
+    its changed_fqn representative stay exactly what they were. Compared against
+    the same run with filtering disabled (candidates = the whole node universe)."""
+    import services.cpt.engine as engine
+
+    adg, matched, adjacency, module_scope = _reverse_filter_matched()
+    filtered = engine.check_structural_predicates(matched, adjacency, module_scope=module_scope)
+
+    universe = {str(node.fqn) for node in adg.nodes} | {edge.target for edge in adg.edges}
+    monkeypatch.setattr(engine, "_reverse_candidates", lambda *a, **k: universe)
+    unfiltered = engine.check_structural_predicates(matched, adjacency, module_scope=module_scope)
+
+    assert _violation_projection(filtered) == _violation_projection(unfiltered)
+    # non-vacuity: the fixture fires through the CONTAINS-first, own-edge, seeded-
+    # module and cyclic shapes (the function reports at its enclosing module)
+    assert {str(v.changed_fqn) for v in filtered} == {
+        "app.pkg", "app.pkg.a", "app.pkg.a.f", "app.cyc1", "app.cyc2",
+    }
+
+
+def test_reverse_candidates_is_complete_for_every_firing_shape() -> None:
+    """The completeness property the no-op contract rests on: every subject that
+    fires (per the unchanged forward BFS) is inside the candidate set, while a
+    subject with no path to the object is outside it (else the filter buys
+    nothing)."""
+    import services.cpt.engine as engine
+
+    adg, matched, adjacency, module_scope = _reverse_filter_matched()
+    kinds = {"CONTAINS", "IMPORTS", "CALLS", "INHERITS"}
+
+    for mc in matched.values():
+        object_strs = {str(fqn) for fqn, _ in mc.object_matches}
+        candidates = engine._reverse_candidates(adjacency, kinds, object_strs)
+        for subject_fqn, _ in mc.subject_matches:
+            subject_str = str(subject_fqn)
+            forward = engine._reachable_paths(
+                subject_str, adjacency, kinds, seed_module=module_scope.get(subject_str),
+            )
+            if any(t == o or t.startswith(o + ".") for t in forward for o in object_strs):
+                # the code's actual skip condition: subject OR its seeded module
+                scope = module_scope.get(subject_str)
+                assert subject_str in candidates or (scope and scope in candidates), subject_str
+
+    # controls, on the ext constraint: nodes the filter is allowed to skip
+    ext_strs = {str(fqn) for fqn, _ in next(
+        mc for mc in matched.values() if mc.constraint.object == "ext"
+    ).object_matches}
+    ext_candidates = engine._reverse_candidates(adjacency, kinds, ext_strs)
+    assert "app.twin" not in ext_candidates  # self-loop only: cannot reach out
+    assert "app.quiet" not in ext_candidates  # no edges at all
+    # the object node itself is always a candidate (conservative seeding)
+    quiet_mc = next(mc for mc in matched.values() if mc.constraint.object == "app.quiet")
+    assert "app.quiet" in engine._reverse_candidates(
+        adjacency, kinds, {str(fqn) for fqn, _ in quiet_mc.object_matches}
+    )
+    # the CONTAINS ancestor above a firing descendant is a candidate too
+    ext_mc = next(mc for mc in matched.values() if mc.constraint.object == "ext")
+    assert "app.pkg" in engine._reverse_candidates(
+        adjacency, kinds, {str(fqn) for fqn, _ in ext_mc.object_matches}
+    )

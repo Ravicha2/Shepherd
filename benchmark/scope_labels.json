@@ -491,6 +491,232 @@
       "recall_safety": null,
       "label_source": "#158 human label (ADR text + benchmark gold note)",
       "notes": "Gold: src.structurizr.api.* requires pydantic. Runtime implementation dependency."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0001",
+      "adr_path": "adr/0001-record-architecture-decisions.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Documentation/process convention (adopting ADR recording): no code relation. Gold: emit no edges."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0002",
+      "adr_path": "adr/0002-minimum-supported-python-version.md",
+      "expected_scope": "tooling",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Interpreter-floor policy codified in the version check code: language/toolchain per the python-tuf ADR-0001 precedent. Superseded by ADR-0020. Gold: emit no edges."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0003",
+      "adr_path": "adr/0003-monitor-condition-and-data-selectors.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "PR-acceptance rule about monitor/data-selector config options ('we don't merge PRs with data selectors'): process policy, not an FQN relation. Gold: emit no edges."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0004",
+      "adr_path": "adr/0004-webscraping.md",
+      "expected_scope": "runtime",
+      "contested": null,
+      "recall_safety": {
+        "required": "runtime",
+        "why": "Gold: homeassistant.components.* prohibits selenium. Runtime constraint on shipped integration code (webscraping ban)."
+      },
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Gold: homeassistant.components.* prohibits selenium. Runtime constraint on shipped integration code (webscraping ban)."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0005",
+      "adr_path": "adr/0005-code-formatting.md",
+      "expected_scope": "tooling",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Black/pylint/flake8/isort formatting: linters and formatters are named in decision 2's tooling list. Gold: emit no edges."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0006",
+      "adr_path": "adr/0006-docker-images.md",
+      "expected_scope": "tooling",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Docker image / packaging-deployment infrastructure (which base image the project ships): build toolchain, tooling. Gold: emit no edges."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0007",
+      "adr_path": "adr/0007-integration-config-yaml-structure.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Config-file placement policy (YAML under the integration domain key): config data shape, not Python topology. Gold: emit no edges."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0008",
+      "adr_path": "adr/0008-code-owners.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Governance (CODEOWNERS conventions): no code relation. Gold: emit no edges."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0009",
+      "adr_path": "adr/0009-translations-2.0.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Translation data layout + frontend translation API redesign: data/API shape, not a dependency or implementation relation. Gold: emit no edges."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0010",
+      "adr_path": "adr/0010-integration-configuration.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Config-UX architecture (config entries/flows); the checkable residue is manifest data. Gold: emit no edges."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0011",
+      "adr_path": "adr/0011-discovery-requires-unique-id.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Discovery unique-id mandate (async_set_unique_id): shipped-code behaviour, but a call-shaped mandate scoped to discoverable flows, not an FQN dependency/implementation relation. Gold: emit no edges (deliberately unencoded)."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0012",
+      "adr_path": "adr/0012-define-supported-installation-method.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Support-policy definition (which installation methods are supported): documentation stance. Gold: emit no edges."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0013",
+      "adr_path": "adr/0013-home-assistant-container.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Installation-method definition (Container): support policy, not a code relation. Gold: emit no edges."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0014",
+      "adr_path": "adr/0014-home-assistant-supervised.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Installation-method definition (Supervised): support policy, not a code relation. Gold: emit no edges."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0015",
+      "adr_path": "adr/0015-home-assistant-os.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Installation-method definition (OS): support policy, not a code relation. Gold: emit no edges."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0016",
+      "adr_path": "adr/0016-home-assistant-core.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Installation-method definition (Core): support policy, not a code relation. Gold: emit no edges."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0017",
+      "adr_path": "adr/0017-hardware-screening-os.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Hardware-policy ADR (OS hardware screening): support policy. Gold: emit no edges."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0018",
+      "adr_path": "adr/0018-supported-databases.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Runtime DB dialect/version floors enforced by string-level gates in recorder/util.py: runtime behaviour with no FQN encoding (python-tuf EOL-python never-fire family). Gold: emit no edges."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0019",
+      "adr_path": "adr/0019-GPIO.md",
+      "expected_scope": "runtime",
+      "contested": null,
+      "recall_safety": {
+        "required": "runtime",
+        "why": "Gold: homeassistant.components.* prohibits gpiozero. Runtime constraint on shipped integration code (GPIO ban); the legacy remote_rpi_gpio fire is the pin's genuine live violation."
+      },
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Gold: homeassistant.components.* prohibits gpiozero. Runtime constraint on shipped integration code (GPIO ban); the legacy remote_rpi_gpio fire is the pin's genuine live violation."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0020",
+      "adr_path": "adr/0020-minimum-supported-python-version.md",
+      "expected_scope": "tooling",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Single-minor interpreter-floor policy, same non-encodable family as ADR-0002 (supersession pair): language/toolchain. Gold: emit no edges."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0021",
+      "adr_path": "adr/0021-YAML-integration-configuration-deprecation-policy.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Deprecation-period process for YAML integration configuration: process policy. Gold: emit no edges."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0022",
+      "adr_path": "adr/0022-integration-quality-scale.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Integration quality scale (rubric); manifest quality_scale values are metadata, not FQN edges. Gold: emit no edges."
     }
   ],
   "_rule_note": "Label rule (decided 2026-09-17 on #158): expected_scope is the scope every edge of that ADR should carry, judged by the ADR's decision role (runtime | tooling | none as defined in ADR 019 decision 2); `none` means the correct observable output is zero edges. Groundability at the pin is a second, separate axis carried by the benchmark gold's 'emit no edges' notes, not by this field. Non-Python-namespace technology decisions (front-end stack, doc-site generator, Rust crate layout, QA process) are tooling. ADR 019 recall-safety rows carry `recall_safety` in addition to expected_scope."
