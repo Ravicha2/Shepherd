@@ -1,0 +1,1408 @@
+{
+  "_meta": {
+    "generated_at": "2026-09-17T23-45-32",
+    "git_commit": "d78af5c",
+    "arm": "baseline",
+    "semble_version": "0.5.6",
+    "semble_model": "minishlab/potion-code-16M-v2",
+    "resolver_model": "google/gemini-3.1-flash-lite"
+  },
+  "repo_id": "home-assistant",
+  "arm": "node_on",
+  "run_index": 1,
+  "pin_commit": "e4b01b65d306cf4ffcd692b9eb7c7d2ce4f794e4",
+  "ingestion": {
+    "exact": 1,
+    "partial": 0,
+    "miss": 1,
+    "total": 2,
+    "false_positives": 5,
+    "false_positive_edges": [
+      {
+        "adr_id": "ADR-0007",
+        "subject": "homeassistant.components.*",
+        "predicate": "requires_dependency",
+        "object": "homeassistant.helpers.discovery.async_load_platform",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0010",
+        "subject": "homeassistant.components.*",
+        "predicate": "requires_implementation",
+        "object": "homeassistant.config_entries.*",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0014",
+        "subject": "homeassistant.*",
+        "predicate": "requires_dependency",
+        "object": "aiohasupervisor",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0018",
+        "subject": "homeassistant.components.recorder.*",
+        "predicate": "prohibits_dependency",
+        "object": "MySQLdb",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0021",
+        "subject": "homeassistant.*",
+        "predicate": "requires_dependency",
+        "object": "homeassistant.helpers.issue_registry.*",
+        "class": "B/C"
+      }
+    ],
+    "credited_fragments": [],
+    "excluded_tooling_edges": [
+      {
+        "adr_id": "ADR-0002",
+        "subject": "homeassistant.*",
+        "predicate": "requires_dependency",
+        "object": "python"
+      },
+      {
+        "adr_id": "ADR-0005",
+        "subject": "homeassistant.*",
+        "predicate": "requires_dependency",
+        "object": "black"
+      },
+      {
+        "adr_id": "ADR-0005",
+        "subject": "homeassistant.*",
+        "predicate": "requires_dependency",
+        "object": "isort"
+      },
+      {
+        "adr_id": "ADR-0005",
+        "subject": "homeassistant.*",
+        "predicate": "requires_dependency",
+        "object": "flake8"
+      },
+      {
+        "adr_id": "ADR-0005",
+        "subject": "homeassistant.*",
+        "predicate": "requires_dependency",
+        "object": "pylint.*"
+      },
+      {
+        "adr_id": "ADR-0009",
+        "subject": "homeassistant.*",
+        "predicate": "requires_dependency",
+        "object": "script.translations.*"
+      },
+      {
+        "adr_id": "ADR-0020",
+        "subject": "homeassistant.*",
+        "predicate": "requires_dependency",
+        "object": "python"
+      }
+    ],
+    "accuracy": 0.5,
+    "per_constraint": [
+      {
+        "adr_id": "ADR-0004",
+        "expected": {
+          "subject": "homeassistant.components.*",
+          "predicate": "prohibits_dependency",
+          "object": "selenium",
+          "justification": "ADR-0004: 'We no longer accept any new integration that relies on webscraping', with the Context naming 'PhantomJS or other headless browsers' as webscraping mechanisms; selenium (browser automation for scraping) is reliance on webscraping inside a core integration, and neither exception clause (generic HTML-parsing integrations; extracting fields from forms during authentication) covers browser automation"
+        },
+        "score": "miss",
+        "resolved_subject": "homeassistant.components.*",
+        "resolved_object": "bs4"
+      },
+      {
+        "adr_id": "ADR-0019",
+        "expected": {
+          "subject": "homeassistant.components.*",
+          "predicate": "prohibits_dependency",
+          "object": "gpiozero",
+          "justification": "ADR-0019: 'We no longer accept integrations that integrate with devices over GPIO' and 'We identify, deprecate and remove integrations that use GPIO'; gpiozero is the GPIO access library, so a core integration importing it is a GPIO integration pending removal, and only custom integrations (outside homeassistant.components) may keep using GPIO"
+        },
+        "score": "exact_match",
+        "resolved_subject": "homeassistant.components.*",
+        "resolved_object": "gpiozero",
+        "class": "B/C"
+      }
+    ],
+    "class_split": {
+      "B/C": {
+        "matched": 1,
+        "false_positive_edges": 5
+      }
+    }
+  },
+  "detection": {
+    "cases": [
+      {
+        "case_id": "ha-bench-pin-baseline",
+        "type": "historical",
+        "detect_seconds": 204.33803858293686,
+        "per_unit": [
+          {
+            "expected_fqn": "homeassistant.components.remote_rpi_gpio",
+            "score": "exact_match",
+            "subject": "homeassistant.components.*",
+            "object": "gpiozero",
+            "pattern_score": "exact_match"
+          }
+        ],
+        "exact": 1,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 1,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 1,
+        "diagnostics": {
+          "expected_triples": 79680,
+          "actual_triples": 160289,
+          "overlap": 79680,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "homeassistant.components.*",
+              "object": "bs4",
+              "matched_fqn": "homeassistant.components.scrape.coordinator",
+              "changed_fqn": "homeassistant.components.scrape",
+              "evidence": "homeassistant.components.scrape.coordinator has dependency path to bs4 via CONTAINS homeassistant.components.scrape.coordinator -> IMPORTS bs4",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0018",
+              "predicate": "prohibits_dependency",
+              "subject": "homeassistant.components.recorder.*",
+              "object": "MySQLdb",
+              "matched_fqn": "homeassistant.components.recorder",
+              "changed_fqn": "homeassistant.components.recorder._async_setup_integration_platform",
+              "evidence": "homeassistant.components.recorder has dependency path to MySQLdb via IMPORTS homeassistant.components.backup -> IMPORTS homeassistant.config_entries -> IMPORTS homeassistant.core -> CALLS homeassistant.components.recorder.tasks -> IMPORTS homeassistant.components.recorder.util -> IMPORTS MySQLdb.constants",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "ha-bench-webscrape-selenium-module",
+        "type": "injected",
+        "detect_seconds": 37.33620412496384,
+        "per_unit": [
+          {
+            "expected_fqn": "homeassistant.components.price_scraper",
+            "score": "miss",
+            "subject": "homeassistant.components.*",
+            "object": "selenium",
+            "pattern_score": "miss"
+          },
+          {
+            "expected_fqn": "homeassistant.components.remote_rpi_gpio",
+            "score": "exact_match",
+            "subject": "homeassistant.components.*",
+            "object": "gpiozero",
+            "pattern_score": "exact_match"
+          }
+        ],
+        "exact": 1,
+        "partial": 0,
+        "miss": 1,
+        "pattern_exact": 1,
+        "pattern_partial": 0,
+        "pattern_miss": 1,
+        "total": 2,
+        "diagnostics": {
+          "expected_triples": 159360,
+          "actual_triples": 2248817,
+          "overlap": 79680,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "homeassistant.components.*",
+              "object": "bs4",
+              "matched_fqn": "homeassistant.components.scrape.coordinator",
+              "changed_fqn": "homeassistant.components.scrape",
+              "evidence": "homeassistant.components.scrape.coordinator has dependency path to bs4 via CONTAINS homeassistant.components.scrape.coordinator -> IMPORTS bs4",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0018",
+              "predicate": "prohibits_dependency",
+              "subject": "homeassistant.components.recorder.*",
+              "object": "MySQLdb",
+              "matched_fqn": "homeassistant.components.recorder",
+              "changed_fqn": "homeassistant.components.recorder._async_setup_integration_platform",
+              "evidence": "homeassistant.components.recorder has dependency path to MySQLdb via IMPORTS homeassistant.components.backup -> IMPORTS homeassistant.config_entries -> IMPORTS homeassistant.core -> CALLS homeassistant.components.recorder.tasks -> IMPORTS homeassistant.components.recorder.util -> IMPORTS MySQLdb.constants",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0007",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.components.*",
+              "object": "homeassistant.helpers.discovery.async_load_platform",
+              "matched_fqn": "homeassistant.components.price_scraper._fetch_price",
+              "changed_fqn": "homeassistant.components.price_scraper._fetch_price",
+              "evidence": "homeassistant.components.price_scraper._fetch_price has no dependency on any module matching homeassistant.helpers.discovery.async_load_platform",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0014",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.*",
+              "object": "aiohasupervisor",
+              "matched_fqn": "homeassistant.components.price_scraper._fetch_price",
+              "changed_fqn": "homeassistant.components.price_scraper._fetch_price",
+              "evidence": "homeassistant.components.price_scraper._fetch_price has no dependency on any module matching aiohasupervisor",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0021",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.*",
+              "object": "homeassistant.helpers.issue_registry.*",
+              "matched_fqn": "homeassistant.components.price_scraper._fetch_price",
+              "changed_fqn": "homeassistant.components.price_scraper._fetch_price",
+              "evidence": "homeassistant.components.price_scraper._fetch_price has no dependency on any module matching homeassistant.helpers.issue_registry.*",
+              "change_type": "added"
+            }
+          ],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "ha-bench-webscrape-selenium-setup-local",
+        "type": "injected",
+        "detect_seconds": 29.769907166948542,
+        "per_unit": [
+          {
+            "expected_fqn": "homeassistant.components.auth_headless",
+            "score": "miss",
+            "subject": "homeassistant.components.*",
+            "object": "selenium",
+            "pattern_score": "miss"
+          },
+          {
+            "expected_fqn": "homeassistant.components.remote_rpi_gpio",
+            "score": "exact_match",
+            "subject": "homeassistant.components.*",
+            "object": "gpiozero",
+            "pattern_score": "exact_match"
+          }
+        ],
+        "exact": 1,
+        "partial": 0,
+        "miss": 1,
+        "pattern_exact": 1,
+        "pattern_partial": 0,
+        "pattern_miss": 1,
+        "total": 2,
+        "diagnostics": {
+          "expected_triples": 159360,
+          "actual_triples": 2248817,
+          "overlap": 79680,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "homeassistant.components.*",
+              "object": "bs4",
+              "matched_fqn": "homeassistant.components.scrape.coordinator",
+              "changed_fqn": "homeassistant.components.scrape",
+              "evidence": "homeassistant.components.scrape.coordinator has dependency path to bs4 via CONTAINS homeassistant.components.scrape.coordinator -> IMPORTS bs4",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0018",
+              "predicate": "prohibits_dependency",
+              "subject": "homeassistant.components.recorder.*",
+              "object": "MySQLdb",
+              "matched_fqn": "homeassistant.components.recorder",
+              "changed_fqn": "homeassistant.components.recorder._async_setup_integration_platform",
+              "evidence": "homeassistant.components.recorder has dependency path to MySQLdb via IMPORTS homeassistant.components.backup -> IMPORTS homeassistant.config_entries -> IMPORTS homeassistant.core -> CALLS homeassistant.components.recorder.tasks -> IMPORTS homeassistant.components.recorder.util -> IMPORTS MySQLdb.constants",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0007",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.components.*",
+              "object": "homeassistant.helpers.discovery.async_load_platform",
+              "matched_fqn": "homeassistant.components.auth_headless.async_setup_entry",
+              "changed_fqn": "homeassistant.components.auth_headless.async_setup_entry",
+              "evidence": "homeassistant.components.auth_headless.async_setup_entry has no dependency on any module matching homeassistant.helpers.discovery.async_load_platform",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0014",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.*",
+              "object": "aiohasupervisor",
+              "matched_fqn": "homeassistant.components.auth_headless.async_setup_entry",
+              "changed_fqn": "homeassistant.components.auth_headless.async_setup_entry",
+              "evidence": "homeassistant.components.auth_headless.async_setup_entry has no dependency on any module matching aiohasupervisor",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0021",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.*",
+              "object": "homeassistant.helpers.issue_registry.*",
+              "matched_fqn": "homeassistant.components.auth_headless.async_setup_entry",
+              "changed_fqn": "homeassistant.components.auth_headless.async_setup_entry",
+              "evidence": "homeassistant.components.auth_headless.async_setup_entry has no dependency on any module matching homeassistant.helpers.issue_registry.*",
+              "change_type": "added"
+            }
+          ],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "ha-bench-webscrape-selenium-in-existing",
+        "type": "injected",
+        "detect_seconds": 31.80996412492823,
+        "per_unit": [
+          {
+            "expected_fqn": "homeassistant.components.rest.sensor",
+            "score": "miss",
+            "subject": "homeassistant.components.*",
+            "object": "selenium",
+            "pattern_score": "miss"
+          },
+          {
+            "expected_fqn": "homeassistant.components.remote_rpi_gpio",
+            "score": "exact_match",
+            "subject": "homeassistant.components.*",
+            "object": "gpiozero",
+            "pattern_score": "exact_match"
+          }
+        ],
+        "exact": 1,
+        "partial": 0,
+        "miss": 1,
+        "pattern_exact": 1,
+        "pattern_partial": 0,
+        "pattern_miss": 1,
+        "total": 2,
+        "diagnostics": {
+          "expected_triples": 159360,
+          "actual_triples": 160289,
+          "overlap": 79680,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "homeassistant.components.*",
+              "object": "bs4",
+              "matched_fqn": "homeassistant.components.scrape.coordinator",
+              "changed_fqn": "homeassistant.components.scrape",
+              "evidence": "homeassistant.components.scrape.coordinator has dependency path to bs4 via CONTAINS homeassistant.components.scrape.coordinator -> IMPORTS bs4",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0018",
+              "predicate": "prohibits_dependency",
+              "subject": "homeassistant.components.recorder.*",
+              "object": "MySQLdb",
+              "matched_fqn": "homeassistant.components.recorder",
+              "changed_fqn": "homeassistant.components.recorder._async_setup_integration_platform",
+              "evidence": "homeassistant.components.recorder has dependency path to MySQLdb via IMPORTS homeassistant.components.backup -> IMPORTS homeassistant.config_entries -> IMPORTS homeassistant.core -> CALLS homeassistant.components.recorder.tasks -> IMPORTS homeassistant.components.recorder.util -> IMPORTS MySQLdb.constants",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "ha-bench-gpio-new-integration",
+        "type": "injected",
+        "detect_seconds": 30.3820017920807,
+        "per_unit": [
+          {
+            "expected_fqn": "homeassistant.components.gpio_status_reader",
+            "score": "exact_match",
+            "subject": "homeassistant.components.*",
+            "object": "gpiozero",
+            "pattern_score": "exact_match"
+          },
+          {
+            "expected_fqn": "homeassistant.components.remote_rpi_gpio",
+            "score": "exact_match",
+            "subject": "homeassistant.components.*",
+            "object": "gpiozero",
+            "pattern_score": "exact_match"
+          }
+        ],
+        "exact": 2,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 2,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 2,
+        "diagnostics": {
+          "expected_triples": 79680,
+          "actual_triples": 2248817,
+          "overlap": 79680,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "homeassistant.components.*",
+              "object": "bs4",
+              "matched_fqn": "homeassistant.components.scrape.coordinator",
+              "changed_fqn": "homeassistant.components.scrape",
+              "evidence": "homeassistant.components.scrape.coordinator has dependency path to bs4 via CONTAINS homeassistant.components.scrape.coordinator -> IMPORTS bs4",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0018",
+              "predicate": "prohibits_dependency",
+              "subject": "homeassistant.components.recorder.*",
+              "object": "MySQLdb",
+              "matched_fqn": "homeassistant.components.recorder",
+              "changed_fqn": "homeassistant.components.recorder._async_setup_integration_platform",
+              "evidence": "homeassistant.components.recorder has dependency path to MySQLdb via IMPORTS homeassistant.components.backup -> IMPORTS homeassistant.config_entries -> IMPORTS homeassistant.core -> CALLS homeassistant.components.recorder.tasks -> IMPORTS homeassistant.components.recorder.util -> IMPORTS MySQLdb.constants",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0007",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.components.*",
+              "object": "homeassistant.helpers.discovery.async_load_platform",
+              "matched_fqn": "homeassistant.components.gpio_status_reader._PinSensor",
+              "changed_fqn": "homeassistant.components.gpio_status_reader._PinSensor",
+              "evidence": "homeassistant.components.gpio_status_reader._PinSensor has no dependency on any module matching homeassistant.helpers.discovery.async_load_platform",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0014",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.*",
+              "object": "aiohasupervisor",
+              "matched_fqn": "homeassistant.components.gpio_status_reader._PinSensor",
+              "changed_fqn": "homeassistant.components.gpio_status_reader._PinSensor",
+              "evidence": "homeassistant.components.gpio_status_reader._PinSensor has no dependency on any module matching aiohasupervisor",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0021",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.*",
+              "object": "homeassistant.helpers.issue_registry.*",
+              "matched_fqn": "homeassistant.components.gpio_status_reader._PinSensor",
+              "changed_fqn": "homeassistant.components.gpio_status_reader._PinSensor",
+              "evidence": "homeassistant.components.gpio_status_reader._PinSensor has no dependency on any module matching homeassistant.helpers.issue_registry.*",
+              "change_type": "added"
+            }
+          ],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "ha-bench-gpio-deep-import",
+        "type": "injected",
+        "detect_seconds": 30.02969349990599,
+        "per_unit": [
+          {
+            "expected_fqn": "homeassistant.components.pi_pin_dashboard",
+            "score": "exact_match",
+            "subject": "homeassistant.components.*",
+            "object": "gpiozero",
+            "pattern_score": "exact_match"
+          },
+          {
+            "expected_fqn": "homeassistant.components.remote_rpi_gpio",
+            "score": "exact_match",
+            "subject": "homeassistant.components.*",
+            "object": "gpiozero",
+            "pattern_score": "exact_match"
+          }
+        ],
+        "exact": 2,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 2,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 2,
+        "diagnostics": {
+          "expected_triples": 79680,
+          "actual_triples": 2248817,
+          "overlap": 79680,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "homeassistant.components.*",
+              "object": "bs4",
+              "matched_fqn": "homeassistant.components.scrape.coordinator",
+              "changed_fqn": "homeassistant.components.scrape",
+              "evidence": "homeassistant.components.scrape.coordinator has dependency path to bs4 via CONTAINS homeassistant.components.scrape.coordinator -> IMPORTS bs4",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0018",
+              "predicate": "prohibits_dependency",
+              "subject": "homeassistant.components.recorder.*",
+              "object": "MySQLdb",
+              "matched_fqn": "homeassistant.components.recorder",
+              "changed_fqn": "homeassistant.components.recorder._async_setup_integration_platform",
+              "evidence": "homeassistant.components.recorder has dependency path to MySQLdb via IMPORTS homeassistant.components.backup -> IMPORTS homeassistant.config_entries -> IMPORTS homeassistant.core -> CALLS homeassistant.components.recorder.tasks -> IMPORTS homeassistant.components.recorder.util -> IMPORTS MySQLdb.constants",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0007",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.components.*",
+              "object": "homeassistant.helpers.discovery.async_load_platform",
+              "matched_fqn": "homeassistant.components.pi_pin_dashboard._connect",
+              "changed_fqn": "homeassistant.components.pi_pin_dashboard._connect",
+              "evidence": "homeassistant.components.pi_pin_dashboard._connect has no dependency on any module matching homeassistant.helpers.discovery.async_load_platform",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0014",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.*",
+              "object": "aiohasupervisor",
+              "matched_fqn": "homeassistant.components.pi_pin_dashboard._connect",
+              "changed_fqn": "homeassistant.components.pi_pin_dashboard._connect",
+              "evidence": "homeassistant.components.pi_pin_dashboard._connect has no dependency on any module matching aiohasupervisor",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0021",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.*",
+              "object": "homeassistant.helpers.issue_registry.*",
+              "matched_fqn": "homeassistant.components.pi_pin_dashboard._connect",
+              "changed_fqn": "homeassistant.components.pi_pin_dashboard._connect",
+              "evidence": "homeassistant.components.pi_pin_dashboard._connect has no dependency on any module matching homeassistant.helpers.issue_registry.*",
+              "change_type": "added"
+            }
+          ],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "ha-bench-probe-http-client",
+        "type": "compliant_probe",
+        "detect_seconds": 29.301966750063002,
+        "per_unit": [
+          {
+            "expected_fqn": "homeassistant.components.remote_rpi_gpio",
+            "score": "exact_match",
+            "subject": "homeassistant.components.*",
+            "object": "gpiozero",
+            "pattern_score": "exact_match"
+          }
+        ],
+        "exact": 1,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 1,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 1,
+        "diagnostics": {
+          "expected_triples": 79680,
+          "actual_triples": 2248817,
+          "overlap": 79680,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "homeassistant.components.*",
+              "object": "bs4",
+              "matched_fqn": "homeassistant.components.scrape.coordinator",
+              "changed_fqn": "homeassistant.components.scrape",
+              "evidence": "homeassistant.components.scrape.coordinator has dependency path to bs4 via CONTAINS homeassistant.components.scrape.coordinator -> IMPORTS bs4",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0018",
+              "predicate": "prohibits_dependency",
+              "subject": "homeassistant.components.recorder.*",
+              "object": "MySQLdb",
+              "matched_fqn": "homeassistant.components.recorder",
+              "changed_fqn": "homeassistant.components.recorder._async_setup_integration_platform",
+              "evidence": "homeassistant.components.recorder has dependency path to MySQLdb via IMPORTS homeassistant.components.backup -> IMPORTS homeassistant.config_entries -> IMPORTS homeassistant.core -> CALLS homeassistant.components.recorder.tasks -> IMPORTS homeassistant.components.recorder.util -> IMPORTS MySQLdb.constants",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0007",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.components.*",
+              "object": "homeassistant.helpers.discovery.async_load_platform",
+              "matched_fqn": "homeassistant.components.webhook_status.async_setup_entry",
+              "changed_fqn": "homeassistant.components.webhook_status.async_setup_entry",
+              "evidence": "homeassistant.components.webhook_status.async_setup_entry has no dependency on any module matching homeassistant.helpers.discovery.async_load_platform",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0014",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.*",
+              "object": "aiohasupervisor",
+              "matched_fqn": "homeassistant.components.webhook_status.async_setup_entry",
+              "changed_fqn": "homeassistant.components.webhook_status.async_setup_entry",
+              "evidence": "homeassistant.components.webhook_status.async_setup_entry has no dependency on any module matching aiohasupervisor",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0021",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.*",
+              "object": "homeassistant.helpers.issue_registry.*",
+              "matched_fqn": "homeassistant.components.webhook_status.async_setup_entry",
+              "changed_fqn": "homeassistant.components.webhook_status.async_setup_entry",
+              "evidence": "homeassistant.components.webhook_status.async_setup_entry has no dependency on any module matching homeassistant.helpers.issue_registry.*",
+              "change_type": "added"
+            }
+          ],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "ha-bench-probe-serial-exempt",
+        "type": "compliant_probe",
+        "detect_seconds": 29.894222583039664,
+        "per_unit": [
+          {
+            "expected_fqn": "homeassistant.components.remote_rpi_gpio",
+            "score": "exact_match",
+            "subject": "homeassistant.components.*",
+            "object": "gpiozero",
+            "pattern_score": "exact_match"
+          }
+        ],
+        "exact": 1,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 1,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 1,
+        "diagnostics": {
+          "expected_triples": 79680,
+          "actual_triples": 2248817,
+          "overlap": 79680,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "homeassistant.components.*",
+              "object": "bs4",
+              "matched_fqn": "homeassistant.components.scrape.coordinator",
+              "changed_fqn": "homeassistant.components.scrape",
+              "evidence": "homeassistant.components.scrape.coordinator has dependency path to bs4 via CONTAINS homeassistant.components.scrape.coordinator -> IMPORTS bs4",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0018",
+              "predicate": "prohibits_dependency",
+              "subject": "homeassistant.components.recorder.*",
+              "object": "MySQLdb",
+              "matched_fqn": "homeassistant.components.recorder",
+              "changed_fqn": "homeassistant.components.recorder._async_setup_integration_platform",
+              "evidence": "homeassistant.components.recorder has dependency path to MySQLdb via IMPORTS homeassistant.components.backup -> IMPORTS homeassistant.config_entries -> IMPORTS homeassistant.core -> CALLS homeassistant.components.recorder.tasks -> IMPORTS homeassistant.components.recorder.util -> IMPORTS MySQLdb.constants",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0007",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.components.*",
+              "object": "homeassistant.helpers.discovery.async_load_platform",
+              "matched_fqn": "homeassistant.components.serial_counter.async_setup_entry",
+              "changed_fqn": "homeassistant.components.serial_counter.async_setup_entry",
+              "evidence": "homeassistant.components.serial_counter.async_setup_entry has no dependency on any module matching homeassistant.helpers.discovery.async_load_platform",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0014",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.*",
+              "object": "aiohasupervisor",
+              "matched_fqn": "homeassistant.components.serial_counter.async_setup_entry",
+              "changed_fqn": "homeassistant.components.serial_counter.async_setup_entry",
+              "evidence": "homeassistant.components.serial_counter.async_setup_entry has no dependency on any module matching aiohasupervisor",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0021",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.*",
+              "object": "homeassistant.helpers.issue_registry.*",
+              "matched_fqn": "homeassistant.components.serial_counter.async_setup_entry",
+              "changed_fqn": "homeassistant.components.serial_counter.async_setup_entry",
+              "evidence": "homeassistant.components.serial_counter.async_setup_entry has no dependency on any module matching homeassistant.helpers.issue_registry.*",
+              "change_type": "added"
+            }
+          ],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "ha-bench-probe-edit-remote-gpio",
+        "type": "compliant_probe",
+        "detect_seconds": 27.150648790993728,
+        "per_unit": [
+          {
+            "expected_fqn": "homeassistant.components.remote_rpi_gpio",
+            "score": "exact_match",
+            "subject": "homeassistant.components.*",
+            "object": "gpiozero",
+            "pattern_score": "exact_match"
+          }
+        ],
+        "exact": 1,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 1,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 1,
+        "diagnostics": {
+          "expected_triples": 79680,
+          "actual_triples": 160289,
+          "overlap": 79680,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "homeassistant.components.*",
+              "object": "bs4",
+              "matched_fqn": "homeassistant.components.scrape.coordinator",
+              "changed_fqn": "homeassistant.components.scrape",
+              "evidence": "homeassistant.components.scrape.coordinator has dependency path to bs4 via CONTAINS homeassistant.components.scrape.coordinator -> IMPORTS bs4",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0018",
+              "predicate": "prohibits_dependency",
+              "subject": "homeassistant.components.recorder.*",
+              "object": "MySQLdb",
+              "matched_fqn": "homeassistant.components.recorder",
+              "changed_fqn": "homeassistant.components.recorder._async_setup_integration_platform",
+              "evidence": "homeassistant.components.recorder has dependency path to MySQLdb via IMPORTS homeassistant.components.backup -> IMPORTS homeassistant.config_entries -> IMPORTS homeassistant.core -> CALLS homeassistant.components.recorder.tasks -> IMPORTS homeassistant.components.recorder.util -> IMPORTS MySQLdb.constants",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "ha-bench-gpio-transitive-import",
+        "type": "injected",
+        "detect_seconds": 31.131211332976818,
+        "per_unit": [
+          {
+            "expected_fqn": "homeassistant.components.pin_tools",
+            "score": "exact_match",
+            "subject": "homeassistant.components.*",
+            "object": "gpiozero",
+            "pattern_score": "exact_match"
+          },
+          {
+            "expected_fqn": "homeassistant.components.door_status",
+            "score": "exact_match",
+            "subject": "homeassistant.components.*",
+            "object": "gpiozero",
+            "pattern_score": "exact_match"
+          },
+          {
+            "expected_fqn": "homeassistant.components.remote_rpi_gpio",
+            "score": "exact_match",
+            "subject": "homeassistant.components.*",
+            "object": "gpiozero",
+            "pattern_score": "exact_match"
+          }
+        ],
+        "exact": 3,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 3,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 3,
+        "diagnostics": {
+          "expected_triples": 79680,
+          "actual_triples": 2248817,
+          "overlap": 79680,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "homeassistant.components.*",
+              "object": "bs4",
+              "matched_fqn": "homeassistant.components.scrape.coordinator",
+              "changed_fqn": "homeassistant.components.scrape",
+              "evidence": "homeassistant.components.scrape.coordinator has dependency path to bs4 via CONTAINS homeassistant.components.scrape.coordinator -> IMPORTS bs4",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0018",
+              "predicate": "prohibits_dependency",
+              "subject": "homeassistant.components.recorder.*",
+              "object": "MySQLdb",
+              "matched_fqn": "homeassistant.components.recorder",
+              "changed_fqn": "homeassistant.components.recorder._async_setup_integration_platform",
+              "evidence": "homeassistant.components.recorder has dependency path to MySQLdb via IMPORTS homeassistant.components.backup -> IMPORTS homeassistant.config_entries -> IMPORTS homeassistant.core -> CALLS homeassistant.components.recorder.tasks -> IMPORTS homeassistant.components.recorder.util -> IMPORTS MySQLdb.constants",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0007",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.components.*",
+              "object": "homeassistant.helpers.discovery.async_load_platform",
+              "matched_fqn": "homeassistant.components.pin_tools.read_pin",
+              "changed_fqn": "homeassistant.components.pin_tools.read_pin",
+              "evidence": "homeassistant.components.pin_tools.read_pin has no dependency on any module matching homeassistant.helpers.discovery.async_load_platform",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0014",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.*",
+              "object": "aiohasupervisor",
+              "matched_fqn": "homeassistant.components.pin_tools.read_pin",
+              "changed_fqn": "homeassistant.components.pin_tools.read_pin",
+              "evidence": "homeassistant.components.pin_tools.read_pin has no dependency on any module matching aiohasupervisor",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0021",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.*",
+              "object": "homeassistant.helpers.issue_registry.*",
+              "matched_fqn": "homeassistant.components.pin_tools.read_pin",
+              "changed_fqn": "homeassistant.components.pin_tools.read_pin",
+              "evidence": "homeassistant.components.pin_tools.read_pin has no dependency on any module matching homeassistant.helpers.issue_registry.*",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0007",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.components.*",
+              "object": "homeassistant.helpers.discovery.async_load_platform",
+              "matched_fqn": "homeassistant.components.door_status._door_state",
+              "changed_fqn": "homeassistant.components.door_status._door_state",
+              "evidence": "homeassistant.components.door_status._door_state has no dependency on any module matching homeassistant.helpers.discovery.async_load_platform",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0014",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.*",
+              "object": "aiohasupervisor",
+              "matched_fqn": "homeassistant.components.door_status._door_state",
+              "changed_fqn": "homeassistant.components.door_status._door_state",
+              "evidence": "homeassistant.components.door_status._door_state has no dependency on any module matching aiohasupervisor",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0021",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.*",
+              "object": "homeassistant.helpers.issue_registry.*",
+              "matched_fqn": "homeassistant.components.door_status._door_state",
+              "changed_fqn": "homeassistant.components.door_status._door_state",
+              "evidence": "homeassistant.components.door_status._door_state has no dependency on any module matching homeassistant.helpers.issue_registry.*",
+              "change_type": "added"
+            }
+          ],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "ha-bench-webscrape-selenium-alias",
+        "type": "injected",
+        "detect_seconds": 29.510479749995284,
+        "per_unit": [
+          {
+            "expected_fqn": "homeassistant.components.vendor_portal",
+            "score": "miss",
+            "subject": "homeassistant.components.*",
+            "object": "selenium",
+            "pattern_score": "miss"
+          },
+          {
+            "expected_fqn": "homeassistant.components.remote_rpi_gpio",
+            "score": "exact_match",
+            "subject": "homeassistant.components.*",
+            "object": "gpiozero",
+            "pattern_score": "exact_match"
+          }
+        ],
+        "exact": 1,
+        "partial": 0,
+        "miss": 1,
+        "pattern_exact": 1,
+        "pattern_partial": 0,
+        "pattern_miss": 1,
+        "total": 2,
+        "diagnostics": {
+          "expected_triples": 159360,
+          "actual_triples": 2248817,
+          "overlap": 79680,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "homeassistant.components.*",
+              "object": "bs4",
+              "matched_fqn": "homeassistant.components.scrape.coordinator",
+              "changed_fqn": "homeassistant.components.scrape",
+              "evidence": "homeassistant.components.scrape.coordinator has dependency path to bs4 via CONTAINS homeassistant.components.scrape.coordinator -> IMPORTS bs4",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0018",
+              "predicate": "prohibits_dependency",
+              "subject": "homeassistant.components.recorder.*",
+              "object": "MySQLdb",
+              "matched_fqn": "homeassistant.components.recorder",
+              "changed_fqn": "homeassistant.components.recorder._async_setup_integration_platform",
+              "evidence": "homeassistant.components.recorder has dependency path to MySQLdb via IMPORTS homeassistant.components.backup -> IMPORTS homeassistant.config_entries -> IMPORTS homeassistant.core -> CALLS homeassistant.components.recorder.tasks -> IMPORTS homeassistant.components.recorder.util -> IMPORTS MySQLdb.constants",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0007",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.components.*",
+              "object": "homeassistant.helpers.discovery.async_load_platform",
+              "matched_fqn": "homeassistant.components.vendor_portal._login_and_read",
+              "changed_fqn": "homeassistant.components.vendor_portal._login_and_read",
+              "evidence": "homeassistant.components.vendor_portal._login_and_read has no dependency on any module matching homeassistant.helpers.discovery.async_load_platform",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0014",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.*",
+              "object": "aiohasupervisor",
+              "matched_fqn": "homeassistant.components.vendor_portal._login_and_read",
+              "changed_fqn": "homeassistant.components.vendor_portal._login_and_read",
+              "evidence": "homeassistant.components.vendor_portal._login_and_read has no dependency on any module matching aiohasupervisor",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0021",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.*",
+              "object": "homeassistant.helpers.issue_registry.*",
+              "matched_fqn": "homeassistant.components.vendor_portal._login_and_read",
+              "changed_fqn": "homeassistant.components.vendor_portal._login_and_read",
+              "evidence": "homeassistant.components.vendor_portal._login_and_read has no dependency on any module matching homeassistant.helpers.issue_registry.*",
+              "change_type": "added"
+            }
+          ],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "ha-bench-gpio-removal",
+        "type": "injected",
+        "detect_seconds": 33.73193620797247,
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 0,
+        "diagnostics": {
+          "expected_triples": 0,
+          "actual_triples": 2248817,
+          "overlap": 0,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "homeassistant.components.*",
+              "object": "bs4",
+              "matched_fqn": "homeassistant.components.scrape.coordinator",
+              "changed_fqn": "homeassistant.components.scrape",
+              "evidence": "homeassistant.components.scrape.coordinator has dependency path to bs4 via CONTAINS homeassistant.components.scrape.coordinator -> IMPORTS bs4",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0018",
+              "predicate": "prohibits_dependency",
+              "subject": "homeassistant.components.recorder.*",
+              "object": "MySQLdb",
+              "matched_fqn": "homeassistant.components.recorder",
+              "changed_fqn": "homeassistant.components.recorder._async_setup_integration_platform",
+              "evidence": "homeassistant.components.recorder has dependency path to MySQLdb via IMPORTS homeassistant.components.backup -> IMPORTS homeassistant.config_entries -> IMPORTS homeassistant.core -> CALLS homeassistant.components.recorder.tasks -> IMPORTS homeassistant.components.recorder.util -> IMPORTS MySQLdb.constants",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0019",
+              "predicate": "prohibits_dependency",
+              "subject": "homeassistant.components.*",
+              "object": "gpiozero",
+              "matched_fqn": "homeassistant.components.remote_rpi_gpio",
+              "changed_fqn": "homeassistant.components.remote_rpi_gpio",
+              "evidence": "homeassistant.components.remote_rpi_gpio has dependency path to gpiozero via IMPORTS gpiozero",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0007",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.components.*",
+              "object": "homeassistant.helpers.discovery.async_load_platform",
+              "matched_fqn": "homeassistant.components.remote_rpi_gpio.setup_output",
+              "changed_fqn": "homeassistant.components.remote_rpi_gpio.setup_output",
+              "evidence": "homeassistant.components.remote_rpi_gpio.setup_output has no dependency on any module matching homeassistant.helpers.discovery.async_load_platform",
+              "change_type": "deleted"
+            },
+            {
+              "adr_id": "ADR-0014",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.*",
+              "object": "aiohasupervisor",
+              "matched_fqn": "homeassistant.components.remote_rpi_gpio.setup_output",
+              "changed_fqn": "homeassistant.components.remote_rpi_gpio.setup_output",
+              "evidence": "homeassistant.components.remote_rpi_gpio.setup_output has no dependency on any module matching aiohasupervisor",
+              "change_type": "deleted"
+            },
+            {
+              "adr_id": "ADR-0021",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.*",
+              "object": "homeassistant.helpers.issue_registry.*",
+              "matched_fqn": "homeassistant.components.remote_rpi_gpio.setup_output",
+              "changed_fqn": "homeassistant.components.remote_rpi_gpio.setup_output",
+              "evidence": "homeassistant.components.remote_rpi_gpio.setup_output has no dependency on any module matching homeassistant.helpers.issue_registry.*",
+              "change_type": "deleted"
+            },
+            {
+              "adr_id": "ADR-0007",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.components.*",
+              "object": "homeassistant.helpers.discovery.async_load_platform",
+              "matched_fqn": "homeassistant.components.remote_rpi_gpio.setup_input",
+              "changed_fqn": "homeassistant.components.remote_rpi_gpio.setup_input",
+              "evidence": "homeassistant.components.remote_rpi_gpio.setup_input has no dependency on any module matching homeassistant.helpers.discovery.async_load_platform",
+              "change_type": "deleted"
+            },
+            {
+              "adr_id": "ADR-0014",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.*",
+              "object": "aiohasupervisor",
+              "matched_fqn": "homeassistant.components.remote_rpi_gpio.setup_input",
+              "changed_fqn": "homeassistant.components.remote_rpi_gpio.setup_input",
+              "evidence": "homeassistant.components.remote_rpi_gpio.setup_input has no dependency on any module matching aiohasupervisor",
+              "change_type": "deleted"
+            },
+            {
+              "adr_id": "ADR-0021",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.*",
+              "object": "homeassistant.helpers.issue_registry.*",
+              "matched_fqn": "homeassistant.components.remote_rpi_gpio.setup_input",
+              "changed_fqn": "homeassistant.components.remote_rpi_gpio.setup_input",
+              "evidence": "homeassistant.components.remote_rpi_gpio.setup_input has no dependency on any module matching homeassistant.helpers.issue_registry.*",
+              "change_type": "deleted"
+            },
+            {
+              "adr_id": "ADR-0007",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.components.*",
+              "object": "homeassistant.helpers.discovery.async_load_platform",
+              "matched_fqn": "homeassistant.components.remote_rpi_gpio.read_input",
+              "changed_fqn": "homeassistant.components.remote_rpi_gpio.read_input",
+              "evidence": "homeassistant.components.remote_rpi_gpio.read_input has no dependency on any module matching homeassistant.helpers.discovery.async_load_platform",
+              "change_type": "deleted"
+            },
+            {
+              "adr_id": "ADR-0014",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.*",
+              "object": "aiohasupervisor",
+              "matched_fqn": "homeassistant.components.remote_rpi_gpio.read_input",
+              "changed_fqn": "homeassistant.components.remote_rpi_gpio.read_input",
+              "evidence": "homeassistant.components.remote_rpi_gpio.read_input has no dependency on any module matching aiohasupervisor",
+              "change_type": "deleted"
+            },
+            {
+              "adr_id": "ADR-0021",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.*",
+              "object": "homeassistant.helpers.issue_registry.*",
+              "matched_fqn": "homeassistant.components.remote_rpi_gpio.read_input",
+              "changed_fqn": "homeassistant.components.remote_rpi_gpio.read_input",
+              "evidence": "homeassistant.components.remote_rpi_gpio.read_input has no dependency on any module matching homeassistant.helpers.issue_registry.*",
+              "change_type": "deleted"
+            }
+          ],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "ha-bench-gpio-wildcard-limitation",
+        "type": "known_limitation",
+        "detect_seconds": 32.120880375034176,
+        "per_unit": [
+          {
+            "expected_fqn": "homeassistant.components.remote_rpi_gpio",
+            "score": "exact_match",
+            "subject": "homeassistant.components.*",
+            "object": "gpiozero",
+            "pattern_score": "exact_match"
+          }
+        ],
+        "exact": 1,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 1,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 1,
+        "diagnostics": {
+          "expected_triples": 79680,
+          "actual_triples": 2248817,
+          "overlap": 79680,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "homeassistant.components.*",
+              "object": "bs4",
+              "matched_fqn": "homeassistant.components.scrape.coordinator",
+              "changed_fqn": "homeassistant.components.scrape",
+              "evidence": "homeassistant.components.scrape.coordinator has dependency path to bs4 via CONTAINS homeassistant.components.scrape.coordinator -> IMPORTS bs4",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0018",
+              "predicate": "prohibits_dependency",
+              "subject": "homeassistant.components.recorder.*",
+              "object": "MySQLdb",
+              "matched_fqn": "homeassistant.components.recorder",
+              "changed_fqn": "homeassistant.components.recorder._async_setup_integration_platform",
+              "evidence": "homeassistant.components.recorder has dependency path to MySQLdb via IMPORTS homeassistant.components.backup -> IMPORTS homeassistant.config_entries -> IMPORTS homeassistant.core -> CALLS homeassistant.components.recorder.tasks -> IMPORTS homeassistant.components.recorder.util -> IMPORTS MySQLdb.constants",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0007",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.components.*",
+              "object": "homeassistant.helpers.discovery.async_load_platform",
+              "matched_fqn": "homeassistant.components.pin_wildcard._read",
+              "changed_fqn": "homeassistant.components.pin_wildcard._read",
+              "evidence": "homeassistant.components.pin_wildcard._read has no dependency on any module matching homeassistant.helpers.discovery.async_load_platform",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0014",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.*",
+              "object": "aiohasupervisor",
+              "matched_fqn": "homeassistant.components.pin_wildcard._read",
+              "changed_fqn": "homeassistant.components.pin_wildcard._read",
+              "evidence": "homeassistant.components.pin_wildcard._read has no dependency on any module matching aiohasupervisor",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0021",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.*",
+              "object": "homeassistant.helpers.issue_registry.*",
+              "matched_fqn": "homeassistant.components.pin_wildcard._read",
+              "changed_fqn": "homeassistant.components.pin_wildcard._read",
+              "evidence": "homeassistant.components.pin_wildcard._read has no dependency on any module matching homeassistant.helpers.issue_registry.*",
+              "change_type": "added"
+            }
+          ],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "ha-bench-gpio-dynamic-import-limitation",
+        "type": "known_limitation",
+        "detect_seconds": 29.239804791053757,
+        "per_unit": [
+          {
+            "expected_fqn": "homeassistant.components.remote_rpi_gpio",
+            "score": "exact_match",
+            "subject": "homeassistant.components.*",
+            "object": "gpiozero",
+            "pattern_score": "exact_match"
+          }
+        ],
+        "exact": 1,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 1,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 1,
+        "diagnostics": {
+          "expected_triples": 79680,
+          "actual_triples": 2248817,
+          "overlap": 79680,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-0004",
+              "predicate": "prohibits_dependency",
+              "subject": "homeassistant.components.*",
+              "object": "bs4",
+              "matched_fqn": "homeassistant.components.scrape.coordinator",
+              "changed_fqn": "homeassistant.components.scrape",
+              "evidence": "homeassistant.components.scrape.coordinator has dependency path to bs4 via CONTAINS homeassistant.components.scrape.coordinator -> IMPORTS bs4",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-0018",
+              "predicate": "prohibits_dependency",
+              "subject": "homeassistant.components.recorder.*",
+              "object": "MySQLdb",
+              "matched_fqn": "homeassistant.components.recorder",
+              "changed_fqn": "homeassistant.components.recorder._async_setup_integration_platform",
+              "evidence": "homeassistant.components.recorder has dependency path to MySQLdb via IMPORTS homeassistant.components.backup -> IMPORTS homeassistant.config_entries -> IMPORTS homeassistant.core -> CALLS homeassistant.components.recorder.tasks -> IMPORTS homeassistant.components.recorder.util -> IMPORTS MySQLdb.constants",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [
+            {
+              "adr_id": "ADR-0007",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.components.*",
+              "object": "homeassistant.helpers.discovery.async_load_platform",
+              "matched_fqn": "homeassistant.components.pin_dynamic._load_backend",
+              "changed_fqn": "homeassistant.components.pin_dynamic._load_backend",
+              "evidence": "homeassistant.components.pin_dynamic._load_backend has no dependency on any module matching homeassistant.helpers.discovery.async_load_platform",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0014",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.*",
+              "object": "aiohasupervisor",
+              "matched_fqn": "homeassistant.components.pin_dynamic._load_backend",
+              "changed_fqn": "homeassistant.components.pin_dynamic._load_backend",
+              "evidence": "homeassistant.components.pin_dynamic._load_backend has no dependency on any module matching aiohasupervisor",
+              "change_type": "added"
+            },
+            {
+              "adr_id": "ADR-0021",
+              "predicate": "requires_dependency",
+              "subject": "homeassistant.*",
+              "object": "homeassistant.helpers.issue_registry.*",
+              "matched_fqn": "homeassistant.components.pin_dynamic._load_backend",
+              "changed_fqn": "homeassistant.components.pin_dynamic._load_backend",
+              "evidence": "homeassistant.components.pin_dynamic._load_backend has no dependency on any module matching homeassistant.helpers.issue_registry.*",
+              "change_type": "added"
+            }
+          ],
+          "arm_candidates": []
+        }
+      }
+    ],
+    "exact": 17,
+    "partial": 0,
+    "miss": 4,
+    "total": 21,
+    "pattern_exact": 17,
+    "pattern_partial": 0,
+    "pattern_miss": 4,
+    "stale_gold_units": 0,
+    "diagnostic_overlap": 1035840,
+    "structural": 29,
+    "merge_mechanism": 42,
+    "arm_candidates": 0
+  },
+  "cost": {
+    "parse_seconds": 144.991,
+    "resolve_seconds": 511.635,
+    "detect_seconds": 606.085,
+    "per_case_detect_seconds": [
+      204.338,
+      37.336,
+      29.77,
+      31.81,
+      30.382,
+      30.03,
+      29.302,
+      29.894,
+      27.151,
+      31.131,
+      29.51,
+      33.732,
+      32.121,
+      29.24
+    ],
+    "prompt_tokens": 904058,
+    "completion_tokens": 3524,
+    "sessions": 22
+  }
+}

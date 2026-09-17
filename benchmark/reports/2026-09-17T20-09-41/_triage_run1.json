@@ -1,0 +1,71 @@
+{
+  "confusion": {
+    "none->runtime": 8,
+    "runtime->runtime": 13,
+    "runtime->tooling": 1,
+    "tooling->runtime": 17,
+    "tooling->tooling": 47
+  },
+  "per_repo_confusion": {
+    "experimenter": {
+      "none->runtime": 4,
+      "runtime->runtime": 5,
+      "runtime->tooling": 1,
+      "tooling->runtime": 8
+    },
+    "flowkit": {
+      "none->runtime": 3,
+      "runtime->runtime": 6,
+      "tooling->runtime": 9,
+      "tooling->tooling": 32
+    },
+    "python-tuf": {
+      "none->runtime": 1,
+      "runtime->runtime": 1,
+      "tooling->tooling": 2
+    },
+    "structurizr-python": {
+      "runtime->runtime": 1,
+      "tooling->tooling": 13
+    }
+  },
+  "totals": {
+    "edges_scored": 86,
+    "expected_scope_mix": {
+      "none": 18,
+      "tooling": 18,
+      "runtime": 11
+    },
+    "none_precision": null,
+    "none_predicted": 0,
+    "none_true_positive": 0,
+    "tooling_recall": 0.734375,
+    "tooling_expected_edges": 64,
+    "tooling_tagged": 47
+  },
+  "recall_safety_failures": [
+    {
+      "repo_id": "python-tuf",
+      "adr_id": "ADR-0006",
+      "required": "runtime",
+      "failure": "no edge emitted at all",
+      "why": ""
+    },
+    {
+      "repo_id": "structurizr-python",
+      "adr_id": "ADR-0008",
+      "required": "runtime",
+      "failure": "no edge emitted at all",
+      "why": "gold edges stay runtime despite the unit-test aside"
+    }
+  ],
+  "mis_tags": [],
+  "trap_adr_0008": {
+    "verdicts": [
+      "runtime",
+      "runtime"
+    ],
+    "dropped": 0,
+    "passed": true
+  }
+}

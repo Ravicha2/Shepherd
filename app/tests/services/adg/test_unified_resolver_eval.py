@@ -305,14 +305,31 @@ def _neighborhood_tool_surface(removed_tool: str):
 
 # -- Fixtures ---------------------------------------------------------------
 
-def _repo_root(repo_id: str) -> Path:
+def _repo_entry(repo_id: str) -> dict:
     with open(REPOS_YAML_PATH) as f:
         repos = yaml.safe_load(f)
-    repo = next(r for r in repos["repos"] if r["id"] == repo_id)
+    return next(r for r in repos["repos"] if r["id"] == repo_id)
+
+
+def _repo_root(repo_id: str) -> Path:
+    repo = _repo_entry(repo_id)
     repo_path = Path(repo["url"])
     if not repo_path.is_absolute():
         repo_path = REPO_ROOT / "repos" / repo_path
     return repo_path
+
+
+def _adr_root(repo_id: str) -> Path:
+    """Directory fixture["adr_path"] is relative to: the code repo, or the
+    sibling adr_repo when the repo keeps its ADRs elsewhere (home-assistant)."""
+    repo = _repo_entry(repo_id)
+    adr_repo = repo.get("adr_repo")
+    if not adr_repo:
+        return _repo_root(repo_id)
+    adr_path = Path(adr_repo)
+    if not adr_path.is_absolute():
+        adr_path = REPO_ROOT / "repos" / adr_path
+    return adr_path
 
 
 def _ground_truth_path(repo_id: str) -> Path:
@@ -346,6 +363,7 @@ def run_eval(
 ) -> EvalResult:
     """Run the unified resolver on every ADR fixture and score against ground truth."""
     repo_root = _repo_root(repo_id)
+    adr_root = _adr_root(repo_id)
     search_backend = _select_search_backend(repo_root, adg)
     result = EvalResult()
 
@@ -353,7 +371,7 @@ def run_eval(
         removed_tool="list_children" if _flag_on("ABLATION_CHILDREN_OFF") else "node_search"
     ):
         for fixture in ground_truth:
-            adr_text = (repo_root / fixture["adr_path"]).read_text()
+            adr_text = (adr_root / fixture["adr_path"]).read_text()
 
             resolved_edges = resolve_adr_constraints(
                 adr_text=adr_text,

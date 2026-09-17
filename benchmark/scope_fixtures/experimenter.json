@@ -1,0 +1,93 @@
+{
+  "repo_id": "experimenter",
+  "roots": [
+    "cirrus",
+    "experimenter",
+    "schemas"
+  ],
+  "pin_commit": "d61a2b8efcb7fd77a849c9f9dc163130473b7f16",
+  "model_id": "google/gemini-3.1-flash-lite",
+  "recorded_at": "2026-09-17T05:46:02+00:00",
+  "adrs": [
+    {
+      "adr_id": "ADR-0001",
+      "adr_path": "docs/adrs/0001-build-nimbus-console-in-experimenter.md",
+      "raw_response": "[]"
+    },
+    {
+      "adr_id": "ADR-0002",
+      "adr_path": "docs/adrs/0002-nimbus-front-end-directory-tree-and-stack.md",
+      "raw_response": "[\n  {\n    \"subject\": \"experimenter.*\",\n    \"object\": \"graphene_django\",\n    \"predicate\": \"requires_dependency\",\n    \"scope\": \"runtime\",\n    \"justification\": \"The ADR mandates the use of graphene-django in the back-end to support GQL in the Nimbus UI.\",\n    \"adr_id\": \"ADR-0002\",\n    \"adr_path\": \"docs/adrs/0002-nimbus-front-end-directory-tree-and-stack.md\"\n  },\n  {\n    \"subject\": \"experimenter.*\",\n    \"object\": \"react\",\n    \"predicate\": \"requires_dependency\",\n    \"scope\": \"runtime\",\n    \"justification\": \"The ADR mandates continuing to use React for the front-end.\",\n    \"adr_id\": \"ADR-0002\",\n    \"adr_path\": \"docs/adrs/0002-nimbus-front-end-directory-tree-and-stack.md\"\n  },\n  {\n    \"subject\": \"experimenter.*\",\n    \"object\": \"react-bootstrap\",\n    \"predicate\": \"requires_dependency\",\n    \"scope\": \"runtime\",\n    \"justification\": \"The ADR mandates continuing to use Bootstrap CSS and react-bootstrap.\",\n    \"adr_id\": \"ADR-0002\",\n    \"adr_path\": \"docs/adrs/0002-nimbus-front-end-directory-tree-and-stack.md\"\n  },\n  {\n    \"subject\": \"experimenter.*\",\n    \"object\": \"tailwind\",\n    \"predicate\": \"prohibits_dependency\",\n    \"scope\": \"runtime\",\n    \"justification\": \"The ADR explicitly rejected Tailwind in favor of Bootstrap.\",\n    \"adr_id\": \"ADR-0002\",\n    \"adr_path\": \"docs/adrs/0002-nimbus-front-end-directory-tree-and-stack.md\"\n  }\n]"
+    },
+    {
+      "adr_id": "ADR-0003",
+      "adr_path": "docs/adrs/0003-analysis-visualization-architecture-approach.md",
+      "raw_response": "[\n  {\n    \"subject\": \"experimenter.experimenter.*\",\n    \"object\": \"experimenter.experimenter.experiments.api.*\",\n    \"predicate\": \"requires_dependency\",\n    \"scope\": \"runtime\",\n    \"justification\": \"The ADR mandates that the visualization front end fetches data via a Django REST API.\",\n    \"adr_id\": \"ADR-0003\",\n    \"adr_path\": \"docs/adrs/0003-analysis-visualization-architecture-approach.md\"\n  }\n]"
+    },
+    {
+      "adr_id": "ADR-0004",
+      "adr_path": "docs/adrs/0004-monitoring-data-import.md",
+      "raw_response": "[\n  {\n    \"subject\": \"experimenter.*\",\n    \"object\": \"celery\",\n    \"predicate\": \"requires_dependency\",\n    \"scope\": \"runtime\",\n    \"justification\": \"The ADR mandates using a background celery task to fetch monitoring data on-demand from BigQuery and store it in Redis.\",\n    \"adr_id\": \"ADR-0004\",\n    \"adr_path\": \"docs/adrs/0004-monitoring-data-import.md\"\n  }\n]"
+    },
+    {
+      "adr_id": "ADR-0005",
+      "adr_path": "docs/adrs/0005-doc-hub.md",
+      "raw_response": "The ADR \"Use Docusaurus + GH Pages for the Nimbus User Doc Hub\" outlines a decision regarding the documentation strategy for the Nimbus platform.\n\nAfter reviewing the ADR and the codebase, I have determined that this ADR describes a documentation and deployment strategy (using Docusaurus and GitHub Pages) rather than an architectural constraint on the runtime code or the development toolchain (such as linters, test frameworks, or build systems). The decision is a process and documentation convention choice.\n\nAs per the instructions, because this decision does not impose an enforceable architectural constraint on the codebase (i.e., it does not mandate a dependency, prohibit an implementation, or govern the development toolchain in a way that can be enforced via static analysis), no architectural constraints are emitted.\n\n[]"
+    },
+    {
+      "adr_id": "ADR-0006",
+      "adr_path": "docs/adrs/0006-doc-hub-repo.md",
+      "raw_response": "The ADR \"Location for the new Experiment 'Docs Hub' codebase + docs\" describes a decision to move documentation to a separate, dedicated repository. This is a process and organizational decision regarding where the documentation source code lives, rather than an architectural constraint on the `experimenter` codebase itself (e.g., it does not mandate or prohibit any specific imports, inheritance, or runtime dependencies within the `experimenter` package).\n\nBecause the decision is about repository structure and organizational policy rather than code-level dependencies or implementation patterns, it does not produce any enforceable architectural constraints for the codebase.\n\n[]"
+    },
+    {
+      "adr_id": "ADR-0007",
+      "adr_path": "docs/adrs/0007-doc-hub-url.md",
+      "raw_response": "[]"
+    },
+    {
+      "adr_id": "ADR-0008",
+      "adr_path": "docs/adrs/0008-integrating-htmx.md",
+      "raw_response": "[\n  {\n    \"subject\": \"experimenter.*\",\n    \"object\": \"graphene\",\n    \"predicate\": \"prohibits_dependency\",\n    \"scope\": \"runtime\",\n    \"justification\": \"The ADR mandates moving away from GraphQL and its associated dependencies (graphene, graphene-django) in favor of HTMX to improve performance and maintainability.\",\n    \"adr_id\": \"ADR-0008\",\n    \"adr_path\": \"docs/adrs/0008-integrating-htmx.md\"\n  },\n  {\n    \"subject\": \"experimenter.*\",\n    \"object\": \"graphene_django\",\n    \"predicate\": \"prohibits_dependency\",\n    \"scope\": \"runtime\",\n    \"justification\": \"The ADR mandates moving away from GraphQL and its associated dependencies (graphene, graphene-django) in favor of HTMX to improve performance and maintainability.\",\n    \"adr_id\": \"ADR-0008\",\n    \"adr_path\": \"docs/adrs/0008-integrating-htmx.md\"\n  }\n]"
+    },
+    {
+      "adr_id": "ADR-0009",
+      "adr_path": "docs/adrs/0009-nimbus-web-sdk-architecture.md",
+      "raw_response": "[\n  {\n    \"subject\": \"cirrus.*\",\n    \"object\": \"cirrus_sdk\",\n    \"predicate\": \"requires_dependency\",\n    \"scope\": \"runtime\",\n    \"justification\": \"The ADR mandates the use of 'Cargo features, one library' to support web applications, which involves integrating the Cirrus SDK functionality into the Nimbus codebase.\",\n    \"adr_id\": \"ADR-0009\",\n    \"adr_path\": \"docs/adrs/0009-nimbus-web-sdk-architecture.md\"\n  },\n  {\n    \"subject\": \"cirrus.*\",\n    \"object\": \"nimbus_megazord.fml\",\n    \"predicate\": \"prohibits_dependency\",\n    \"scope\": \"runtime\",\n    \"justification\": \"The ADR explicitly rejects the 'Expose a stateless API alongside the stateful API' option, which would have mixed Nimbus and Cirrus logic, and instead mandates a boundary via Cargo features.\",\n    \"adr_id\": \"ADR-0009\",\n    \"adr_path\": \"docs/adrs/0009-nimbus-web-sdk-architecture.md\"\n  }\n]"
+    },
+    {
+      "adr_id": "ADR-0010",
+      "adr_path": "docs/adrs/0010-jetstream-shared-schema.md",
+      "raw_response": "[\n  {\n    \"subject\": \"experimenter.*\",\n    \"object\": \"pydantic\",\n    \"predicate\": \"requires_dependency\",\n    \"scope\": \"runtime\",\n    \"justification\": \"The ADR mandates using Pydantic for defining shared schemas in the experimenter repository.\",\n    \"adr_id\": \"ADR-0010\",\n    \"adr_path\": \"docs/adrs/0010-jetstream-shared-schema.md\"\n  }\n]"
+    },
+    {
+      "adr_id": "ADR-0011",
+      "adr_path": "docs/adrs/0011-nimbus-web-glean-application-structure.md",
+      "raw_response": "[\n  {\n    \"subject\": \"experimenter.experimenter.*\",\n    \"object\": \"experimenter.experimenter.glean.*\",\n    \"predicate\": \"prohibits_implementation\",\n    \"scope\": \"runtime\",\n    \"justification\": \"The ADR mandates 'One Glean app ID per product domain' and explicitly rejects 'One glean app ID per application' as detrimental. This implies that individual applications must not implement their own independent Glean application ID logic, but rather adhere to the domain-based structure.\",\n    \"adr_id\": \"ADR-0011\",\n    \"adr_path\": \"docs/adrs/0011-nimbus-web-glean-application-structure.md\"\n  }\n]"
+    },
+    {
+      "adr_id": "ADR-0012",
+      "adr_path": "docs/adrs/0012-exposure-events-and-coenrolling-features.md",
+      "raw_response": "[\n  {\n    \"subject\": \"experimenter.experimenter.experiments.api.v5.serializers.NimbusReviewSerializer\",\n    \"object\": \"experimenter.experimenter.experiments.constants.NimbusConstants\",\n    \"predicate\": \"requires_dependency\",\n    \"scope\": \"runtime\",\n    \"justification\": \"The ADR mandates adding the experiment slug to the feature schema, which is implemented by validating the 'experiment' field in the messaging feature configuration using NimbusConstants.\",\n    \"adr_id\": \"ADR-0012\",\n    \"adr_path\": \"docs/adrs/0012-exposure-events-and-coenrolling-features.md\"\n  }\n]"
+    },
+    {
+      "adr_id": "ADR-0013",
+      "adr_path": "docs/adrs/0013-guardrail-metric-versioning.md",
+      "raw_response": "The ADR \"Nimbus Metrics Guardrail Versioning\" proposes a versioning strategy for guardrail metrics by appending a `_v#` suffix to new metric definitions (Option 2). This is a process and naming convention decision rather than an architectural constraint that mandates or prohibits specific code dependencies or implementation patterns.\n\nThe ADR describes a workflow for how metrics should be defined and updated in the future, but it does not mandate that any specific module must import or inherit from another, nor does it prohibit the use of any existing code or external libraries. As such, it does not contain enforceable architectural constraints that can be mapped to `requires_*` or `prohibits_*` edges.\n\n[]"
+    },
+    {
+      "adr_id": "ADR-0014",
+      "adr_path": "docs/adrs/0014-desktop-randomization-unit.md",
+      "raw_response": "[\n  {\n    \"subject\": \"experimenter.experimenter.experiments.*\",\n    \"object\": \"experimenter.experimenter.experiments.models.NimbusIsolationGroup\",\n    \"predicate\": \"requires_implementation\",\n    \"scope\": \"runtime\",\n    \"justification\": \"The ADR mandates switching to `group_id` as the randomization unit for Firefox desktop experiments, requiring updates to the isolation group logic to support this new unit.\",\n    \"adr_id\": \"ADR-0014\",\n    \"adr_path\": \"docs/adrs/0014-desktop-randomization-unit.md\"\n  }\n]"
+    },
+    {
+      "adr_id": "ADR-0015",
+      "adr_path": "docs/adrs/0015-webapps-qa-strategy.md",
+      "raw_response": "[\n  {\n    \"subject\": \"cirrus.*\",\n    \"object\": \"kinto_http\",\n    \"predicate\": \"requires_dependency\",\n    \"scope\": \"runtime\",\n    \"justification\": \"The ADR mandates the use of a separate preview collection (nimbus-web-preview) for QA testing, which is managed via Kinto clients in the Cirrus/Experimenter ecosystem.\",\n    \"adr_id\": \"ADR-0015\",\n    \"adr_path\": \"docs/adrs/0015-webapps-qa-strategy.md\"\n  },\n  {\n    \"subject\": \"cirrus.*\",\n    \"object\": \"fastapi\",\n    \"predicate\": \"requires_dependency\",\n    \"scope\": \"runtime\",\n    \"justification\": \"The ADR mandates implementing the `nimbus_preview` flag in the URL for Cirrus to fetch from the preview collection, which is implemented as a FastAPI Query parameter.\",\n    \"adr_id\": \"ADR-0015\",\n    \"adr_path\": \"docs/adrs/0015-webapps-qa-strategy.md\"\n  }\n]"
+    },
+    {
+      "adr_id": "ADR-0016",
+      "adr_path": "docs/adrs/0016-ci-external-firefox-tracking.md",
+      "raw_response": "The ADR describes a process-level change to the CI/CD workflow (moving to a Just-In-Time testing strategy triggered by external dependency changes). While this is a significant architectural shift in how the project is validated and maintained, it does not mandate specific code-level dependencies, inheritance patterns, or prohibitions that would be enforced by static analysis of the codebase.\n\nThe ADR focuses on:\n1.  **Process/Policy:** Changing the CI trigger mechanism (CircleCI/Taskcluster integration).\n2.  **Configuration:** Updating tracked keys (Task IDs, commit hashes) within the repository.\n3.  **Testing Strategy:** Reducing test scope per PR and running specialized test suites upon external changes.\n\nThese are operational and process-oriented decisions rather than architectural constraints on the codebase's runtime or tooling structure (e.g., it does not mandate a specific library for CI interaction or prohibit the use of any existing code). Therefore, no enforceable architectural constraints are identified.\n\n[]"
+    }
+  ]
+}

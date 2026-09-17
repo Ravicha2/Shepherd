@@ -45,6 +45,9 @@ def adg_with_specificity(adg: ADG) -> ADG:
 
     ConstraintEdges start with specificity=0.0 from the unified resolver;
     this computes pattern depth + exact bonus for each edge.
+
+    `scope` is carried through: rebuilding the dataclass would otherwise default
+    every edge back to RUNTIME and undo the resolver's per-edge verdict (#159).
     """
     new_edges: list[ConstraintEdge] = []
     for edge in adg.constraint_edges:
@@ -56,6 +59,7 @@ def adg_with_specificity(adg: ADG) -> ADG:
             adr_id=edge.adr_id,
             adr_path=edge.adr_path,
             specificity=pattern_specificity(edge.subject),
+            scope=edge.scope,
         ))
     return ADG(
         nodes=list(adg.nodes),

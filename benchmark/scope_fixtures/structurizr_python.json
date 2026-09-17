@@ -1,0 +1,58 @@
+{
+  "repo_id": "structurizr-python",
+  "roots": [
+    "examples",
+    "setup",
+    "src"
+  ],
+  "pin_commit": "31f1dcadb3ff113d8a77ce132657237ea01c307b",
+  "model_id": "google/gemini-3.1-flash-lite",
+  "recorded_at": "2026-09-17T05:46:46+00:00",
+  "adrs": [
+    {
+      "adr_id": "ADR-0001",
+      "adr_path": "docs/development/adr/0001-record-architecture-decisions.md",
+      "raw_response": "The provided ADR describes a process-level decision (\"We will use Architecture Decision Records\") rather than a technical constraint on the codebase's implementation, dependencies, or architecture.\n\nAs per the instructions: \"If the ADR contains no enforceable architectural constraints, return an empty array [].\"\n\n[]"
+    },
+    {
+      "adr_id": "ADR-0002",
+      "adr_path": "docs/development/adr/0002-version-control-our-code.md",
+      "raw_response": "[]"
+    },
+    {
+      "adr_id": "ADR-0003",
+      "adr_path": "docs/development/adr/0003-python-3-6-only.md",
+      "raw_response": "[\n  {\n    \"subject\": \"examples.*\",\n    \"object\": \"python2.7\",\n    \"predicate\": \"prohibits_dependency\",\n    \"scope\": \"tooling\",\n    \"justification\": \"ADR mandates support only for Python 3.6+, explicitly rejecting older versions like Python 2.7.\",\n    \"adr_id\": \"ADR-0003\",\n    \"adr_path\": \"docs/development/adr/0003-python-3-6-only.md\"\n  },\n  {\n    \"subject\": \"src.*\",\n    \"object\": \"python2.7\",\n    \"predicate\": \"prohibits_dependency\",\n    \"scope\": \"tooling\",\n    \"justification\": \"ADR mandates support only for Python 3.6+, explicitly rejecting older versions like Python 2.7.\",\n    \"adr_id\": \"ADR-0003\",\n    \"adr_path\": \"docs/development/adr/0003-python-3-6-only.md\"\n  },\n  {\n    \"subject\": \"examples.*\",\n    \"object\": \"python3.5\",\n    \"predicate\": \"prohibits_dependency\",\n    \"scope\": \"tooling\",\n    \"justification\": \"ADR mandates support only for Python 3.6+, explicitly rejecting older versions like Python 3.5.\",\n    \"adr_id\": \"ADR-0003\",\n    \"adr_path\": \"docs/development/adr/0003-python-3-6-only.md\"\n  },\n  {\n    \"subject\": \"src.*\",\n    \"object\": \"python3.5\",\n    \"predicate\": \"prohibits_dependency\",\n    \"scope\": \"tooling\",\n    \"justification\": \"ADR mandates support only for Python 3.6+, explicitly rejecting older versions like Python 3.5.\",\n    \"adr_id\": \"ADR-0003\",\n    \"adr_path\": \"docs/development/adr/0003-python-3-6-only.md\"\n  }\n]"
+    },
+    {
+      "adr_id": "ADR-0004",
+      "adr_path": "docs/development/adr/0004-python-package-versioning.md",
+      "raw_response": "[\n  {\n    \"subject\": \"src.*\",\n    \"object\": \"versioneer\",\n    \"predicate\": \"requires_dependency\",\n    \"scope\": \"tooling\",\n    \"justification\": \"The ADR mandates the use of versioneer for managing package versions.\",\n    \"adr_id\": \"ADR-0004\",\n    \"adr_path\": \"docs/development/adr/0004-python-package-versioning.md\"\n  }\n]"
+    },
+    {
+      "adr_id": "ADR-0005",
+      "adr_path": "docs/development/adr/0005-code-quality-assurance.md",
+      "raw_response": "[\n  {\n    \"subject\": \"examples.*\",\n    \"object\": \"isort\",\n    \"predicate\": \"requires_dependency\",\n    \"scope\": \"tooling\",\n    \"justification\": \"ADR mandates the use of isort for import formatting.\",\n    \"adr_id\": \"ADR-0005\",\n    \"adr_path\": \"docs/development/adr/0005-code-quality-assurance.md\"\n  },\n  {\n    \"subject\": \"src.*\",\n    \"object\": \"isort\",\n    \"predicate\": \"requires_dependency\",\n    \"scope\": \"tooling\",\n    \"justification\": \"ADR mandates the use of isort for import formatting.\",\n    \"adr_id\": \"ADR-0005\",\n    \"adr_path\": \"docs/development/adr/0005-code-quality-assurance.md\"\n  },\n  {\n    \"subject\": \"examples.*\",\n    \"object\": \"black\",\n    \"predicate\": \"requires_dependency\",\n    \"scope\": \"tooling\",\n    \"justification\": \"ADR mandates the use of black for code formatting.\",\n    \"adr_id\": \"ADR-0005\",\n    \"adr_path\": \"docs/development/adr/0005-code-quality-assurance.md\"\n  },\n  {\n    \"subject\": \"src.*\",\n    \"object\": \"black\",\n    \"predicate\": \"requires_dependency\",\n    \"scope\": \"tooling\",\n    \"justification\": \"ADR mandates the use of black for code formatting.\",\n    \"adr_id\": \"ADR-0005\",\n    \"adr_path\": \"docs/development/adr/0005-code-quality-assurance.md\"\n  },\n  {\n    \"subject\": \"examples.*\",\n    \"object\": \"flake8\",\n    \"predicate\": \"requires_dependency\",\n    \"scope\": \"tooling\",\n    \"justification\": \"ADR mandates the use of flake8 for style guideline checking.\",\n    \"adr_id\": \"ADR-0005\",\n    \"adr_path\": \"docs/development/adr/0005-code-quality-assurance.md\"\n  },\n  {\n    \"subject\": \"src.*\",\n    \"object\": \"flake8\",\n    \"predicate\": \"requires_dependency\",\n    \"scope\": \"tooling\",\n    \"justification\": \"ADR mandates the use of flake8 for style guideline checking.\",\n    \"adr_id\": \"ADR-0005\",\n    \"adr_path\": \"docs/development/adr/0005-code-quality-assurance.md\"\n  }\n]"
+    },
+    {
+      "adr_id": "ADR-0006",
+      "adr_path": "docs/development/adr/0006-code-testing.md",
+      "raw_response": "[\n  {\n    \"subject\": \"src.*\",\n    \"object\": \"tox\",\n    \"predicate\": \"requires_dependency\",\n    \"scope\": \"tooling\",\n    \"justification\": \"The ADR mandates the use of tox to define, configure, and run test scenarios.\",\n    \"adr_id\": \"ADR-0006\",\n    \"adr_path\": \"docs/development/adr/0006-code-testing.md\"\n  }\n]"
+    },
+    {
+      "adr_id": "ADR-0007",
+      "adr_path": "docs/development/adr/0007-unit-tests.md",
+      "raw_response": "[\n  {\n    \"subject\": \"src.*\",\n    \"object\": \"pytest\",\n    \"predicate\": \"requires_dependency\",\n    \"scope\": \"tooling\",\n    \"justification\": \"The ADR mandates the use of pytest as the project's testing framework.\",\n    \"adr_id\": \"ADR-0007\",\n    \"adr_path\": \"docs/development/adr/0007-unit-tests.md\"\n  }\n]"
+    },
+    {
+      "adr_id": "ADR-0008",
+      "adr_path": "docs/development/adr/0008-package-structure.md",
+      "raw_response": "The ADR \"8. Package structure\" describes a convention for organizing the codebase (allowing nested sub-packages while maintaining a public interface via top-level exports). This is a documentation/convention-based decision regarding project structure and API design.\n\nIt does not mandate specific dependencies, inheritance hierarchies, or prohibitions that can be enforced as architectural constraints (e.g., `requires_dependency` or `prohibits_implementation`) via the provided tooling. The decision is a guideline for developers on how to structure their code and expose interfaces, rather than a rule that restricts the import graph or implementation details.\n\nTherefore, no enforceable architectural constraints are identified.\n\n[]"
+    },
+    {
+      "adr_id": "ADR-0009",
+      "adr_path": "docs/development/adr/0009-use-pydantic-for-json-de-serialization.md",
+      "raw_response": "[\n  {\n    \"subject\": \"src.structurizr.*\",\n    \"object\": \"pydantic\",\n    \"predicate\": \"requires_dependency\",\n    \"scope\": \"runtime\",\n    \"justification\": \"The ADR mandates the use of pydantic for JSON (de-)serialization of Structurizr workspace entities.\",\n    \"adr_id\": \"ADR-0009\",\n    \"adr_path\": \"docs/development/adr/0009-use-pydantic-for-json-de-serialization.md\"\n  }\n]"
+    }
+  ]
+}

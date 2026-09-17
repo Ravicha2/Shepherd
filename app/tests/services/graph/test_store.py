@@ -21,6 +21,7 @@ from services.fqn import FQN
 from services.models import (
     ADG,
     ConstraintEdge,
+    ConstraintScope,
     Edge,
     FQNKind,
     FQNNode,
@@ -220,6 +221,36 @@ class TestConstraintEdgeCRUD:
         assert constraints[0].predicate == PredicateType.REQUIRES_IMPLEMENTATION
         assert constraints[0].object == "app.auth.middleware"
         assert constraints[0].specificity == 4.0
+
+    def test_scope_verdict_survives_the_round_trip(self, neo4j_store) -> None:
+        """#159: the deployed CLI path is seed build -> Neo4j -> detect, and the
+        benchmark harness has no database, so this is the only place the reload is
+        pinned. A dropped scope key silently restores RUNTIME on every reloaded
+        edge, which would make the engine's TOOLING filter a no-op for CLI users.
+        """
+        tooling = ConstraintEdge(
+            subject="app.flows.*",
+            predicate=PredicateType.REQUIRES_DEPENDENCY,
+            object="prefect",
+            justification="Prefect deploys the flows.",
+            adr_id="ADR-010",
+            adr_path="docs/adr/010.md",
+            scope=ConstraintScope.TOOLING,
+        )
+        runtime = ConstraintEdge(
+            subject="app.api.*",
+            predicate=PredicateType.REQUIRES_IMPLEMENTATION,
+            object="app.auth.middleware",
+            justification="Auth required.",
+            adr_id="ADR-011",
+            adr_path="docs/adr/011.md",
+        )
+        neo4j_store.store_constraint_edge(tooling)
+        neo4j_store.store_constraint_edge(runtime)
+
+        loaded = {constraint.adr_id: constraint for constraint in neo4j_store.load_all_constraint_edges()}
+        assert loaded["ADR-010"].scope is ConstraintScope.TOOLING
+        assert loaded["ADR-011"].scope is ConstraintScope.RUNTIME
 
     def test_delete_constraints_by_adr_id(self, neo4j_store) -> None:
         """Full replace per ADR: delete all constraints for a given ADR."""

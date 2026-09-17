@@ -481,7 +481,7 @@ change it.
 | flowkit | `24d88247d57987fe33f6b8915540d7bf09b58033` | 2026-05-28 | violations found: none at pin (compliant); injected-diff cases recommended |
 | mozilla-experimenter | `d61a2b8efcb7fd77a849c9f9dc163130473b7f16` | 2026-08-31 | violations found: none at pin (compliant); historical violation pins `a2de3aeb` (2023-06-09, schema-availability) and `9857c48a` (2023-06-23, last pre-adoption; parent of fix `b6d9aebc`) — case-verified 2026-09-15 |
 | eq-questionnaire-runner | `da90adfdc4390c0fd1d33dbc896adc38d6ca2022` | 2026-08-26 | violations found: 1 mild non-encodable (ADR-0010 cookie remnants); verdict SWAP |
-| home-assistant (held-out, report-only) | `e4b01b65d306cf4ffcd692b9eb7c7d2ce4f794e4` | 2026-09-01 | code repo; ADRs in separate repo `home-assistant-architecture` @ `0c4f7dbf21c9e1279bea23a1eb2f9ab295d0e9e9`; **gold authored 2026-09-14, VERIFIED 14/14 and un-parked 2026-09-15 post-#150 (PR #151)**: 2 constraints, 1 GENUINE live violation at pin (ADR-0019, legacy `remote_rpi_gpio` importing gpiozero); full-graph detect still deferred (>60 min CPU hazard, see §7 verification note) |
+| home-assistant (held-out, report-only) | `e4b01b65d306cf4ffcd692b9eb7c7d2ce4f794e4` | 2026-09-01 | code repo; ADRs in separate repo `home-assistant-architecture` @ `0c4f7dbf21c9e1279bea23a1eb2f9ab295d0e9e9`; **gold authored 2026-09-14, VERIFIED 14/14 and un-parked 2026-09-15 post-#150 (PR #151)**: 2 constraints, 1 GENUINE live violation at pin (ADR-0019, legacy `remote_rpi_gpio` importing gpiozero); full-graph detect still deferred (>60 min CPU hazard, see §7 verification note); **2026-09-17 #165 RESOLVED that hazard**: reverse-reachability skip-filter takes full-graph `detect()` to 4.0 s and returns exactly the one gold unit (eval.md #165 row); **2026-09-17 #160 ran the first full-graph HA cell** (node_on k=1, `benchmark/reports/2026-09-17T23-44-54/`, `CONVENTION.md` there records full graph as the default convention), so this repo is no longer held-out |
 
 ---
 
@@ -658,9 +658,11 @@ violation. Historical pin `6e172854` (2019-05-26, adds remote_rpi_gpio)
 recorded as era context only — pre-dates ADR-0019 (2021-12-20), so pre-ADR
 gpiozero usage is anachronism, not violation. Scoping caveat: the staged tree
 proves direct/2-hop paths and non-firing controls; full-graph confirmation
-(all ~2000 components, no other transitive subjects) belongs to the deferred
-report-only run, which additionally remains the >60-min CPU hazard
-(independent perf issue).
+(all ~2000 components, no other transitive subjects) was **run 2026-09-17 on
+the real tree by #165**: full-graph `detect()` with the two gold constraints as
+input returns exactly this one unit (no other transitive subject) in 4.0 s,
+which also resolves the >60-min CPU hazard (independent perf issue) — see the
+eval.md #165 row.
 
 **Population after HA (un-parked): 49 cases / 48 expected-violation scoring
 units** (was 35 / 27; HA adds 14 cases / 21 units, of which 9 units are the

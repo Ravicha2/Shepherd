@@ -12,6 +12,9 @@ Resolution logic tested separately in test_resolution.py.
 
 from __future__ import annotations
 
+import textwrap
+from pathlib import Path
+
 import pytest
 
 from services.fqn import FQN
@@ -19,6 +22,7 @@ from services.models import (
     ADG,
     ChangedFQN,
     ConstraintEdge,
+    ConstraintScope,
     DependencyRole,
     DiffResult,
     Edge,
@@ -148,6 +152,38 @@ def _changed_fqn(fqn_str: str, change_type: str = "modified") -> ChangedFQN:
 # 1. match_constraints: single-pass matching against all ADG nodes
 # ===========================================================================
 
+# Run in a child process (see test_detect_output_is_hash_seed_independent): a
+# wildcard subject over sibling functions in one module, so match order decides
+# which function anchors the violation.
+_HASH_SEED_PROBE = textwrap.dedent(
+    """
+    from services.fqn import FQN
+    from services.models import ADG, ConstraintEdge, DiffResult, Edge, FQNKind, FQNNode, PredicateType
+    from services.cpt.engine import detect
+
+    def node(dotted, kind=FQNKind.MODULE):
+        return FQNNode(fqn=FQN.from_dotted_safe(dotted), kind=kind,
+                       file_path="x.py", line_start=1, line_end=2)
+
+    adg = ADG(
+        nodes=[node("app"), node("app.mod"),
+               node("app.mod.first_function", FQNKind.FUNCTION),
+               node("app.mod.second_function", FQNKind.FUNCTION),
+               node("app.db")],
+        edges=[Edge("app", "app.mod", "CONTAINS"),
+               Edge("app.mod", "app.mod.first_function", "CONTAINS"),
+               Edge("app.mod", "app.mod.second_function", "CONTAINS"),
+               Edge("app.mod.first_function", "app.db", "IMPORTS"),
+               Edge("app.mod.second_function", "app.db", "IMPORTS")],
+        constraint_edges=[ConstraintEdge(
+            subject="app.*", predicate=PredicateType.PROHIBITS_DEPENDENCY, object="app.db",
+            justification="probe", adr_id="ADR-0001", adr_path="docs/adr/0001.md")],
+    )
+    for violation in detect(DiffResult(to_sha="deadbeef"), adg).violations:
+        print(violation.changed_fqn, violation.matched_fqn, violation.evidence)
+    """
+)
+
 
 class TestMatchConstraints:
     """For each constraint, match all ADG node FQNs against subject/object."""
@@ -211,6 +247,30 @@ class TestMatchConstraints:
         adg = ADG(nodes=sample_adg.nodes, edges=sample_adg.edges, constraint_edges=constraints)
         matched = match_constraints(adg)
         assert len(matched) == 0
+
+
+def test_detect_output_is_hash_seed_independent() -> None:
+    """Cross-process determinism can only be checked in two processes (#165): a
+    wildcard constraint over several sibling subjects must name the same anchor
+    and the same evidence at any PYTHONHASHSEED."""
+    import os
+    import subprocess
+    import sys
+
+    app_dir = Path(__file__).resolve().parents[3]
+    outputs = []
+    for seed in ("0", "1"):  # seed 1 is the one that moves without the sort
+        completed = subprocess.run(
+            [sys.executable, "-c", _HASH_SEED_PROBE],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=app_dir,
+            env={**os.environ, "PYTHONHASHSEED": seed, "PYTHONPATH": str(app_dir)},
+        )
+        outputs.append(completed.stdout)
+
+    assert outputs[0] == outputs[1], f"detect() output follows PYTHONHASHSEED:\n{outputs[0]}\nvs\n{outputs[1]}"
 
 
 # ===========================================================================
@@ -882,6 +942,45 @@ class TestDetect:
         result = detect(diff, adg)
         assert len(result.orphans) >= 1
         assert any(c.adr_id == "ADR-999" for c in result.orphans)
+
+    def test_detect_skips_tooling_scoped_constraints(
+        self, sample_adg: ADG, sample_constraints: list[ConstraintEdge]
+    ) -> None:
+        """#159: a TOOLING edge is not enforced, and is not reported as an orphan
+        either (it is not ungrounded, it is deliberately out of detect's scope).
+
+        The tooling edge is the runtime twin of `sample_constraints[0]` (ADR-003,
+        which fires on this diff): the silence is the scope tag, not an inert
+        pattern."""
+        from services.cpt.engine import detect
+
+        runtime_edge = sample_constraints[0]
+        tooling_edge = ConstraintEdge(
+            subject=runtime_edge.subject,
+            predicate=runtime_edge.predicate,
+            object=runtime_edge.object,
+            justification=runtime_edge.justification,
+            adr_id="ADR-900",
+            adr_path="docs/adr/900-tooling.md",
+            scope=ConstraintScope.TOOLING,
+        )
+        diff = DiffResult(
+            to_sha="abc123",
+            from_sha="def456",
+            changed_files=[FileChange(path="app/api/orders.py", status="modified")],
+            changed_fqns=[_changed_fqn("app.api.orders")],
+        )
+
+        def run(edge: ConstraintEdge):
+            adg = ADG(nodes=sample_adg.nodes, edges=sample_adg.edges, constraint_edges=[edge])
+            return detect(diff, adg)
+
+        runtime_result = run(runtime_edge)
+        assert [v.constraint.adr_id for v in runtime_result.violations] == ["ADR-003"]
+
+        tooling_result = run(tooling_edge)
+        assert tooling_result.violations == []
+        assert tooling_result.orphans == []
 
     def test_detect_specificity_resolution(self, sample_adg: ADG) -> None:
         from services.cpt.engine import detect
@@ -1732,3 +1831,148 @@ class TestProhibitsReportsAtEvidenceOwner:
         result = detect(diff, adg)
         assert len(result.violations) == 1
         assert str(result.violations[0].matched_fqn) == "app.core.admin"
+
+
+# ===========================================================================
+# #165: reverse-reachability skip-filter on structural prohibits
+# ===========================================================================
+
+
+def _reverse_filter_adg() -> ADG:
+    """The reach shapes the skip-filter must not mistake for "cannot fire":
+
+        app.pkg CONTAINS app.pkg.a   -> CONTAINS-first descent
+        app.pkg.a IMPORTS ext        -> app.pkg.a.f (FUNCTION, no own edges)
+                                        fires only via the seeded module edge
+        app.cyc1 CALLS app.cyc2, app.cyc2 CALLS app.cyc1,
+        app.cyc2 IMPORTS ext.deep    -> cycle + deep-prefix object target
+        app.twin IMPORTS app.twin    -> self-referential node (no reach to ext)
+        app.quiet                    -> no edges at all
+    """
+    def node(fqn: str, kind: FQNKind, path: str = "app/x.py") -> FQNNode:
+        return FQNNode(fqn=FQN.from_dotted(fqn), kind=kind, file_path=path,
+                       line_start=0, line_end=20, start_byte=0, end_byte=0)
+
+    nodes = [
+        node("app", FQNKind.MODULE, "app/__init__.py"),
+        node("app.pkg", FQNKind.MODULE, "app/pkg/__init__.py"),
+        node("app.pkg.a", FQNKind.MODULE, "app/pkg/a.py"),
+        node("app.pkg.a.f", FQNKind.FUNCTION, "app/pkg/a.py"),
+        node("app.cyc1", FQNKind.MODULE),
+        node("app.cyc2", FQNKind.MODULE),
+        node("app.twin", FQNKind.MODULE),
+        node("app.quiet", FQNKind.MODULE),
+        node("ext", FQNKind.EXTERNAL, ""),
+        node("ext.deep", FQNKind.EXTERNAL, ""),
+    ]
+    edges = [
+        Edge(source="app", target="app.pkg", kind="CONTAINS"),
+        Edge(source="app", target="app.cyc1", kind="CONTAINS"),
+        Edge(source="app", target="app.cyc2", kind="CONTAINS"),
+        Edge(source="app", target="app.twin", kind="CONTAINS"),
+        Edge(source="app", target="app.quiet", kind="CONTAINS"),
+        Edge(source="app.pkg", target="app.pkg.a", kind="CONTAINS"),
+        Edge(source="app.pkg.a", target="app.pkg.a.f", kind="CONTAINS"),
+        Edge(source="app.pkg.a", target="ext", kind="IMPORTS"),
+        Edge(source="app.cyc1", target="app.cyc2", kind="CALLS"),
+        Edge(source="app.cyc2", target="app.cyc1", kind="CALLS"),
+        Edge(source="app.cyc2", target="ext.deep", kind="IMPORTS"),
+        Edge(source="app.twin", target="app.twin", kind="IMPORTS"),
+    ]
+    return ADG(nodes=nodes, edges=edges)
+
+
+def _reverse_filter_constraints() -> list[ConstraintEdge]:
+    return [
+        # A: subject is a wide wildcard, object an external package with a deep sibling
+        ConstraintEdge(subject="app.*", predicate=PredicateType.PROHIBITS_DEPENDENCY,
+                       object="ext", justification="ext is banned.", adr_id="ADR-165",
+                       adr_path="docs/adr/165.md"),
+        # B: the object node is itself a subject match (subject==object shape)
+        ConstraintEdge(subject="app.*", predicate=PredicateType.PROHIBITS_DEPENDENCY,
+                       object="app.quiet", justification="quiet is reserved.", adr_id="ADR-166",
+                       adr_path="docs/adr/166.md"),
+    ]
+
+
+def _violation_projection(violations: list) -> list[tuple]:
+    return [
+        (v.constraint.adr_id, v.constraint.subject, str(v.changed_fqn), str(v.matched_fqn),
+         v.evidence, v.change_type, tuple((h["kind"], h["target"]) for h in (v.path_hops or ())))
+        for v in violations
+    ]
+
+
+def _reverse_filter_matched() -> tuple:
+    import services.cpt.engine as engine
+
+    adg = _reverse_filter_adg()
+    matched = engine.match_constraints(
+        ADG(nodes=adg.nodes, edges=adg.edges, constraint_edges=_reverse_filter_constraints())
+    )
+    assert matched, "fixture must produce matched constraints"
+    return adg, matched, engine._build_adjacency(adg.edges), engine._enclosing_module_map(adg)
+
+
+def test_reverse_filter_is_a_no_op_on_structural_violations(monkeypatch) -> None:
+    """#165 contract: the filter only SKIPS subjects whose forward BFS provably
+    cannot fire, so every violation, its evidence string, its recorded path and
+    its changed_fqn representative stay exactly what they were. Compared against
+    the same run with filtering disabled (candidates = the whole node universe)."""
+    import services.cpt.engine as engine
+
+    adg, matched, adjacency, module_scope = _reverse_filter_matched()
+    filtered = engine.check_structural_predicates(matched, adjacency, module_scope=module_scope)
+
+    universe = {str(node.fqn) for node in adg.nodes} | {edge.target for edge in adg.edges}
+    monkeypatch.setattr(engine, "_reverse_candidates", lambda *a, **k: universe)
+    unfiltered = engine.check_structural_predicates(matched, adjacency, module_scope=module_scope)
+
+    assert _violation_projection(filtered) == _violation_projection(unfiltered)
+    # non-vacuity: the fixture fires through the CONTAINS-first, own-edge, seeded-
+    # module and cyclic shapes (the function reports at its enclosing module)
+    assert {str(v.changed_fqn) for v in filtered} == {
+        "app.pkg", "app.pkg.a", "app.pkg.a.f", "app.cyc1", "app.cyc2",
+    }
+
+
+def test_reverse_candidates_is_complete_for_every_firing_shape() -> None:
+    """The completeness property the no-op contract rests on: every subject that
+    fires (per the unchanged forward BFS) is inside the candidate set, while a
+    subject with no path to the object is outside it (else the filter buys
+    nothing)."""
+    import services.cpt.engine as engine
+
+    adg, matched, adjacency, module_scope = _reverse_filter_matched()
+    kinds = {"CONTAINS", "IMPORTS", "CALLS", "INHERITS"}
+
+    for mc in matched.values():
+        object_strs = {str(fqn) for fqn, _ in mc.object_matches}
+        candidates = engine._reverse_candidates(adjacency, kinds, object_strs)
+        for subject_fqn, _ in mc.subject_matches:
+            subject_str = str(subject_fqn)
+            forward = engine._reachable_paths(
+                subject_str, adjacency, kinds, seed_module=module_scope.get(subject_str),
+            )
+            if any(t == o or t.startswith(o + ".") for t in forward for o in object_strs):
+                # the code's actual skip condition: subject OR its seeded module
+                scope = module_scope.get(subject_str)
+                assert subject_str in candidates or (scope and scope in candidates), subject_str
+
+    # controls, on the ext constraint: nodes the filter is allowed to skip
+    ext_strs = {str(fqn) for fqn, _ in next(
+        mc for mc in matched.values() if mc.constraint.object == "ext"
+    ).object_matches}
+    ext_candidates = engine._reverse_candidates(adjacency, kinds, ext_strs)
+    assert "app.twin" not in ext_candidates  # self-loop only: cannot reach out
+    assert "app.quiet" not in ext_candidates  # no edges at all
+    # the object node itself is always a candidate (conservative seeding)
+    quiet_mc = next(mc for mc in matched.values() if mc.constraint.object == "app.quiet")
+    assert "app.quiet" in engine._reverse_candidates(
+        adjacency, kinds, {str(fqn) for fqn, _ in quiet_mc.object_matches}
+    )
+    # the CONTAINS ancestor above a firing descendant is a candidate too
+    ext_mc = next(mc for mc in matched.values() if mc.constraint.object == "ext")
+    assert "app.pkg" in engine._reverse_candidates(
+        adjacency, kinds, {str(fqn) for fqn, _ in ext_mc.object_matches}
+    )

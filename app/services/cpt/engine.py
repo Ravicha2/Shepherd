@@ -4,7 +4,7 @@ import logging
 from dataclasses import dataclass, field
 
 from services.fqn import FQN
-from services.models import ADG, ChangedFQN, ConstraintEdge, DependencyRole, DiffResult, Edge, FQNKind, PredicateType
+from services.models import ADG, ChangedFQN, ConstraintEdge, ConstraintScope, DependencyRole, DiffResult, Edge, FQNKind, PredicateType
 from services.cpt.resolution import Violation, resolve, suppress_outweighed_prohibits, suppress_outweighed_requires
 from services.resolver import MatchStatus, fqn_matches_pattern
 from collections.abc import Iterable
@@ -126,6 +126,65 @@ def _reachable_paths(
     return paths
 
 
+def _reverse_candidates(
+    adjacency: dict[str, list[Edge]],
+    kinds: set[str],
+    object_strs: set[str],
+) -> set[str]:
+    """Subjects whose forward `_reachable_paths` can put some object in `paths`.
+
+    Mirrors the traversal shape of `_reachable_paths` (issue 150): an object is
+    only reachable as CONTAINS descent from the start, then dependency edges
+    (IMPORTS/CALLS/INHERITS) with no further CONTAINS. So a start fires iff its
+    CONTAINS subtree meets Z = the dependency-only reverse closure of the
+    objects, plus every node owning a dependency edge into that closure.
+    Candidates are Z and Z's CONTAINS ancestors; the only over-approximation is
+    ignoring edge roles (DEV_TOOL is skipped by the forward BFS).
+
+    Used ONLY as a skip-filter (issue #165): a subject outside this set is
+    provably unable to fire, and the forward BFS still runs, unchanged, for
+    every survivor, so violations, evidence strings, recorded path_hops and the
+    `_path_excused` shortest-path read stay exactly what they were.
+    """
+    dependency_reverse: dict[str, list[str]] = defaultdict(list)
+    contains_reverse: dict[str, list[str]] = defaultdict(list)
+    nodes: set[str] = set(adjacency)
+    for source, edges in adjacency.items():
+        for edge in edges:
+            nodes.add(edge.target)
+            if edge.kind == "CONTAINS":
+                contains_reverse[edge.target].append(source)
+            elif edge.kind in kinds:
+                dependency_reverse[edge.target].append(source)
+
+    # a reachable target matches an object by prefix, not by pattern (the
+    # `gpiozero.pins.pigpio` case), so seed every node at or under an object
+    seeds = {
+        node for node in nodes
+        if any(node == object_str or node.startswith(object_str + ".") for object_str in object_strs)
+    }
+    closure = set(seeds)
+    queue: deque[str] = deque(seeds)
+    while queue:
+        for source in dependency_reverse.get(queue.popleft(), ()):
+            if source not in closure:
+                closure.add(source)
+                queue.append(source)
+
+    frontier = set(closure)
+    for node in closure:
+        frontier.update(dependency_reverse.get(node, ()))
+
+    candidates = set(frontier)
+    queue = deque(frontier)
+    while queue:
+        for parent in contains_reverse.get(queue.popleft(), ()):
+            if parent not in candidates:
+                candidates.add(parent)
+                queue.append(parent)
+    return candidates
+
+
 def _path_excused(path: list[Edge], object_str: str, requires: list[ConstraintEdge]) -> bool:
     """True when every intermediary on the path is itself required to depend on the
     object ('via connector' pattern): services -> connector -> db is allowed when a
@@ -149,11 +208,17 @@ def match_constraints(adg: ADG) -> dict[int, MatchedConstraint]:
     match all constraint with all nodes O(c x n) 
     TODO: do we need to check all constraints? optimize?
     """
+    # The set dedups adg.nodes (88,508 nodes carry 88,405 distinct FQNs on the HA
+    # full graph); the sort makes match order process-independent. Without it,
+    # PYTHONHASHSEED decides which match anchors a violation's changed_fqn and
+    # which object FQN variant its evidence names (#165). Hoisted out of the
+    # constraint loop: it is constraint-independent, so one sort, not c sorts.
+    all_fqns = sorted({node.fqn for node in adg.nodes}, key=str)
+
     matched: dict[int, MatchedConstraint] = {}
     for constraint in adg.constraint_edges:
         subject_matches: list[tuple[FQN, MatchStatus]] = []
         object_matches: list[tuple[FQN, MatchStatus]] = []
-        all_fqns = {node.fqn for node in adg.nodes}
         for fqn in all_fqns:
             subj_status = fqn_matches_pattern(fqn, constraint.subject)
             if subj_status != MatchStatus.NO_MATCH:
@@ -207,11 +272,21 @@ def check_structural_predicates(
         if not non_dev_object_matches:
             continue
 
+        # skip-filter (issue #165): one reverse pass per constraint replaces a
+        # forward BFS per wildcard subject match. A subject is skipped only when
+        # neither it nor its seeded enclosing module can reach the object at all,
+        # in which case the forward BFS below finds nothing anyway.
+        candidates = _reverse_candidates(
+            adjacency, kinds, {str(fqn) for fqn, _ in non_dev_object_matches}
+        )
+
         for subject_fqn, subject_status in matched_constraint.subject_matches:
             subject_str = str(subject_fqn)
             # function/method subjects cannot see module-level edges from their own
             # frontier: seed it with the enclosing module's edges (issue 115, B1)
             scope_str = (module_scope or {}).get(subject_str)
+            if subject_str not in candidates and (not scope_str or scope_str not in candidates):
+                continue
             paths = _reachable_paths(
                 subject_str, adjacency, kinds,
                 node_roles=node_roles, skip_roles={DependencyRole.DEV_TOOL},
@@ -350,9 +425,18 @@ def detect(diff_result: DiffResult, adg: ADG) -> CPTResult:
     node_roles = {str(node.fqn): node.role for node in adg.nodes}
     module_scope = _enclosing_module_map(adg)
 
+    # #159: TOOLING-scoped constraints are out of detect's world entirely, neither
+    # enforced nor reported as orphans (an orphan is an ungrounded constraint; a
+    # tooling edge is a grounded one that the import graph does not govern).
+    # Scope-blind matching at ingestion still lets them satisfy gold (#136, ADR 019).
+    enforced_edges = [
+        constraint for constraint in adg.constraint_edges
+        if constraint.scope is not ConstraintScope.TOOLING
+    ]
+
     # filter self-loop constraints (subject == object), surface as informational
     self_loop_constraints: list[ConstraintEdge] = [
-        constraint for constraint in adg.constraint_edges if constraint.subject == constraint.object
+        constraint for constraint in enforced_edges if constraint.subject == constraint.object
     ]
 
     if self_loop_constraints:
@@ -362,7 +446,7 @@ def detect(diff_result: DiffResult, adg: ADG) -> CPTResult:
             [(constraint.adr_id, constraint.subject) for constraint in self_loop_constraints],
         )
 
-    safe_edges = [constraint for constraint in adg.constraint_edges if constraint.subject != constraint.object] # filter self loop
+    safe_edges = [constraint for constraint in enforced_edges if constraint.subject != constraint.object] # filter self loop
     safe_adg = ADG(nodes=adg.nodes, edges=adg.edges, constraint_edges=safe_edges)
     matched = match_constraints(safe_adg)
 
@@ -400,7 +484,7 @@ def detect(diff_result: DiffResult, adg: ADG) -> CPTResult:
                 hop["file_path"] = hop_node.file_path
 
     orphans: list[ConstraintEdge] = []
-    for constraint in adg.constraint_edges:
+    for constraint in enforced_edges:
         if id(constraint) not in matched:
             orphans.append(constraint)
 

@@ -1,0 +1,723 @@
+{
+  "_purpose": "#158 triage ground truth: the human-labeled per-ADR scope verdict for every benchmark ADR, scored against the resolver's per-edge verdicts as a runtime/tooling/none confusion matrix.",
+  "_how_to_label": "Read the ADR at adr_path in the repo's pinned worktree. Fill expected_scope with 'runtime', 'tooling' or 'none' (ADR 019 decision 2 vocabulary: runtime governs shipped code, tooling is the dev toolchain, none is not a dependency/implementation relation at all). Set label_source to 'human' and add a one-line notes entry when you fill one in. Gold context for each ADR (its expected constraints and a note) lives in benchmark/gold/<repo>_gold.json under the same adr_id; has-gold ADRs are the recall-safety ones. Rows whose label_source is null are unlabeled.",
+  "_anchoring_note": "Deliberately NOT included: what the committed #157 fixture run produced for each ADR. Seeing the machine's verdict before labeling would anchor the ground truth (#158 axis 2 is the instrument that decides whether the triage stays).",
+  "_contested_note": "Resolved 2026-09-17 on #158. flowkit ADR-0008/0009/0010 stay tooling (the #157 named list), ADR-0011/0012 stay none. Recorded caveat for 0010: tooling edges are excluded from FP accounting, so grounding the absent AutoFlow reads clean.",
+  "adrs": [
+    {
+      "repo_id": "python-tuf",
+      "adr_id": "ADR-0000",
+      "adr_path": "docs/adr/0000-use-markdown-architectural-decision-records.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#158 human label (ADR text + benchmark gold note)",
+      "notes": "Documentation/process convention (MADR template): how decisions are recorded, no dependency or implementation relation. Gold: emit no edges."
+    },
+    {
+      "repo_id": "python-tuf",
+      "adr_id": "ADR-0001",
+      "adr_path": "docs/adr/0001-python-version-3-6-plus.md",
+      "expected_scope": "tooling",
+      "contested": null,
+      "recall_safety": {
+        "required": "tooling",
+        "why": "language-version prohibitions: gold rows tag tooling AND still match (scope-blind pin)"
+      },
+      "label_source": "#157 named expectation (ADR 019 decision 2); ADR 019 recall-safety table",
+      "notes": ""
+    },
+    {
+      "repo_id": "python-tuf",
+      "adr_id": "ADR-0002",
+      "adr_path": "docs/adr/0002-pre-1-0-deprecation-strategy.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#158 human label (ADR text + benchmark gold note)",
+      "notes": "Release/support policy (best-effort pre-1.0 bug handling): governance commitment, no FQN relation. Gold: emit no edges."
+    },
+    {
+      "repo_id": "python-tuf",
+      "adr_id": "ADR-0003",
+      "adr_path": "docs/adr/0003-where-to-develop-TUF-1-0-0.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#158 human label (ADR text + benchmark gold note)",
+      "notes": "Process/location decision (develop 1.0.0 in a subdirectory): development workflow, no importable relation. Gold: emit no edges."
+    },
+    {
+      "repo_id": "python-tuf",
+      "adr_id": "ADR-0004",
+      "adr_path": "docs/adr/0004-extent-of-OOP-in-metadata-model.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#158 human label (ADR text + benchmark gold note)",
+      "notes": "Data-representation redesign (dicts to custom classes inside tuf.api.metadata): vocabulary names data-model redesigns as none. Gold: emit no edges."
+    },
+    {
+      "repo_id": "python-tuf",
+      "adr_id": "ADR-0005",
+      "adr_path": "docs/adr/0005-use-google-python-style-guide.md",
+      "expected_scope": "tooling",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#158 human label (ADR text + benchmark gold note)",
+      "notes": "Code-style guide; linters/formatters are named in decision 2's tooling list and the style tool is present (pyproject.toml [tool.ruff.lint.flake8-annotations]). Gold: emit no edges."
+    },
+    {
+      "repo_id": "python-tuf",
+      "adr_id": "ADR-0006",
+      "adr_path": "docs/adr/0006-where-to-implemenent-model-serialization.md",
+      "expected_scope": "runtime",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#158 human label (ADR text + benchmark gold note)",
+      "notes": "Gold: tuf.api.metadata.* requires tuf.api.serialization.*. Runtime implementation dependency (serialization separated from the class model)."
+    },
+    {
+      "repo_id": "python-tuf",
+      "adr_id": "ADR-0008",
+      "adr_path": "docs/adr/0008-accept-unrecognised-fields.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#158 human label (ADR text + benchmark gold note)",
+      "notes": "Runtime deserialization behavior (keep unrecognized fields on load) inside tuf.api._payload, but not a dependency or implementation relation between FQNs. Gold: emit no edges. Decision recorded on #158: none."
+    },
+    {
+      "repo_id": "python-tuf",
+      "adr_id": "ADR-0009",
+      "adr_path": "docs/adr/0009-what-is-a-reference-implementation.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#158 human label (ADR text + benchmark gold note)",
+      "notes": "Vision ADR (reference implementation as exemplary reference): design philosophy, no operationally checkable code relation. Gold: emit no edges."
+    },
+    {
+      "repo_id": "python-tuf",
+      "adr_id": "ADR-0010",
+      "adr_path": "docs/adr/0010-repository-library-design.md",
+      "expected_scope": "runtime",
+      "contested": null,
+      "recall_safety": {
+        "required": "runtime",
+        "why": "gold edge stays runtime despite the in-memory test implementation aside"
+      },
+      "label_source": "#158 human label (ADR text + benchmark gold note)",
+      "notes": "Gold: tuf.repository.* requires tuf.api.metadata.*. Runtime dependency; the in-memory test implementation aside must not demote it (ADR 019 recall-safety)."
+    },
+    {
+      "repo_id": "flowkit",
+      "adr_id": "ADR-0001",
+      "adr_path": "docs/source/developer/adr/0001-pipenv-for-package-and-dependency-management.md",
+      "expected_scope": "tooling",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#157 named expectation",
+      "notes": ""
+    },
+    {
+      "repo_id": "flowkit",
+      "adr_id": "ADR-0002",
+      "adr_path": "docs/source/developer/adr/0002-pytest-for-testing.md",
+      "expected_scope": "tooling",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#157 named expectation",
+      "notes": ""
+    },
+    {
+      "repo_id": "flowkit",
+      "adr_id": "ADR-0003",
+      "adr_path": "docs/source/developer/adr/0003-http-api.md",
+      "expected_scope": "runtime",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#158 human label (ADR text + benchmark gold note)",
+      "notes": "Gold: flowclient/flowapi prohibit flowmachine. Runtime constraint on shipped packages."
+    },
+    {
+      "repo_id": "flowkit",
+      "adr_id": "ADR-0004",
+      "adr_path": "docs/source/developer/adr/0004-http-framework.md",
+      "expected_scope": "runtime",
+      "contested": null,
+      "recall_safety": {
+        "required": "runtime",
+        "why": "reverse trap: framework language (# Quart), runtime verdict"
+      },
+      "label_source": "#158 human label (ADR text + benchmark gold note)",
+      "notes": "Gold: flowapi requires quart. Reverse trap: framework language, runtime verdict (ADR 019 recall-safety)."
+    },
+    {
+      "repo_id": "flowkit",
+      "adr_id": "ADR-0005",
+      "adr_path": "docs/source/developer/adr/0005-IPC-methods.md",
+      "expected_scope": "runtime",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#158 human label (ADR text + benchmark gold note)",
+      "notes": "Gold: flowapi requires zmq, flowmachine.core requires redis. Runtime IPC/dependency edges."
+    },
+    {
+      "repo_id": "flowkit",
+      "adr_id": "ADR-0006",
+      "adr_path": "docs/source/developer/adr/0006-JWTs.md",
+      "expected_scope": "runtime",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#158 human label (ADR text + benchmark gold note)",
+      "notes": "Gold: flowapi requires quart_jwt_extended. Runtime access-control implementation."
+    },
+    {
+      "repo_id": "flowkit",
+      "adr_id": "ADR-0007",
+      "adr_path": "docs/source/developer/adr/0007-mapbox-for-worked-examples.md",
+      "expected_scope": "tooling",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#158 human label (ADR text + benchmark gold note)",
+      "notes": "Notebook-visualisation choice for the docs worked examples; mapboxgl is a real docs-environment dependency (docs/Pipfile). Gold: emit no edges."
+    },
+    {
+      "repo_id": "flowkit",
+      "adr_id": "ADR-0008",
+      "adr_path": "docs/source/developer/adr/0008-jupyter-notebooks-for-autoflow.md",
+      "expected_scope": "tooling",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#158 human label (ADR text + benchmark gold note)",
+      "notes": "AutoFlow notebook execution (Jupyter + Papermill). Settled on #158 by the tool-present rule: the notebook toolchain IS present in the repo (docs/Pipfile jupyter-client/jupyterlab/nbconvert, docker-compose jupyter lab service, flowmachine/core/context.py notebook detection). Gold: no edges, because the AutoFlow deployment itself is absent at this pin."
+    },
+    {
+      "repo_id": "flowkit",
+      "adr_id": "ADR-0009",
+      "adr_path": "docs/source/developer/adr/0009-asciidoctor-pdf-for-notebook-conversion.md",
+      "expected_scope": "tooling",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#158 human label (ADR text + benchmark gold note)",
+      "notes": "Notebook-to-PDF doc build chain; nbconvert is present in the docs toolchain (docs/Pipfile). Gold: no edges (build/document toolchain, no FQN relation)."
+    },
+    {
+      "repo_id": "flowkit",
+      "adr_id": "ADR-0010",
+      "adr_path": "docs/source/developer/adr/0010-prefect-for-autoflow.md",
+      "expected_scope": "tooling",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#158 human label (ADR text + benchmark gold note)",
+      "notes": "Workflow-engine choice for AutoFlow (Prefect over Airflow). Settled on #158: kept as tooling with the #157 named expectation, over ADR 019 decision 2's narrower dev-toolchain reading. Caveat recorded: tooling edges are excluded from FP accounting, so a run that grounds flowmachine.* for the absent AutoFlow reads clean rather than as a subject-grounding miss (gold: AutoFlow is absent at this pin, so no edge is groundable)."
+    },
+    {
+      "repo_id": "flowkit",
+      "adr_id": "ADR-0011",
+      "adr_path": "docs/source/developer/adr/0011-redaction-strategy-for-labelled-aggregates.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#158 human label (ADR text + benchmark gold note)",
+      "notes": "Runtime numeric redaction policy (threshold 15), a business rule inside a query implementation, not an FQN relation. Gold: emit no edges."
+    },
+    {
+      "repo_id": "flowkit",
+      "adr_id": "ADR-0012",
+      "adr_path": "docs/source/developer/adr/0012-claims-role-scope-rework.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#158 human label (ADR text + benchmark gold note)",
+      "notes": "Claims-to-roles/scopes rework redesigning the flowauth schema and JWT contents: data-model redesign. Gold: emit no edges."
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0001",
+      "adr_path": "docs/adrs/0001-build-nimbus-console-in-experimenter.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#158 human label (ADR text + benchmark gold note)",
+      "notes": "Strategy/portfolio ADR (build the Nimbus console inside Experimenter): no importable or implementable code relation. Gold: emit no edges."
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0002",
+      "adr_path": "docs/adrs/0002-nimbus-front-end-directory-tree-and-stack.md",
+      "expected_scope": "tooling",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#158 human label (ADR text + benchmark gold note)",
+      "notes": "Front-end stack and directory tree (React/CRA/Bootstrap/GQL/Storybook): non-Python-runtime technology choice, tooling per the #158 decision. Gold: emit no edges (JS-side tooling, not Python FQN edges)."
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0003",
+      "adr_path": "docs/adrs/0003-analysis-visualization-architecture-approach.md",
+      "expected_scope": "runtime",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#158 human label (ADR text + benchmark gold note)",
+      "notes": "Gold: experimenter.jetstream.* requires google.cloud.storage. Runtime dependency for on-demand GCS fetch."
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0004",
+      "adr_path": "docs/adrs/0004-monitoring-data-import.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#158 human label (ADR text + benchmark gold note)",
+      "notes": "Monitoring-data sourcing strategy with cost tradeoffs and explicitly transitional language: not an enforceable import/inheritance edge. Gold: emit no edges."
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0005",
+      "adr_path": "docs/adrs/0005-doc-hub.md",
+      "expected_scope": "tooling",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#158 human label (ADR text + benchmark gold note)",
+      "notes": "Docs-hub build tool (Docusaurus + GitHub Pages): doc build tooling per the #158 decision. Gold: emit no edges (documentation infrastructure outside the Python namespace)."
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0006",
+      "adr_path": "docs/adrs/0006-doc-hub-repo.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#158 human label (ADR text + benchmark gold note)",
+      "notes": "Docs-hub repository placement: infrastructure location, no code-level constraint. Gold: emit no edges."
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0007",
+      "adr_path": "docs/adrs/0007-doc-hub-url.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#158 human label (ADR text + benchmark gold note)",
+      "notes": "Docs-hub URL string: a configuration value, which decision 2 names as none. Gold: emit no edges."
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0008",
+      "adr_path": "docs/adrs/0008-integrating-htmx.md",
+      "expected_scope": "runtime",
+      "contested": null,
+      "recall_safety": {
+        "required": "runtime",
+        "why": "Jest aside: the gold nimbus_ui.* prohibits graphene edge must stay runtime"
+      },
+      "label_source": "#158 human label (ADR text + benchmark gold note)",
+      "notes": "Mixed ADR: gold nimbus_ui.* prohibits graphene is runtime while the Jest aside is tooling. Whole-ADR scope cannot express this; per-edge triage must (ADR 019 recall-safety trap)."
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0009",
+      "adr_path": "docs/adrs/0009-nimbus-web-sdk-architecture.md",
+      "expected_scope": "tooling",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#158 human label (ADR text + benchmark gold note)",
+      "notes": "Nimbus Web SDK Rust crate organisation (cargo features): non-Python-runtime technology choice, tooling per the #158 decision. Gold: emit no edges (outside the Python codebase)."
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0010",
+      "adr_path": "docs/adrs/0010-jetstream-shared-schema.md",
+      "expected_scope": "runtime",
+      "contested": null,
+      "recall_safety": {
+        "required": "runtime",
+        "why": "gold edges stay runtime despite the serializer test refactor"
+      },
+      "label_source": "#158 human label (ADR text + benchmark gold note)",
+      "notes": "Gold: jetstream requires mozilla_nimbus_schemas.* and schemas require pydantic. Runtime; the serializer test refactor aside must not demote it (ADR 019 recall-safety)."
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0011",
+      "adr_path": "docs/adrs/0011-nimbus-web-glean-application-structure.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#158 human label (ADR text + benchmark gold note)",
+      "notes": "Glean application-ID granularity: telemetry-identity policy, no FQN relation. Gold: emit no edges."
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0012",
+      "adr_path": "docs/adrs/0012-exposure-events-and-coenrolling-features.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#158 human label (ADR text + benchmark gold note)",
+      "notes": "Exposure-event attribution via the feature-JSON experiment property: client-side messaging behaviour, not a dependency edge. Gold: emit no edges."
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0013",
+      "adr_path": "docs/adrs/0013-guardrail-metric-versioning.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#158 human label (ADR text + benchmark gold note)",
+      "notes": "Guardrail metric versioning convention (_v# suffixes): data-definition naming policy. Gold: emit no edges."
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0014",
+      "adr_path": "docs/adrs/0014-desktop-randomization-unit.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#158 human label (ADR text + benchmark gold note)",
+      "notes": "Desktop randomization-unit change: client telemetry semantics. Gold: emit no edges."
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0015",
+      "adr_path": "docs/adrs/0015-webapps-qa-strategy.md",
+      "expected_scope": "tooling",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#158 human label (ADR text + benchmark gold note)",
+      "notes": "QA-only preview mode / nimbus-web-preview collection: dev-and-QA engineering process choice, tooling per the #158 decision. Gold: emit no edges (QA process)."
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0016",
+      "adr_path": "docs/adrs/0016-ci-external-firefox-tracking.md",
+      "expected_scope": "tooling",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#158 human label (ADR text + benchmark gold note)",
+      "notes": "CI workflow for tracking external Firefox changes: CI is named in decision 2's tooling list. Gold: emit no edges."
+    },
+    {
+      "repo_id": "structurizr-python",
+      "adr_id": "ADR-0001",
+      "adr_path": "docs/development/adr/0001-record-architecture-decisions.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#157 named expectation",
+      "notes": ""
+    },
+    {
+      "repo_id": "structurizr-python",
+      "adr_id": "ADR-0002",
+      "adr_path": "docs/development/adr/0002-version-control-our-code.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#157 named expectation",
+      "notes": ""
+    },
+    {
+      "repo_id": "structurizr-python",
+      "adr_id": "ADR-0003",
+      "adr_path": "docs/development/adr/0003-python-3-6-only.md",
+      "expected_scope": "tooling",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#157 named expectation",
+      "notes": ""
+    },
+    {
+      "repo_id": "structurizr-python",
+      "adr_id": "ADR-0004",
+      "adr_path": "docs/development/adr/0004-python-package-versioning.md",
+      "expected_scope": "tooling",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#157 named expectation",
+      "notes": ""
+    },
+    {
+      "repo_id": "structurizr-python",
+      "adr_id": "ADR-0005",
+      "adr_path": "docs/development/adr/0005-code-quality-assurance.md",
+      "expected_scope": "tooling",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#158 human label (ADR text + benchmark gold note)",
+      "notes": "isort/black/flake8 style checking: linters and formatters are named in decision 2's tooling list. Gold: emit no edges."
+    },
+    {
+      "repo_id": "structurizr-python",
+      "adr_id": "ADR-0006",
+      "adr_path": "docs/development/adr/0006-code-testing.md",
+      "expected_scope": "tooling",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#157 named expectation",
+      "notes": ""
+    },
+    {
+      "repo_id": "structurizr-python",
+      "adr_id": "ADR-0007",
+      "adr_path": "docs/development/adr/0007-unit-tests.md",
+      "expected_scope": "tooling",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#157 named expectation",
+      "notes": ""
+    },
+    {
+      "repo_id": "structurizr-python",
+      "adr_id": "ADR-0008",
+      "adr_path": "docs/development/adr/0008-package-structure.md",
+      "expected_scope": "runtime",
+      "contested": null,
+      "recall_safety": {
+        "required": "runtime",
+        "why": "gold edges stay runtime despite the unit-test aside"
+      },
+      "label_source": "#158 human label (ADR text + benchmark gold note)",
+      "notes": "Gold: examples.* prohibit structurizr.api.*. Runtime interface constraint; unit-test aside must not demote it (ADR 019 recall-safety)."
+    },
+    {
+      "repo_id": "structurizr-python",
+      "adr_id": "ADR-0009",
+      "adr_path": "docs/development/adr/0009-use-pydantic-for-json-de-serialization.md",
+      "expected_scope": "runtime",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#158 human label (ADR text + benchmark gold note)",
+      "notes": "Gold: src.structurizr.api.* requires pydantic. Runtime implementation dependency."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0001",
+      "adr_path": "adr/0001-record-architecture-decisions.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Documentation/process convention (adopting ADR recording): no code relation. Gold: emit no edges."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0002",
+      "adr_path": "adr/0002-minimum-supported-python-version.md",
+      "expected_scope": "tooling",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Interpreter-floor policy codified in the version check code: language/toolchain per the python-tuf ADR-0001 precedent. Superseded by ADR-0020. Gold: emit no edges."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0003",
+      "adr_path": "adr/0003-monitor-condition-and-data-selectors.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "PR-acceptance rule about monitor/data-selector config options ('we don't merge PRs with data selectors'): process policy, not an FQN relation. Gold: emit no edges."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0004",
+      "adr_path": "adr/0004-webscraping.md",
+      "expected_scope": "runtime",
+      "contested": null,
+      "recall_safety": {
+        "required": "runtime",
+        "why": "Gold: homeassistant.components.* prohibits selenium. Runtime constraint on shipped integration code (webscraping ban)."
+      },
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Gold: homeassistant.components.* prohibits selenium. Runtime constraint on shipped integration code (webscraping ban)."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0005",
+      "adr_path": "adr/0005-code-formatting.md",
+      "expected_scope": "tooling",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Black/pylint/flake8/isort formatting: linters and formatters are named in decision 2's tooling list. Gold: emit no edges."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0006",
+      "adr_path": "adr/0006-docker-images.md",
+      "expected_scope": "tooling",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Docker image / packaging-deployment infrastructure (which base image the project ships): build toolchain, tooling. Gold: emit no edges."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0007",
+      "adr_path": "adr/0007-integration-config-yaml-structure.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Config-file placement policy (YAML under the integration domain key): config data shape, not Python topology. Gold: emit no edges."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0008",
+      "adr_path": "adr/0008-code-owners.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Governance (CODEOWNERS conventions): no code relation. Gold: emit no edges."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0009",
+      "adr_path": "adr/0009-translations-2.0.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Translation data layout + frontend translation API redesign: data/API shape, not a dependency or implementation relation. Gold: emit no edges."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0010",
+      "adr_path": "adr/0010-integration-configuration.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Config-UX architecture (config entries/flows); the checkable residue is manifest data. Gold: emit no edges."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0011",
+      "adr_path": "adr/0011-discovery-requires-unique-id.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Discovery unique-id mandate (async_set_unique_id): shipped-code behaviour, but a call-shaped mandate scoped to discoverable flows, not an FQN dependency/implementation relation. Gold: emit no edges (deliberately unencoded)."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0012",
+      "adr_path": "adr/0012-define-supported-installation-method.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Support-policy definition (which installation methods are supported): documentation stance. Gold: emit no edges."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0013",
+      "adr_path": "adr/0013-home-assistant-container.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Installation-method definition (Container): support policy, not a code relation. Gold: emit no edges."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0014",
+      "adr_path": "adr/0014-home-assistant-supervised.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Installation-method definition (Supervised): support policy, not a code relation. Gold: emit no edges."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0015",
+      "adr_path": "adr/0015-home-assistant-os.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Installation-method definition (OS): support policy, not a code relation. Gold: emit no edges."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0016",
+      "adr_path": "adr/0016-home-assistant-core.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Installation-method definition (Core): support policy, not a code relation. Gold: emit no edges."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0017",
+      "adr_path": "adr/0017-hardware-screening-os.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Hardware-policy ADR (OS hardware screening): support policy. Gold: emit no edges."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0018",
+      "adr_path": "adr/0018-supported-databases.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Runtime DB dialect/version floors enforced by string-level gates in recorder/util.py: runtime behaviour with no FQN encoding (python-tuf EOL-python never-fire family). Gold: emit no edges."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0019",
+      "adr_path": "adr/0019-GPIO.md",
+      "expected_scope": "runtime",
+      "contested": null,
+      "recall_safety": {
+        "required": "runtime",
+        "why": "Gold: homeassistant.components.* prohibits gpiozero. Runtime constraint on shipped integration code (GPIO ban); the legacy remote_rpi_gpio fire is the pin's genuine live violation."
+      },
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Gold: homeassistant.components.* prohibits gpiozero. Runtime constraint on shipped integration code (GPIO ban); the legacy remote_rpi_gpio fire is the pin's genuine live violation."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0020",
+      "adr_path": "adr/0020-minimum-supported-python-version.md",
+      "expected_scope": "tooling",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Single-minor interpreter-floor policy, same non-encodable family as ADR-0002 (supersession pair): language/toolchain. Gold: emit no edges."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0021",
+      "adr_path": "adr/0021-YAML-integration-configuration-deprecation-policy.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Deprecation-period process for YAML integration configuration: process policy. Gold: emit no edges."
+    },
+    {
+      "repo_id": "home-assistant",
+      "adr_id": "ADR-0022",
+      "adr_path": "adr/0022-integration-quality-scale.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#160 human label (ADR text + benchmark gold note)",
+      "notes": "Integration quality scale (rubric); manifest quality_scale values are metadata, not FQN edges. Gold: emit no edges."
+    }
+  ],
+  "_rule_note": "Label rule (decided 2026-09-17 on #158): expected_scope is the scope every edge of that ADR should carry, judged by the ADR's decision role (runtime | tooling | none as defined in ADR 019 decision 2); `none` means the correct observable output is zero edges. Groundability at the pin is a second, separate axis carried by the benchmark gold's 'emit no edges' notes, not by this field. Non-Python-namespace technology decisions (front-end stack, doc-site generator, Rust crate layout, QA process) are tooling. ADR 019 recall-safety rows carry `recall_safety` in addition to expected_scope."
+}

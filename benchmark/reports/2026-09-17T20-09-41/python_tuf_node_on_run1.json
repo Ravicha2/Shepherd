@@ -1,0 +1,1484 @@
+{
+  "_meta": {
+    "generated_at": "2026-09-17T20-09-48",
+    "git_commit": "e4d9e6b",
+    "arm": "baseline",
+    "semble_version": "0.5.6",
+    "semble_model": "minishlab/potion-code-16M-v2",
+    "resolver_model": "google/gemini-3.1-flash-lite"
+  },
+  "repo_id": "python-tuf",
+  "arm": "node_on",
+  "run_index": 1,
+  "pin_commit": "6889cfbffbb90a17930fbdedf12ae050be775fe3",
+  "ingestion": {
+    "exact": 3,
+    "partial": 0,
+    "miss": 1,
+    "total": 4,
+    "false_positives": 1,
+    "false_positive_edges": [
+      {
+        "adr_id": "ADR-0004",
+        "subject": "tuf.*",
+        "predicate": "prohibits_dependency",
+        "object": "securesystemslib",
+        "class": "B/C"
+      }
+    ],
+    "credited_fragments": [],
+    "excluded_tooling_edges": [],
+    "accuracy": 0.75,
+    "per_constraint": [
+      {
+        "adr_id": "ADR-0001",
+        "expected": {
+          "subject": "tuf.*",
+          "predicate": "prohibits_dependency",
+          "object": "python2.7",
+          "justification": "ADR-0001 chooses Python 3.6+ only; Python 2.7 is named as end-of-life and explicitly rejected"
+        },
+        "score": "exact_match",
+        "resolved_subject": "tuf.*",
+        "resolved_object": "python2.7",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0001",
+        "expected": {
+          "subject": "tuf.*",
+          "predicate": "prohibits_dependency",
+          "object": "python3.5",
+          "justification": "ADR-0001 chooses Python 3.6+ only; Python 3.5 is named as end-of-life and explicitly rejected"
+        },
+        "score": "exact_match",
+        "resolved_subject": "tuf.*",
+        "resolved_object": "python3.5",
+        "class": "B/C"
+      },
+      {
+        "adr_id": "ADR-0006",
+        "expected": {
+          "subject": "tuf.api.metadata.*",
+          "predicate": "requires_dependency",
+          "object": "tuf.api.serialization.*",
+          "justification": "ADR-0006 separates serialization from the metadata class model; metadata classes depend on the serialization package (tuf.api.serialization), not the other way around"
+        },
+        "score": "miss",
+        "resolved_subject": null,
+        "resolved_object": null
+      },
+      {
+        "adr_id": "ADR-0010",
+        "expected": {
+          "subject": "tuf.repository.*",
+          "predicate": "requires_dependency",
+          "object": "tuf.api.metadata.*",
+          "justification": "ADR-0010 states the repository library is built on top of the Metadata API; this is a dependency, not an inheritance rule"
+        },
+        "score": "exact_match",
+        "resolved_subject": "tuf.repository.*",
+        "resolved_object": "tuf.api.metadata.*",
+        "class": "B/C"
+      }
+    ],
+    "class_split": {
+      "B/C": {
+        "matched": 3,
+        "false_positive_edges": 1
+      }
+    }
+  },
+  "detection": {
+    "cases": [
+      {
+        "case_id": "tuf-bench-legacy-json-store",
+        "type": "injected",
+        "detect_seconds": 0.47860366699751467,
+        "per_unit": [
+          {
+            "expected_fqn": "tuf.repository._legacy.read_role_file",
+            "score": "exact_match",
+            "subject": "tuf.repository.*",
+            "object": "tuf.api.metadata.*",
+            "pattern_score": "exact_match"
+          },
+          {
+            "expected_fqn": "tuf.repository._legacy.write_role_file",
+            "score": "exact_match",
+            "subject": "tuf.repository.*",
+            "object": "tuf.api.metadata.*",
+            "pattern_score": "exact_match"
+          },
+          {
+            "expected_fqn": "tuf.repository._legacy.LegacyRoleStore",
+            "score": "exact_match",
+            "subject": "tuf.repository.*",
+            "object": "tuf.api.metadata.*",
+            "pattern_score": "exact_match"
+          }
+        ],
+        "exact": 3,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 3,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 3,
+        "diagnostics": {
+          "expected_triples": 266,
+          "actual_triples": 521,
+          "overlap": 266,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.exceptions",
+              "changed_fqn": "tuf.api.exceptions.UnsignedMetadataError",
+              "evidence": "tuf.api.exceptions has dependency path to securesystemslib via IMPORTS securesystemslib.exceptions",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api._payload",
+              "changed_fqn": "tuf.api._payload.Targets.__eq__",
+              "evidence": "tuf.api._payload has dependency path to securesystemslib via IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.repository._repository",
+              "changed_fqn": "tuf.repository._repository.Repository",
+              "evidence": "tuf.repository._repository has dependency path to securesystemslib via IMPORTS tuf.api.metadata -> IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.dsse",
+              "changed_fqn": "tuf.api.dsse.SimpleEnvelope",
+              "evidence": "tuf.api.dsse has dependency path to securesystemslib via INHERITS securesystemslib.dsse.Envelope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.serialization",
+              "changed_fqn": "tuf.api.serialization.SignedSerializer.serialize",
+              "evidence": "tuf.api.serialization has dependency path to securesystemslib via IMPORTS tuf.api.metadata -> IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.metadata",
+              "changed_fqn": "tuf.api.metadata.Metadata.sign",
+              "evidence": "tuf.api.metadata has dependency path to securesystemslib via IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.ngclient",
+              "changed_fqn": "tuf.ngclient",
+              "evidence": "tuf.ngclient has dependency path to securesystemslib via IMPORTS tuf.api.metadata -> IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "tuf-bench-legacy-repo-client",
+        "type": "injected",
+        "detect_seconds": 0.05156179191544652,
+        "per_unit": [
+          {
+            "expected_fqn": "tuf.repository._writer.LegacyRepoClient",
+            "score": "exact_match",
+            "subject": "tuf.repository.*",
+            "object": "tuf.api.metadata.*",
+            "pattern_score": "exact_match"
+          }
+        ],
+        "exact": 1,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 1,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 1,
+        "diagnostics": {
+          "expected_triples": 266,
+          "actual_triples": 521,
+          "overlap": 266,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.exceptions",
+              "changed_fqn": "tuf.api.exceptions.UnsignedMetadataError",
+              "evidence": "tuf.api.exceptions has dependency path to securesystemslib via IMPORTS securesystemslib.exceptions",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api._payload",
+              "changed_fqn": "tuf.api._payload.Targets.__eq__",
+              "evidence": "tuf.api._payload has dependency path to securesystemslib via IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.repository._repository",
+              "changed_fqn": "tuf.repository._repository.Repository",
+              "evidence": "tuf.repository._repository has dependency path to securesystemslib via IMPORTS tuf.api.metadata -> IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.dsse",
+              "changed_fqn": "tuf.api.dsse.SimpleEnvelope",
+              "evidence": "tuf.api.dsse has dependency path to securesystemslib via INHERITS securesystemslib.dsse.Envelope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.serialization",
+              "changed_fqn": "tuf.api.serialization.SignedSerializer.serialize",
+              "evidence": "tuf.api.serialization has dependency path to securesystemslib via IMPORTS tuf.api.metadata -> IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.metadata",
+              "changed_fqn": "tuf.api.metadata.Metadata.sign",
+              "evidence": "tuf.api.metadata has dependency path to securesystemslib via IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.ngclient",
+              "changed_fqn": "tuf.ngclient",
+              "evidence": "tuf.ngclient has dependency path to securesystemslib via IMPORTS tuf.api.metadata -> IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "tuf-bench-hist-pre-repository-compliant",
+        "type": "historical",
+        "detect_seconds": 2.442242500022985,
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 0,
+        "diagnostics": {
+          "expected_triples": 0,
+          "actual_triples": 464,
+          "overlap": 0,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.sig",
+              "changed_fqn": "tuf.sig.get_signature_status",
+              "evidence": "tuf.sig has dependency path to securesystemslib via IMPORTS securesystemslib",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.repository_tool",
+              "changed_fqn": "tuf.repository_tool.Metadata.load_signing_key",
+              "evidence": "tuf.repository_tool has dependency path to securesystemslib via IMPORTS securesystemslib.interface",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.repository_lib",
+              "changed_fqn": "tuf.repository_lib._delete_obsolete_metadata",
+              "evidence": "tuf.repository_lib has dependency path to securesystemslib via IMPORTS securesystemslib",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.metadata",
+              "changed_fqn": "tuf.api.metadata.Targets.add_key",
+              "evidence": "tuf.api.metadata has dependency path to securesystemslib via IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.client.updater",
+              "changed_fqn": "tuf.client.updater.Updater._ensure_not_expired",
+              "evidence": "tuf.client.updater has dependency path to securesystemslib via IMPORTS tuf.download -> IMPORTS securesystemslib",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.scripts.repo",
+              "changed_fqn": "tuf.scripts.repo",
+              "evidence": "tuf.scripts.repo has dependency path to securesystemslib via IMPORTS securesystemslib",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.serialization.json",
+              "changed_fqn": "tuf.api.serialization",
+              "evidence": "tuf.api.serialization.json has dependency path to securesystemslib via CONTAINS tuf.api.serialization.json -> IMPORTS securesystemslib.formats",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.roledb",
+              "changed_fqn": "tuf.roledb.add_role",
+              "evidence": "tuf.roledb has dependency path to securesystemslib via IMPORTS securesystemslib",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.developer_tool",
+              "changed_fqn": "tuf.developer_tool.load_project",
+              "evidence": "tuf.developer_tool has dependency path to securesystemslib via IMPORTS securesystemslib",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.keydb",
+              "changed_fqn": "tuf.keydb.remove_key",
+              "evidence": "tuf.keydb has dependency path to securesystemslib via IMPORTS securesystemslib",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.download",
+              "changed_fqn": "tuf.download",
+              "evidence": "tuf.download has dependency path to securesystemslib via IMPORTS securesystemslib",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.mirrors",
+              "changed_fqn": "tuf.mirrors.get_list_of_mirrors",
+              "evidence": "tuf.mirrors has dependency path to securesystemslib via IMPORTS securesystemslib",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "tuf-bench-probe-repository-metadata-import",
+        "type": "compliant_probe",
+        "detect_seconds": 0.06467420898843557,
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 0,
+        "diagnostics": {
+          "expected_triples": 0,
+          "actual_triples": 255,
+          "overlap": 0,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.exceptions",
+              "changed_fqn": "tuf.api.exceptions.UnsignedMetadataError",
+              "evidence": "tuf.api.exceptions has dependency path to securesystemslib via IMPORTS securesystemslib.exceptions",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api._payload",
+              "changed_fqn": "tuf.api._payload.Targets.__eq__",
+              "evidence": "tuf.api._payload has dependency path to securesystemslib via IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.repository._repository",
+              "changed_fqn": "tuf.repository._repository.Repository",
+              "evidence": "tuf.repository._repository has dependency path to securesystemslib via IMPORTS tuf.api.metadata -> IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.dsse",
+              "changed_fqn": "tuf.api.dsse.SimpleEnvelope",
+              "evidence": "tuf.api.dsse has dependency path to securesystemslib via INHERITS securesystemslib.dsse.Envelope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.serialization",
+              "changed_fqn": "tuf.api.serialization.SignedSerializer.serialize",
+              "evidence": "tuf.api.serialization has dependency path to securesystemslib via IMPORTS tuf.api.metadata -> IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.metadata",
+              "changed_fqn": "tuf.api.metadata.Metadata.sign",
+              "evidence": "tuf.api.metadata has dependency path to securesystemslib via IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.ngclient",
+              "changed_fqn": "tuf.ngclient",
+              "evidence": "tuf.ngclient has dependency path to securesystemslib via IMPORTS tuf.api.metadata -> IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "tuf-bench-probe-repository-dotted-import",
+        "type": "compliant_probe",
+        "detect_seconds": 0.09074029105249792,
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 0,
+        "diagnostics": {
+          "expected_triples": 0,
+          "actual_triples": 255,
+          "overlap": 0,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.exceptions",
+              "changed_fqn": "tuf.api.exceptions.UnsignedMetadataError",
+              "evidence": "tuf.api.exceptions has dependency path to securesystemslib via IMPORTS securesystemslib.exceptions",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api._payload",
+              "changed_fqn": "tuf.api._payload.Targets.__eq__",
+              "evidence": "tuf.api._payload has dependency path to securesystemslib via IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.repository._repository",
+              "changed_fqn": "tuf.repository._repository.Repository",
+              "evidence": "tuf.repository._repository has dependency path to securesystemslib via IMPORTS tuf.api.metadata -> IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.dsse",
+              "changed_fqn": "tuf.api.dsse.SimpleEnvelope",
+              "evidence": "tuf.api.dsse has dependency path to securesystemslib via INHERITS securesystemslib.dsse.Envelope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.serialization",
+              "changed_fqn": "tuf.api.serialization.SignedSerializer.serialize",
+              "evidence": "tuf.api.serialization has dependency path to securesystemslib via IMPORTS tuf.api.metadata -> IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.metadata",
+              "changed_fqn": "tuf.api.metadata.Metadata.sign",
+              "evidence": "tuf.api.metadata has dependency path to securesystemslib via IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.ngclient",
+              "changed_fqn": "tuf.ngclient",
+              "evidence": "tuf.ngclient has dependency path to securesystemslib via IMPORTS tuf.api.metadata -> IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": [
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.repository._dotted",
+              "changed_fqn": "tuf.repository._dotted",
+              "evidence": "tuf.repository._dotted has dependency path to securesystemslib via IMPORTS tuf.api.metadata -> IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            }
+          ]
+        }
+      },
+      {
+        "case_id": "tuf-bench-probe-sanctioned-serializer",
+        "type": "compliant_probe",
+        "detect_seconds": 0.06432899995706975,
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 0,
+        "diagnostics": {
+          "expected_triples": 0,
+          "actual_triples": 255,
+          "overlap": 0,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.exceptions",
+              "changed_fqn": "tuf.api.exceptions.UnsignedMetadataError",
+              "evidence": "tuf.api.exceptions has dependency path to securesystemslib via IMPORTS securesystemslib.exceptions",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api._payload",
+              "changed_fqn": "tuf.api._payload.Targets.__eq__",
+              "evidence": "tuf.api._payload has dependency path to securesystemslib via IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.repository._repository",
+              "changed_fqn": "tuf.repository._repository.Repository",
+              "evidence": "tuf.repository._repository has dependency path to securesystemslib via IMPORTS tuf.api.metadata -> IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.dsse",
+              "changed_fqn": "tuf.api.dsse.SimpleEnvelope",
+              "evidence": "tuf.api.dsse has dependency path to securesystemslib via INHERITS securesystemslib.dsse.Envelope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.serialization",
+              "changed_fqn": "tuf.api.serialization.SignedSerializer.serialize",
+              "evidence": "tuf.api.serialization has dependency path to securesystemslib via IMPORTS tuf.api.metadata -> IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.metadata",
+              "changed_fqn": "tuf.api.metadata.Metadata.sign",
+              "evidence": "tuf.api.metadata has dependency path to securesystemslib via IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.ngclient",
+              "changed_fqn": "tuf.ngclient",
+              "evidence": "tuf.ngclient has dependency path to securesystemslib via IMPORTS tuf.api.metadata -> IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "tuf-bench-probe-payload-out-of-scope",
+        "type": "compliant_probe",
+        "detect_seconds": 0.2765705839265138,
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 0,
+        "diagnostics": {
+          "expected_triples": 0,
+          "actual_triples": 255,
+          "overlap": 0,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.exceptions",
+              "changed_fqn": "tuf.api.exceptions.UnsignedMetadataError",
+              "evidence": "tuf.api.exceptions has dependency path to securesystemslib via IMPORTS securesystemslib.exceptions",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api._payload",
+              "changed_fqn": "tuf.api._payload.Targets.__eq__",
+              "evidence": "tuf.api._payload has dependency path to securesystemslib via IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.repository._repository",
+              "changed_fqn": "tuf.repository._repository.Repository",
+              "evidence": "tuf.repository._repository has dependency path to securesystemslib via IMPORTS tuf.api.metadata -> IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.dsse",
+              "changed_fqn": "tuf.api.dsse.SimpleEnvelope",
+              "evidence": "tuf.api.dsse has dependency path to securesystemslib via INHERITS securesystemslib.dsse.Envelope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.serialization",
+              "changed_fqn": "tuf.api.serialization.SignedSerializer.serialize",
+              "evidence": "tuf.api.serialization has dependency path to securesystemslib via IMPORTS tuf.api.metadata -> IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.metadata",
+              "changed_fqn": "tuf.api.metadata.Metadata.sign",
+              "evidence": "tuf.api.metadata has dependency path to securesystemslib via IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.ngclient",
+              "changed_fqn": "tuf.ngclient",
+              "evidence": "tuf.ngclient has dependency path to securesystemslib via IMPORTS tuf.api.metadata -> IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "tuf-bench-repository-class-import",
+        "type": "injected",
+        "detect_seconds": 0.042580374982208014,
+        "per_unit": [
+          {
+            "expected_fqn": "tuf.repository._via_repository.MaintenanceRepository",
+            "score": "exact_match",
+            "subject": "tuf.repository.*",
+            "object": "tuf.api.metadata.*",
+            "pattern_score": "exact_match"
+          }
+        ],
+        "exact": 1,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 1,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 1,
+        "diagnostics": {
+          "expected_triples": 266,
+          "actual_triples": 521,
+          "overlap": 266,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.exceptions",
+              "changed_fqn": "tuf.api.exceptions.UnsignedMetadataError",
+              "evidence": "tuf.api.exceptions has dependency path to securesystemslib via IMPORTS securesystemslib.exceptions",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api._payload",
+              "changed_fqn": "tuf.api._payload.Targets.__eq__",
+              "evidence": "tuf.api._payload has dependency path to securesystemslib via IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.repository._repository",
+              "changed_fqn": "tuf.repository._repository.Repository",
+              "evidence": "tuf.repository._repository has dependency path to securesystemslib via IMPORTS tuf.api.metadata -> IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.dsse",
+              "changed_fqn": "tuf.api.dsse.SimpleEnvelope",
+              "evidence": "tuf.api.dsse has dependency path to securesystemslib via INHERITS securesystemslib.dsse.Envelope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.serialization",
+              "changed_fqn": "tuf.api.serialization.SignedSerializer.serialize",
+              "evidence": "tuf.api.serialization has dependency path to securesystemslib via IMPORTS tuf.api.metadata -> IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.metadata",
+              "changed_fqn": "tuf.api.metadata.Metadata.sign",
+              "evidence": "tuf.api.metadata has dependency path to securesystemslib via IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.ngclient",
+              "changed_fqn": "tuf.ngclient",
+              "evidence": "tuf.ngclient has dependency path to securesystemslib via IMPORTS tuf.api.metadata -> IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "tuf-bench-repository-facade-import",
+        "type": "injected",
+        "detect_seconds": 0.04720016708597541,
+        "per_unit": [
+          {
+            "expected_fqn": "tuf.repository._via_package.describe_repository_layout",
+            "score": "exact_match",
+            "subject": "tuf.repository.*",
+            "object": "tuf.api.metadata.*",
+            "pattern_score": "exact_match"
+          }
+        ],
+        "exact": 1,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 1,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 1,
+        "diagnostics": {
+          "expected_triples": 266,
+          "actual_triples": 521,
+          "overlap": 266,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.exceptions",
+              "changed_fqn": "tuf.api.exceptions.UnsignedMetadataError",
+              "evidence": "tuf.api.exceptions has dependency path to securesystemslib via IMPORTS securesystemslib.exceptions",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api._payload",
+              "changed_fqn": "tuf.api._payload.Targets.__eq__",
+              "evidence": "tuf.api._payload has dependency path to securesystemslib via IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.repository._repository",
+              "changed_fqn": "tuf.repository._repository.Repository",
+              "evidence": "tuf.repository._repository has dependency path to securesystemslib via IMPORTS tuf.api.metadata -> IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.dsse",
+              "changed_fqn": "tuf.api.dsse.SimpleEnvelope",
+              "evidence": "tuf.api.dsse has dependency path to securesystemslib via INHERITS securesystemslib.dsse.Envelope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.serialization",
+              "changed_fqn": "tuf.api.serialization.SignedSerializer.serialize",
+              "evidence": "tuf.api.serialization has dependency path to securesystemslib via IMPORTS tuf.api.metadata -> IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.metadata",
+              "changed_fqn": "tuf.api.metadata.Metadata.sign",
+              "evidence": "tuf.api.metadata has dependency path to securesystemslib via IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.ngclient",
+              "changed_fqn": "tuf.ngclient",
+              "evidence": "tuf.ngclient has dependency path to securesystemslib via IMPORTS tuf.api.metadata -> IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "tuf-bench-probe-repository-sibling-import",
+        "type": "compliant_probe",
+        "detect_seconds": 0.03976800001692027,
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 0,
+        "diagnostics": {
+          "expected_triples": 0,
+          "actual_triples": 255,
+          "overlap": 0,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.exceptions",
+              "changed_fqn": "tuf.api.exceptions.UnsignedMetadataError",
+              "evidence": "tuf.api.exceptions has dependency path to securesystemslib via IMPORTS securesystemslib.exceptions",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api._payload",
+              "changed_fqn": "tuf.api._payload.Targets.__eq__",
+              "evidence": "tuf.api._payload has dependency path to securesystemslib via IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.repository._repository",
+              "changed_fqn": "tuf.repository._repository.Repository",
+              "evidence": "tuf.repository._repository has dependency path to securesystemslib via IMPORTS tuf.api.metadata -> IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.dsse",
+              "changed_fqn": "tuf.api.dsse.SimpleEnvelope",
+              "evidence": "tuf.api.dsse has dependency path to securesystemslib via INHERITS securesystemslib.dsse.Envelope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.serialization",
+              "changed_fqn": "tuf.api.serialization.SignedSerializer.serialize",
+              "evidence": "tuf.api.serialization has dependency path to securesystemslib via IMPORTS tuf.api.metadata -> IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.metadata",
+              "changed_fqn": "tuf.api.metadata.Metadata.sign",
+              "evidence": "tuf.api.metadata has dependency path to securesystemslib via IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.ngclient",
+              "changed_fqn": "tuf.ngclient",
+              "evidence": "tuf.ngclient has dependency path to securesystemslib via IMPORTS tuf.api.metadata -> IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": [
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.repository._via_sibling",
+              "changed_fqn": "tuf.repository._via_sibling",
+              "evidence": "tuf.repository._via_sibling has dependency path to securesystemslib via IMPORTS tuf.repository._repository -> IMPORTS tuf.api.metadata -> IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            }
+          ]
+        }
+      },
+      {
+        "case_id": "tuf-bench-serialization-deleted",
+        "type": "known_limitation",
+        "detect_seconds": 0.044181874953210354,
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 0,
+        "diagnostics": {
+          "expected_triples": 0,
+          "actual_triples": 255,
+          "overlap": 0,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.exceptions",
+              "changed_fqn": "tuf.api.exceptions.UnsignedMetadataError",
+              "evidence": "tuf.api.exceptions has dependency path to securesystemslib via IMPORTS securesystemslib.exceptions",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api._payload",
+              "changed_fqn": "tuf.api._payload.Targets.__eq__",
+              "evidence": "tuf.api._payload has dependency path to securesystemslib via IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.repository._repository",
+              "changed_fqn": "tuf.repository._repository.Repository",
+              "evidence": "tuf.repository._repository has dependency path to securesystemslib via IMPORTS tuf.api.metadata -> IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.dsse",
+              "changed_fqn": "tuf.api.dsse.SimpleEnvelope",
+              "evidence": "tuf.api.dsse has dependency path to securesystemslib via INHERITS securesystemslib.dsse.Envelope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.serialization",
+              "changed_fqn": "tuf.api.serialization.SignedSerializer.serialize",
+              "evidence": "tuf.api.serialization has dependency path to securesystemslib via IMPORTS tuf.api.metadata -> IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.metadata",
+              "changed_fqn": "tuf.api.metadata.Metadata.sign",
+              "evidence": "tuf.api.metadata has dependency path to securesystemslib via IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.ngclient",
+              "changed_fqn": "tuf.ngclient",
+              "evidence": "tuf.ngclient has dependency path to securesystemslib via IMPORTS tuf.api.metadata -> IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "tuf-bench-probe-metadata-seeded",
+        "type": "compliant_probe",
+        "detect_seconds": 0.1392307080095634,
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 0,
+        "diagnostics": {
+          "expected_triples": 0,
+          "actual_triples": 255,
+          "overlap": 0,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.exceptions",
+              "changed_fqn": "tuf.api.exceptions.UnsignedMetadataError",
+              "evidence": "tuf.api.exceptions has dependency path to securesystemslib via IMPORTS securesystemslib.exceptions",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api._payload",
+              "changed_fqn": "tuf.api._payload.Targets.__eq__",
+              "evidence": "tuf.api._payload has dependency path to securesystemslib via IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.repository._repository",
+              "changed_fqn": "tuf.repository._repository.Repository",
+              "evidence": "tuf.repository._repository has dependency path to securesystemslib via IMPORTS tuf.api.metadata -> IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.dsse",
+              "changed_fqn": "tuf.api.dsse.SimpleEnvelope",
+              "evidence": "tuf.api.dsse has dependency path to securesystemslib via INHERITS securesystemslib.dsse.Envelope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.serialization",
+              "changed_fqn": "tuf.api.serialization.SignedSerializer.serialize",
+              "evidence": "tuf.api.serialization has dependency path to securesystemslib via IMPORTS tuf.api.metadata -> IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.metadata",
+              "changed_fqn": "tuf.api.metadata.Metadata.sign",
+              "evidence": "tuf.api.metadata has dependency path to securesystemslib via IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.ngclient",
+              "changed_fqn": "tuf.ngclient",
+              "evidence": "tuf.ngclient has dependency path to securesystemslib via IMPORTS tuf.api.metadata -> IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "tuf-bench-probe-repository-json-satisfied",
+        "type": "compliant_probe",
+        "detect_seconds": 0.06714208307676017,
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 0,
+        "diagnostics": {
+          "expected_triples": 0,
+          "actual_triples": 255,
+          "overlap": 0,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.exceptions",
+              "changed_fqn": "tuf.api.exceptions.UnsignedMetadataError",
+              "evidence": "tuf.api.exceptions has dependency path to securesystemslib via IMPORTS securesystemslib.exceptions",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api._payload",
+              "changed_fqn": "tuf.api._payload.Targets.__eq__",
+              "evidence": "tuf.api._payload has dependency path to securesystemslib via IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.repository._repository",
+              "changed_fqn": "tuf.repository._repository.Repository",
+              "evidence": "tuf.repository._repository has dependency path to securesystemslib via IMPORTS tuf.api.metadata -> IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.dsse",
+              "changed_fqn": "tuf.api.dsse.SimpleEnvelope",
+              "evidence": "tuf.api.dsse has dependency path to securesystemslib via INHERITS securesystemslib.dsse.Envelope",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.serialization",
+              "changed_fqn": "tuf.api.serialization.SignedSerializer.serialize",
+              "evidence": "tuf.api.serialization has dependency path to securesystemslib via IMPORTS tuf.api.metadata -> IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.api.metadata",
+              "changed_fqn": "tuf.api.metadata.Metadata.sign",
+              "evidence": "tuf.api.metadata has dependency path to securesystemslib via IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            },
+            {
+              "adr_id": "ADR-2020-11-30",
+              "predicate": "prohibits_dependency",
+              "subject": "tuf.*",
+              "object": "securesystemslib",
+              "matched_fqn": "tuf.ngclient",
+              "changed_fqn": "tuf.ngclient",
+              "evidence": "tuf.ngclient has dependency path to securesystemslib via IMPORTS tuf.api.metadata -> IMPORTS securesystemslib.signer",
+              "change_type": "structural"
+            }
+          ],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      }
+    ],
+    "exact": 6,
+    "partial": 0,
+    "miss": 0,
+    "total": 6,
+    "pattern_exact": 6,
+    "pattern_partial": 0,
+    "pattern_miss": 0,
+    "stale_gold_units": 0,
+    "diagnostic_overlap": 1064,
+    "structural": 96,
+    "merge_mechanism": 0,
+    "arm_candidates": 2
+  },
+  "cost": {
+    "parse_seconds": 0.363,
+    "resolve_seconds": 63.319,
+    "detect_seconds": 3.85,
+    "per_case_detect_seconds": [
+      0.479,
+      0.052,
+      2.442,
+      0.065,
+      0.091,
+      0.064,
+      0.277,
+      0.043,
+      0.047,
+      0.04,
+      0.044,
+      0.139,
+      0.067
+    ],
+    "prompt_tokens": 224210,
+    "completion_tokens": 2063,
+    "sessions": 10
+  }
+}
