@@ -19,6 +19,7 @@ from services.models import (
     ChangedFQN,
     Diff,
     ConstraintEdge,
+    ConstraintScope,
     DiffResult,
     Edge,
     FileChange,
@@ -236,6 +237,44 @@ def _make_constraint_edges() -> list[ConstraintEdge]:
 
 
 class TestADGPipelineRunPrepared:
+    def test_tooling_scoped_constraint_does_not_fire(self):
+        """#159: the pipeline must not launder a TOOLING edge back to runtime.
+
+        `adg_with_specificity` rebuilds every ConstraintEdge; if it drops the
+        scope key the engine's TOOLING filter never sees the tag and tooling ADRs
+        fire again. The CLI and the benchmark harness both run through here, so
+        the engine-side skip is only real if this holds."""
+        diff_result = DiffResult(
+            to_sha="abc123",
+            changed_fqns=[
+                ChangedFQN(
+                    fqn=FQN.from_dotted("app.service"),
+                    change_type="modified",
+                    file_path="app/service.py",
+                    enclosing_module=FQN.from_dotted("app.service"),
+                ),
+            ],
+        )
+
+        def fires(scope: ConstraintScope) -> list[str]:
+            adg = _make_adg()
+            adg.constraint_edges = [
+                ConstraintEdge(
+                    subject="app.*",
+                    predicate=PredicateType.PROHIBITS_DEPENDENCY,
+                    object="app.repo",
+                    justification="Prefect deploys the flow; not import-graph scope",
+                    adr_id="ADR-010",
+                    adr_path="docs/adr/010-tooling.md",
+                    scope=scope,
+                ),
+            ]
+            result = ADGPipeline().run_prepared(PipelineInputs(adg=adg, diff_result=diff_result))
+            return [v.constraint.adr_id for v in result.violations]
+
+        assert fires(ConstraintScope.RUNTIME) == ["ADR-010"]  # non-vacuity: it fires
+        assert fires(ConstraintScope.TOOLING) == []
+
     def test_violations_have_nonzero_specificity(self):
         """The core bug fix: specificity must not be 0.0 after pipeline."""
         adg = ADG(

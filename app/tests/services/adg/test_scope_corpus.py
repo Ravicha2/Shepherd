@@ -25,6 +25,7 @@ from services.adg.treesitter import parse_repo
 from services.adg.unified_resolver import _materialize_edges, _parse_edges
 from services.cpt.engine import CPTResult, detect
 from services.models import ADG, ChangedFQN, ConstraintEdge, ConstraintScope, DiffResult
+from services.pipeline import adg_with_specificity
 from tests.services.adg.test_benchmark_arms_eval import _load_gold
 from tests.services.adg.test_unified_resolver_eval import _score_constraint, _repo_root
 
@@ -284,7 +285,11 @@ def test_tooling_scope_silences_real_corpus_fires(adgs) -> None:
     )
 
     def run(constraint_edges: list[ConstraintEdge]) -> CPTResult:
-        return detect(diff, ADG(nodes=adg.nodes, edges=adg.edges, constraint_edges=constraint_edges))
+        # Through the real path (the harness seed and the CLI both go
+        # parse -> merge -> adg_with_specificity -> detect): building the ADG by
+        # hand would skip the specificity pass that used to drop the scope tag.
+        prepared = adg_with_specificity(ADG(nodes=adg.nodes, edges=adg.edges, constraint_edges=constraint_edges))
+        return detect(diff, prepared)
 
     runtime_result = run(edges)
     assert runtime_result.violations, "fixture replay should fire (non-vacuity guard)"

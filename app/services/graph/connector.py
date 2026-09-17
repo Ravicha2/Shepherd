@@ -8,7 +8,7 @@ from neo4j import GraphDatabase
 
 from services.cpt.dismissal import Dismissal
 from services.fqn import FQN
-from services.models import ADG, ConstraintEdge, DependencyRole, Edge, FQNKind, FQNNode, PredicateType
+from services.models import ADG, ConstraintEdge, ConstraintScope, DependencyRole, Edge, FQNKind, FQNNode, PredicateType
 
 log = logging.getLogger(__name__)
 
@@ -195,7 +195,7 @@ class GraphStore:
                 f"MATCH (tgt:FQNNode {{fqn: $object}}) "
                 f"CREATE (src)-[r:{predicate_str} {{"
                 "justification: $justification, adr_id: $adr_id, adr_path: $adr_path, "
-                "specificity: $specificity"
+                "specificity: $specificity, scope: $scope"
                 "}]->(tgt)",
                 subject=constraint_edge.subject,
                 object=constraint_edge.object,
@@ -203,11 +203,18 @@ class GraphStore:
                 adr_id=constraint_edge.adr_id,
                 adr_path=constraint_edge.adr_path,
                 specificity=constraint_edge.specificity,
+                scope=constraint_edge.scope.value,
             )
 
     @staticmethod
     def _row_to_constraint_edge(record) -> ConstraintEdge:
         predicate = REL_TO_PREDICATE[record["predicate"]]
+        try:
+            # ADR 019 decision 3: a missing (legacy row) or invalid scope reads
+            # back as RUNTIME, so an untagged edge stays charged, never sheltered.
+            scope = ConstraintScope(record.get("scope"))
+        except ValueError:
+            scope = ConstraintScope.RUNTIME
         return ConstraintEdge(
             subject=record["subject"],
             predicate=predicate,
@@ -216,6 +223,7 @@ class GraphStore:
             adr_id=record["adr_id"],
             adr_path=record["adr_path"],
             specificity=record.get("specificity", 0.0),
+            scope=scope,
         )
 
     def load_constraint_edges(self, adr_id: str) -> list[ConstraintEdge]:
@@ -226,7 +234,7 @@ class GraphStore:
                 "RETURN src.fqn AS subject, type(r) AS predicate, tgt.fqn AS object, "
                 "r.justification AS justification, r.adr_id AS adr_id, "
                 "r.adr_path AS adr_path, "
-                "r.specificity AS specificity",
+                "r.specificity AS specificity, r.scope AS scope",
                 adr_id=adr_id,
                 predicate_types=PREDICATE_VALUES,
             )
@@ -240,7 +248,7 @@ class GraphStore:
                 "RETURN src.fqn AS subject, type(r) AS predicate, tgt.fqn AS object, "
                 "r.justification AS justification, r.adr_id AS adr_id, "
                 "r.adr_path AS adr_path, "
-                "r.specificity AS specificity",
+                "r.specificity AS specificity, r.scope AS scope",
                 predicate_types=PREDICATE_VALUES,
             )
             return [self._row_to_constraint_edge(record) for record in result]
@@ -392,7 +400,7 @@ class GraphStore:
                 "RETURN n.fqn AS subject, type(r) AS predicate, tgt.fqn AS object, "
                 "r.justification AS justification, r.adr_id AS adr_id, "
                 "r.adr_path AS adr_path, "
-                "r.specificity AS specificity",
+                "r.specificity AS specificity, r.scope AS scope",
                 file_path=file_path,
                 predicate_types=PREDICATE_VALUES,
             ))
@@ -402,7 +410,7 @@ class GraphStore:
                 "RETURN src.fqn AS subject, type(r) AS predicate, n.fqn AS object, "
                 "r.justification AS justification, r.adr_id AS adr_id, "
                 "r.adr_path AS adr_path, "
-                "r.specificity AS specificity",
+                "r.specificity AS specificity, r.scope AS scope",
                 file_path=file_path,
                 predicate_types=PREDICATE_VALUES,
             ))
