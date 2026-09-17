@@ -1,0 +1,496 @@
+{
+  "_purpose": "#158 triage ground truth: the human-labeled per-ADR scope verdict for every benchmark ADR, scored against the resolver's per-edge verdicts as a runtime/tooling/none confusion matrix.",
+  "_how_to_label": "Read the ADR at adr_path in the repo's pinned worktree. Fill expected_scope with 'runtime', 'tooling' or 'none' (ADR 019 decision 2 vocabulary: runtime governs shipped code, tooling is the dev toolchain, none is not a dependency/implementation relation at all). Set label_source to 'human' and add a one-line notes entry when you fill one in. Gold context for each ADR (its expected constraints and a note) lives in benchmark/gold/<repo>_gold.json under the same adr_id; has-gold ADRs are the recall-safety ones. Rows whose label_source is null are unlabeled.",
+  "_anchoring_note": "Deliberately NOT included: what the committed #157 fixture run produced for each ADR. Seeing the machine's verdict before labeling would anchor the ground truth (#158 axis 2 is the instrument that decides whether the triage stays).",
+  "_contested_note": "A non-null `contested` marks an expectation that is carried forward but is NOT settled: ADR 019 records the committed run diverging from it and questions the #157 vocabulary. Decide these before scoring against them, or report them as a separate column.",
+  "adrs": [
+    {
+      "repo_id": "python-tuf",
+      "adr_id": "ADR-0000",
+      "adr_path": "docs/adr/0000-use-markdown-architectural-decision-records.md",
+      "expected_scope": null,
+      "contested": null,
+      "recall_safety": null,
+      "label_source": null,
+      "notes": ""
+    },
+    {
+      "repo_id": "python-tuf",
+      "adr_id": "ADR-0001",
+      "adr_path": "docs/adr/0001-python-version-3-6-plus.md",
+      "expected_scope": "tooling",
+      "contested": null,
+      "recall_safety": {
+        "required": "tooling",
+        "why": "language-version prohibitions: gold rows tag tooling AND still match (scope-blind pin)"
+      },
+      "label_source": "#157 named expectation (ADR 019 decision 2); ADR 019 recall-safety table",
+      "notes": ""
+    },
+    {
+      "repo_id": "python-tuf",
+      "adr_id": "ADR-0002",
+      "adr_path": "docs/adr/0002-pre-1-0-deprecation-strategy.md",
+      "expected_scope": null,
+      "contested": null,
+      "recall_safety": null,
+      "label_source": null,
+      "notes": ""
+    },
+    {
+      "repo_id": "python-tuf",
+      "adr_id": "ADR-0003",
+      "adr_path": "docs/adr/0003-where-to-develop-TUF-1-0-0.md",
+      "expected_scope": null,
+      "contested": null,
+      "recall_safety": null,
+      "label_source": null,
+      "notes": ""
+    },
+    {
+      "repo_id": "python-tuf",
+      "adr_id": "ADR-0004",
+      "adr_path": "docs/adr/0004-extent-of-OOP-in-metadata-model.md",
+      "expected_scope": null,
+      "contested": null,
+      "recall_safety": null,
+      "label_source": null,
+      "notes": ""
+    },
+    {
+      "repo_id": "python-tuf",
+      "adr_id": "ADR-0005",
+      "adr_path": "docs/adr/0005-use-google-python-style-guide.md",
+      "expected_scope": null,
+      "contested": null,
+      "recall_safety": null,
+      "label_source": null,
+      "notes": ""
+    },
+    {
+      "repo_id": "python-tuf",
+      "adr_id": "ADR-0006",
+      "adr_path": "docs/adr/0006-where-to-implemenent-model-serialization.md",
+      "expected_scope": null,
+      "contested": null,
+      "recall_safety": null,
+      "label_source": null,
+      "notes": ""
+    },
+    {
+      "repo_id": "python-tuf",
+      "adr_id": "ADR-0008",
+      "adr_path": "docs/adr/0008-accept-unrecognised-fields.md",
+      "expected_scope": null,
+      "contested": null,
+      "recall_safety": null,
+      "label_source": null,
+      "notes": ""
+    },
+    {
+      "repo_id": "python-tuf",
+      "adr_id": "ADR-0009",
+      "adr_path": "docs/adr/0009-what-is-a-reference-implementation.md",
+      "expected_scope": null,
+      "contested": null,
+      "recall_safety": null,
+      "label_source": null,
+      "notes": ""
+    },
+    {
+      "repo_id": "python-tuf",
+      "adr_id": "ADR-0010",
+      "adr_path": "docs/adr/0010-repository-library-design.md",
+      "expected_scope": null,
+      "contested": null,
+      "recall_safety": {
+        "required": "runtime",
+        "why": "gold edge stays runtime despite the in-memory test implementation aside"
+      },
+      "label_source": "ADR 019 recall-safety table",
+      "notes": ""
+    },
+    {
+      "repo_id": "flowkit",
+      "adr_id": "ADR-0001",
+      "adr_path": "docs/source/developer/adr/0001-pipenv-for-package-and-dependency-management.md",
+      "expected_scope": "tooling",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#157 named expectation",
+      "notes": ""
+    },
+    {
+      "repo_id": "flowkit",
+      "adr_id": "ADR-0002",
+      "adr_path": "docs/source/developer/adr/0002-pytest-for-testing.md",
+      "expected_scope": "tooling",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#157 named expectation",
+      "notes": ""
+    },
+    {
+      "repo_id": "flowkit",
+      "adr_id": "ADR-0003",
+      "adr_path": "docs/source/developer/adr/0003-http-api.md",
+      "expected_scope": null,
+      "contested": null,
+      "recall_safety": null,
+      "label_source": null,
+      "notes": ""
+    },
+    {
+      "repo_id": "flowkit",
+      "adr_id": "ADR-0004",
+      "adr_path": "docs/source/developer/adr/0004-http-framework.md",
+      "expected_scope": null,
+      "contested": null,
+      "recall_safety": {
+        "required": "runtime",
+        "why": "reverse trap: framework language (# Quart), runtime verdict"
+      },
+      "label_source": "ADR 019 recall-safety table",
+      "notes": ""
+    },
+    {
+      "repo_id": "flowkit",
+      "adr_id": "ADR-0005",
+      "adr_path": "docs/source/developer/adr/0005-IPC-methods.md",
+      "expected_scope": null,
+      "contested": null,
+      "recall_safety": null,
+      "label_source": null,
+      "notes": ""
+    },
+    {
+      "repo_id": "flowkit",
+      "adr_id": "ADR-0006",
+      "adr_path": "docs/source/developer/adr/0006-JWTs.md",
+      "expected_scope": null,
+      "contested": null,
+      "recall_safety": null,
+      "label_source": null,
+      "notes": ""
+    },
+    {
+      "repo_id": "flowkit",
+      "adr_id": "ADR-0007",
+      "adr_path": "docs/source/developer/adr/0007-mapbox-for-worked-examples.md",
+      "expected_scope": null,
+      "contested": null,
+      "recall_safety": null,
+      "label_source": null,
+      "notes": ""
+    },
+    {
+      "repo_id": "flowkit",
+      "adr_id": "ADR-0008",
+      "adr_path": "docs/source/developer/adr/0008-jupyter-notebooks-for-autoflow.md",
+      "expected_scope": "tooling",
+      "contested": "ADR 019: workflow-engine decision, outside decision-2's dev-toolchain vocabulary; gold says the ADR should emit no edges (AutoFlow is an absent component)",
+      "recall_safety": null,
+      "label_source": "#157 named expectation",
+      "notes": ""
+    },
+    {
+      "repo_id": "flowkit",
+      "adr_id": "ADR-0009",
+      "adr_path": "docs/source/developer/adr/0009-asciidoctor-pdf-for-notebook-conversion.md",
+      "expected_scope": "tooling",
+      "contested": "ADR 019: notebook-execution decision, outside decision-2's dev-toolchain vocabulary; gold says the ADR should emit no edges",
+      "recall_safety": null,
+      "label_source": "#157 named expectation",
+      "notes": ""
+    },
+    {
+      "repo_id": "flowkit",
+      "adr_id": "ADR-0010",
+      "adr_path": "docs/source/developer/adr/0010-prefect-for-autoflow.md",
+      "expected_scope": "tooling",
+      "contested": "ADR 019: prefect workflow-engine decision, outside decision-2's dev-toolchain vocabulary; gold says the ADR should emit no edges",
+      "recall_safety": null,
+      "label_source": "#157 named expectation",
+      "notes": ""
+    },
+    {
+      "repo_id": "flowkit",
+      "adr_id": "ADR-0011",
+      "adr_path": "docs/source/developer/adr/0011-redaction-strategy-for-labelled-aggregates.md",
+      "expected_scope": "none",
+      "contested": "ADR 019: redaction policy; #157 expected none, the run returned runtime",
+      "recall_safety": null,
+      "label_source": "#157 named expectation",
+      "notes": ""
+    },
+    {
+      "repo_id": "flowkit",
+      "adr_id": "ADR-0012",
+      "adr_path": "docs/source/developer/adr/0012-claims-role-scope-rework.md",
+      "expected_scope": "none",
+      "contested": "ADR 019: claims/roles data-model policy; #157 expected none, the run returned runtime",
+      "recall_safety": null,
+      "label_source": "#157 named expectation",
+      "notes": ""
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0001",
+      "adr_path": "docs/adrs/0001-build-nimbus-console-in-experimenter.md",
+      "expected_scope": null,
+      "contested": null,
+      "recall_safety": null,
+      "label_source": null,
+      "notes": ""
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0002",
+      "adr_path": "docs/adrs/0002-nimbus-front-end-directory-tree-and-stack.md",
+      "expected_scope": null,
+      "contested": null,
+      "recall_safety": null,
+      "label_source": null,
+      "notes": ""
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0003",
+      "adr_path": "docs/adrs/0003-analysis-visualization-architecture-approach.md",
+      "expected_scope": null,
+      "contested": null,
+      "recall_safety": null,
+      "label_source": null,
+      "notes": ""
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0004",
+      "adr_path": "docs/adrs/0004-monitoring-data-import.md",
+      "expected_scope": null,
+      "contested": null,
+      "recall_safety": null,
+      "label_source": null,
+      "notes": ""
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0005",
+      "adr_path": "docs/adrs/0005-doc-hub.md",
+      "expected_scope": null,
+      "contested": null,
+      "recall_safety": null,
+      "label_source": null,
+      "notes": ""
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0006",
+      "adr_path": "docs/adrs/0006-doc-hub-repo.md",
+      "expected_scope": null,
+      "contested": null,
+      "recall_safety": null,
+      "label_source": null,
+      "notes": ""
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0007",
+      "adr_path": "docs/adrs/0007-doc-hub-url.md",
+      "expected_scope": null,
+      "contested": null,
+      "recall_safety": null,
+      "label_source": null,
+      "notes": ""
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0008",
+      "adr_path": "docs/adrs/0008-integrating-htmx.md",
+      "expected_scope": null,
+      "contested": null,
+      "recall_safety": {
+        "required": "runtime",
+        "why": "Jest aside: the gold nimbus_ui.* prohibits graphene edge must stay runtime"
+      },
+      "label_source": "ADR 019 recall-safety table",
+      "notes": ""
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0009",
+      "adr_path": "docs/adrs/0009-nimbus-web-sdk-architecture.md",
+      "expected_scope": null,
+      "contested": null,
+      "recall_safety": null,
+      "label_source": null,
+      "notes": ""
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0010",
+      "adr_path": "docs/adrs/0010-jetstream-shared-schema.md",
+      "expected_scope": null,
+      "contested": null,
+      "recall_safety": {
+        "required": "runtime",
+        "why": "gold edges stay runtime despite the serializer test refactor"
+      },
+      "label_source": "ADR 019 recall-safety table",
+      "notes": ""
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0011",
+      "adr_path": "docs/adrs/0011-nimbus-web-glean-application-structure.md",
+      "expected_scope": null,
+      "contested": null,
+      "recall_safety": null,
+      "label_source": null,
+      "notes": ""
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0012",
+      "adr_path": "docs/adrs/0012-exposure-events-and-coenrolling-features.md",
+      "expected_scope": null,
+      "contested": null,
+      "recall_safety": null,
+      "label_source": null,
+      "notes": ""
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0013",
+      "adr_path": "docs/adrs/0013-guardrail-metric-versioning.md",
+      "expected_scope": null,
+      "contested": null,
+      "recall_safety": null,
+      "label_source": null,
+      "notes": ""
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0014",
+      "adr_path": "docs/adrs/0014-desktop-randomization-unit.md",
+      "expected_scope": null,
+      "contested": null,
+      "recall_safety": null,
+      "label_source": null,
+      "notes": ""
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0015",
+      "adr_path": "docs/adrs/0015-webapps-qa-strategy.md",
+      "expected_scope": null,
+      "contested": null,
+      "recall_safety": null,
+      "label_source": null,
+      "notes": ""
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0016",
+      "adr_path": "docs/adrs/0016-ci-external-firefox-tracking.md",
+      "expected_scope": null,
+      "contested": null,
+      "recall_safety": null,
+      "label_source": null,
+      "notes": ""
+    },
+    {
+      "repo_id": "structurizr-python",
+      "adr_id": "ADR-0001",
+      "adr_path": "docs/development/adr/0001-record-architecture-decisions.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#157 named expectation",
+      "notes": ""
+    },
+    {
+      "repo_id": "structurizr-python",
+      "adr_id": "ADR-0002",
+      "adr_path": "docs/development/adr/0002-version-control-our-code.md",
+      "expected_scope": "none",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#157 named expectation",
+      "notes": ""
+    },
+    {
+      "repo_id": "structurizr-python",
+      "adr_id": "ADR-0003",
+      "adr_path": "docs/development/adr/0003-python-3-6-only.md",
+      "expected_scope": "tooling",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#157 named expectation",
+      "notes": ""
+    },
+    {
+      "repo_id": "structurizr-python",
+      "adr_id": "ADR-0004",
+      "adr_path": "docs/development/adr/0004-python-package-versioning.md",
+      "expected_scope": "tooling",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#157 named expectation",
+      "notes": ""
+    },
+    {
+      "repo_id": "structurizr-python",
+      "adr_id": "ADR-0005",
+      "adr_path": "docs/development/adr/0005-code-quality-assurance.md",
+      "expected_scope": null,
+      "contested": null,
+      "recall_safety": null,
+      "label_source": null,
+      "notes": ""
+    },
+    {
+      "repo_id": "structurizr-python",
+      "adr_id": "ADR-0006",
+      "adr_path": "docs/development/adr/0006-code-testing.md",
+      "expected_scope": "tooling",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#157 named expectation",
+      "notes": ""
+    },
+    {
+      "repo_id": "structurizr-python",
+      "adr_id": "ADR-0007",
+      "adr_path": "docs/development/adr/0007-unit-tests.md",
+      "expected_scope": "tooling",
+      "contested": null,
+      "recall_safety": null,
+      "label_source": "#157 named expectation",
+      "notes": ""
+    },
+    {
+      "repo_id": "structurizr-python",
+      "adr_id": "ADR-0008",
+      "adr_path": "docs/development/adr/0008-package-structure.md",
+      "expected_scope": null,
+      "contested": null,
+      "recall_safety": {
+        "required": "runtime",
+        "why": "gold edges stay runtime despite the unit-test aside"
+      },
+      "label_source": "ADR 019 recall-safety table",
+      "notes": ""
+    },
+    {
+      "repo_id": "structurizr-python",
+      "adr_id": "ADR-0009",
+      "adr_path": "docs/development/adr/0009-use-pydantic-for-json-de-serialization.md",
+      "expected_scope": null,
+      "contested": null,
+      "recall_safety": null,
+      "label_source": null,
+      "notes": ""
+    }
+  ]
+}
