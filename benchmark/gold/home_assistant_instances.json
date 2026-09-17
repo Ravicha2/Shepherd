@@ -7,7 +7,7 @@
   "adr_dir": "adr",
   "adr_repo": "../../dataset-Shepherd/large/home-assistant-architecture",
   "adr_repo_pin": "0c4f7dbf21c9e1279bea23a1eb2f9ab295d0e9e9",
-  "verification": "VERIFIED 2026-09-15, 14/14 cases PASS post-#150 (fix landed via PR #151, commit b4a7941: _reachable_paths keys its BFS visited-set by (node, still-descending), so CONTAINS expands only during pure descent from the start/seed and namespace imports onto package nodes no longer fan into subtrees). Run shape: pruned staged tree (remote_rpi_gpio, scrape, rest, alpha_vantage, acomax copied from the pin clone), mirroring test_cpt_detect_eval run_case (parse_repo -> add_external_nodes -> merge_constraint_edges -> specificity -> augment_immutable -> process_diff -> detect); ha-bench-gpio-removal runs on the staged tree minus the three remote_rpi_gpio files with an empty diff because augment_adg cannot remove nodes. Confirmed: pin baseline = exactly 1 violation (ADR-0019 at homeassistant.components.remote_rpi_gpio, the genuine live violation); every case fires only its own module plus the standing baseline; transitive door_status fires via the 2-hop IMPORTS chain; alias/deep-import/wildcard/dynamic behaviors exactly as documented in the grading notes. History: first verification 2026-09-14 found the namespace-import CONTAINS-descent blocker (13/14 FAIL) — that discovery became #150; expectations were authored for the post-fix semantics and held unchanged. Scoping caveat: the pruned tree proves the direct/2-hop paths and non-firing controls; full-graph confirmation (all ~2000 components, incl. no other transitive subjects) belongs to the deferred report-only run, which additionally remains the known >60min CPU hazard. BASELINE-IS-NON-ZERO design note: every case's expected_violations include the standing remote_rpi_gpio fire; probes are 'no fire beyond the baseline', not 'zero'.",
+  "verification": "VERIFIED 2026-09-15, 14/14 cases PASS post-#150 (fix landed via PR #151, commit b4a7941: _reachable_paths keys its BFS visited-set by (node, still-descending), so CONTAINS expands only during pure descent from the start/seed and namespace imports onto package nodes no longer fan into subtrees). Run shape: pruned staged tree (remote_rpi_gpio, scrape, rest, alpha_vantage, acomax copied from the pin clone), mirroring test_cpt_detect_eval run_case (parse_repo -> add_external_nodes -> merge_constraint_edges -> specificity -> augment_immutable -> process_diff -> detect); ha-bench-gpio-removal runs on the staged tree minus the three remote_rpi_gpio files with an empty diff because augment_adg cannot remove nodes. Confirmed: pin baseline = exactly 1 violation (ADR-0019 at homeassistant.components.remote_rpi_gpio, the genuine live violation); every case fires only its own module plus the standing baseline; transitive door_status fires via the 2-hop IMPORTS chain; alias/deep-import/wildcard/dynamic behaviors exactly as documented in the grading notes. History: first verification 2026-09-14 found the namespace-import CONTAINS-descent blocker (13/14 FAIL) — that discovery became #150; expectations were authored for the post-fix semantics and held unchanged. Scoping caveat: the pruned tree proves the direct/2-hop paths and non-firing controls; full-graph confirmation (all ~2000 components, incl. no other transitive subjects) belongs to the deferred report-only run, which additionally remains the known >60min CPU hazard. BASELINE-IS-NON-ZERO design note: every case's expected_violations include the standing remote_rpi_gpio fire; probes are 'no fire beyond the baseline', not 'zero'.; 2026-09-18 (#162 scrub): the '(new code)' / '(new code, ...)' meta-annotations were removed from diff docstrings because they are visible to the reviewer and give away which code was planted. Text-only change to the appended docstrings: no imports, FQNs or code structure touched. The PASS results above were measured before this edit.",
   "historical_pins": [
     {
       "commit": "6e1728542ef22ef48a7cb03542004e0ef3cee9b5",
@@ -42,7 +42,7 @@
         {
           "path": "homeassistant/components/price_scraper/__init__.py",
           "status": "added",
-          "append": "\"\"\"Support for scraping a price page with a headless browser (new code).\"\"\"\nfrom selenium import webdriver\n\n\ndef _fetch_price(url):\n    \"\"\"Load a page in a headless browser and read the price (new code).\"\"\"\n    driver = webdriver.Chrome()\n    driver.get(url)\n    price = driver.find_element(\"id\", \"price\").text\n    driver.quit()\n    return price\n"
+          "append": "\"\"\"Support for scraping a price page with a headless browser.\"\"\"\nfrom selenium import webdriver\n\n\ndef _fetch_price(url):\n    \"\"\"Load a page in a headless browser and read the price.\"\"\"\n    driver = webdriver.Chrome()\n    driver.get(url)\n    price = driver.find_element(\"id\", \"price\").text\n    driver.quit()\n    return price\n"
         }
       ],
       "expected_violations": [
@@ -73,7 +73,7 @@
         {
           "path": "homeassistant/components/auth_headless/__init__.py",
           "status": "added",
-          "append": "\"\"\"Support for logging into a vendor portal with a browser (new code).\"\"\"\nfrom __future__ import annotations\n\n\nasync def async_setup_entry(hass, entry) -> None:\n    \"\"\"Set up the integration, scraping the portal behind login (new code).\"\"\"\n    from selenium import webdriver\n\n    driver = webdriver.Chrome()\n    driver.get(entry.data[\"portal_url\"])\n    entry.runtime_data = driver.find_element(\"id\", \"session\").text\n    driver.quit()\n"
+          "append": "\"\"\"Support for logging into a vendor portal with a browser.\"\"\"\nfrom __future__ import annotations\n\n\nasync def async_setup_entry(hass, entry) -> None:\n    \"\"\"Set up the integration, scraping the portal behind login.\"\"\"\n    from selenium import webdriver\n\n    driver = webdriver.Chrome()\n    driver.get(entry.data[\"portal_url\"])\n    entry.runtime_data = driver.find_element(\"id\", \"session\").text\n    driver.quit()\n"
         }
       ],
       "expected_violations": [
@@ -135,7 +135,7 @@
         {
           "path": "homeassistant/components/gpio_status_reader/__init__.py",
           "status": "added",
-          "append": "\"\"\"Support for reading a status pin as a binary sensor (new code).\"\"\"\nfrom __future__ import annotations\n\n\nasync def async_setup_entry(hass, entry, async_add_entities) -> None:\n    \"\"\"Set up pin reading directly on the local board (new code).\"\"\"\n    import gpiozero\n\n    reader = gpiozero.Button(entry.data[\"pin\"])\n    async_add_entities([_PinSensor(reader)], update_before_add=True)\n\n\nclass _PinSensor:\n    \"\"\"Entity wrapper around the gpiozero reader (new code).\"\"\"\n\n    def __init__(self, reader) -> None:\n        self._reader = reader\n"
+          "append": "\"\"\"Support for reading a status pin as a binary sensor.\"\"\"\nfrom __future__ import annotations\n\n\nasync def async_setup_entry(hass, entry, async_add_entities) -> None:\n    \"\"\"Set up pin reading directly on the local board.\"\"\"\n    import gpiozero\n\n    reader = gpiozero.Button(entry.data[\"pin\"])\n    async_add_entities([_PinSensor(reader)], update_before_add=True)\n\n\nclass _PinSensor:\n    \"\"\"Entity wrapper around the gpiozero reader.\"\"\"\n\n    def __init__(self, reader) -> None:\n        self._reader = reader\n"
         }
       ],
       "expected_violations": [
@@ -166,7 +166,7 @@
         {
           "path": "homeassistant/components/pi_pin_dashboard/__init__.py",
           "status": "added",
-          "append": "\"\"\"Support for dashboarding pins on a remote Raspberry Pi (new code).\"\"\"\nfrom gpiozero.pins.pigpio import PiGPIOFactory\n\n\ndef _connect(host):\n    \"\"\"Open a pin factory against a remote pigpio daemon (new code).\"\"\"\n    return PiGPIOFactory(host=host)\n"
+          "append": "\"\"\"Support for dashboarding pins on a remote Raspberry Pi.\"\"\"\nfrom gpiozero.pins.pigpio import PiGPIOFactory\n\n\ndef _connect(host):\n    \"\"\"Open a pin factory against a remote pigpio daemon.\"\"\"\n    return PiGPIOFactory(host=host)\n"
         }
       ],
       "expected_violations": [
@@ -197,7 +197,7 @@
         {
           "path": "homeassistant/components/webhook_status/__init__.py",
           "status": "added",
-          "append": "\"\"\"Support for polling a webhook status endpoint (new code).\"\"\"\nfrom __future__ import annotations\n\n\nasync def async_setup_entry(hass, entry) -> None:\n    \"\"\"Set up polling of the status endpoint (new code).\"\"\"\n    import aiohttp\n\n    session = aiohttp.ClientSession()\n    entry.runtime_data = await session.get(entry.data[\"status_url\"])\n"
+          "append": "\"\"\"Support for polling a webhook status endpoint.\"\"\"\nfrom __future__ import annotations\n\n\nasync def async_setup_entry(hass, entry) -> None:\n    \"\"\"Set up polling of the status endpoint.\"\"\"\n    import aiohttp\n\n    session = aiohttp.ClientSession()\n    entry.runtime_data = await session.get(entry.data[\"status_url\"])\n"
         }
       ],
       "expected_violations": [
@@ -220,7 +220,7 @@
         {
           "path": "homeassistant/components/serial_counter/__init__.py",
           "status": "added",
-          "append": "\"\"\"Support for a GPIO-attached counter exposed as a serial device (new code).\"\"\"\nfrom __future__ import annotations\n\n\nasync def async_setup_entry(hass, entry) -> None:\n    \"\"\"Set up reading counts from the serial device (new code).\"\"\"\n    import serial\n\n    reader = serial.Serial(entry.data[\"port\"])\n    entry.runtime_data = reader.readline()\n"
+          "append": "\"\"\"Support for a GPIO-attached counter exposed as a serial device.\"\"\"\nfrom __future__ import annotations\n\n\nasync def async_setup_entry(hass, entry) -> None:\n    \"\"\"Set up reading counts from the serial device.\"\"\"\n    import serial\n\n    reader = serial.Serial(entry.data[\"port\"])\n    entry.runtime_data = reader.readline()\n"
         }
       ],
       "expected_violations": [
@@ -266,12 +266,12 @@
         {
           "path": "homeassistant/components/pin_tools/__init__.py",
           "status": "added",
-          "append": "\"\"\"Shared pin-reading helpers for local boards (new code).\"\"\"\nfrom gpiozero import Button\n\n\ndef read_pin(number):\n    \"\"\"Read a GPIO pin number through gpiozero (new code).\"\"\"\n    return Button(number).value\n"
+          "append": "\"\"\"Shared pin-reading helpers for local boards.\"\"\"\nfrom gpiozero import Button\n\n\ndef read_pin(number):\n    \"\"\"Read a GPIO pin number through gpiozero.\"\"\"\n    return Button(number).value\n"
         },
         {
           "path": "homeassistant/components/door_status/__init__.py",
           "status": "added",
-          "append": "\"\"\"Support for reporting a door pin state (new code).\"\"\"\nfrom homeassistant.components import pin_tools\n\n\ndef _door_state(pin_number):\n    \"\"\"Read the door state through the shared helper (new code).\"\"\"\n    return \"open\" if pin_tools.read_pin(pin_number) else \"closed\"\n"
+          "append": "\"\"\"Support for reporting a door pin state.\"\"\"\nfrom homeassistant.components import pin_tools\n\n\ndef _door_state(pin_number):\n    \"\"\"Read the door state through the shared helper.\"\"\"\n    return \"open\" if pin_tools.read_pin(pin_number) else \"closed\"\n"
         }
       ],
       "expected_violations": [
@@ -310,7 +310,7 @@
         {
           "path": "homeassistant/components/vendor_portal/__init__.py",
           "status": "added",
-          "append": "\"\"\"Support for screen-scraping a vendor portal (new code).\"\"\"\nimport selenium as browser_driver\n\n\ndef _login_and_read(url, credentials):\n    \"\"\"Drive the portal through the aliased browser module (new code).\"\"\"\n    driver = browser_driver.Chrome()\n    driver.get(url)\n    body = driver.page_source\n    driver.quit()\n    return body\n"
+          "append": "\"\"\"Support for screen-scraping a vendor portal.\"\"\"\nimport selenium as browser_driver\n\n\ndef _login_and_read(url, credentials):\n    \"\"\"Drive the portal through the aliased browser module.\"\"\"\n    driver = browser_driver.Chrome()\n    driver.get(url)\n    body = driver.page_source\n    driver.quit()\n    return body\n"
         }
       ],
       "expected_violations": [
@@ -365,7 +365,7 @@
         {
           "path": "homeassistant/components/pin_wildcard/__init__.py",
           "status": "added",
-          "append": "\"\"\"Support for wildcard-driven pin access (new code, ADR-violating shape).\"\"\"\nfrom gpiozero import *  # noqa: F403\n\n\ndef _read(number):\n    \"\"\"Read a pin through wildcard-imported names (new code).\"\"\"\n    return Button(number).value\n"
+          "append": "\"\"\"Support for wildcard-driven pin access.\"\"\"\nfrom gpiozero import *  # noqa: F403\n\n\ndef _read(number):\n    \"\"\"Read a pin through wildcard-imported names.\"\"\"\n    return Button(number).value\n"
         }
       ],
       "expected_violations": [
@@ -388,7 +388,7 @@
         {
           "path": "homeassistant/components/pin_dynamic/__init__.py",
           "status": "added",
-          "append": "\"\"\"Support for dynamically loaded pin backends (new code, ADR-violating shape).\"\"\"\nfrom importlib import import_module\n\n\ndef _load_backend():\n    \"\"\"Load the gpiozero backend at runtime (new code).\"\"\"\n    return import_module(\"gpiozero\")\n"
+          "append": "\"\"\"Support for dynamically loaded pin backends.\"\"\"\nfrom importlib import import_module\n\n\ndef _load_backend():\n    \"\"\"Load the gpiozero backend at runtime.\"\"\"\n    return import_module(\"gpiozero\")\n"
         }
       ],
       "expected_violations": [

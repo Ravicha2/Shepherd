@@ -5,7 +5,7 @@
   "pin_commit": "6889cfbffbb90a17930fbdedf12ae050be775fe3",
   "pin_date": "2026-07-14",
   "adr_dir": "docs/adr",
-  "verification": "verified 2026-09-12: all 8 cases run empirically at the pin (in-memory ADG from parse_repo + gold constraints, process_diff + ADGPipeline().run_prepared); baseline detect at 6889cfbf yields zero violations; the historical compliant probe verified on a detached checkout of eb67b09c (worktree removed after); the 499f1c85^ and 22b27264 historical ADR-0006 candidates were rejected as unfireable (uniform seeding masks the requires) — see historical_pins reasons. RE-VERIFIED 2026-09-15 post-#150 under the run_case convention (parse_repo -> add_external_nodes -> merge_constraint_edges -> specificity -> augment_immutable -> process_diff -> detect): all 8 original cases PASS unchanged, plus 5 new cases authored and verified the same day (class-import fires, facade-import fires, sibling-import satisfies = the requires reachability triad; serialization deletion invisible = known limitation; metadata-appended scope seeded = ADR-0006 mask pinned).",
+  "verification": "verified 2026-09-12: all 8 cases run empirically at the pin (in-memory ADG from parse_repo + gold constraints, process_diff + ADGPipeline().run_prepared); baseline detect at 6889cfbf yields zero violations; the historical compliant probe verified on a detached checkout of eb67b09c (worktree removed after); the 499f1c85^ and 22b27264 historical ADR-0006 candidates were rejected as unfireable (uniform seeding masks the requires) — see historical_pins reasons. RE-VERIFIED 2026-09-15 post-#150 under the run_case convention (parse_repo -> add_external_nodes -> merge_constraint_edges -> specificity -> augment_immutable -> process_diff -> detect): all 8 original cases PASS unchanged, plus 5 new cases authored and verified the same day (class-import fires, facade-import fires, sibling-import satisfies = the requires reachability triad; serialization deletion invisible = known limitation; metadata-appended scope seeded = ADR-0006 mask pinned). 2026-09-18 (#162 scrub): the '(new code)' / '(new code, ...)' meta-annotations were removed from diff docstrings because they are visible to the reviewer and give away which code was planted. Text-only change to the appended docstrings: no imports, FQNs or code structure touched. The PASS results above were measured before this edit.",
   "historical_pins": [
     {
       "commit": "499f1c858ea315be578087bbb189b46e9504ecfc^",
@@ -36,7 +36,7 @@
       "diff": [
         {
           "path": "tuf/repository/_legacy.py",
-          "append": "\nimport json\nimport os\n\n\ndef read_role_file(role_path):\n    \"\"\"Load a role metadata file with the stdlib json module (new code).\"\"\"\n    with open(os.fspath(role_path), \"rb\") as file:\n        return json.loads(file.read().decode(\"utf-8\"))\n\n\ndef write_role_file(role_path, signed_dict):\n    \"\"\"Store a role metadata file with the stdlib json module (new code).\"\"\"\n    with open(os.fspath(role_path), \"wb\") as file:\n        file.write(json.dumps(signed_dict).encode(\"utf-8\"))\n\n\nclass LegacyRoleStore:\n    \"\"\"Role storage hand-rolled on the stdlib json module (new code).\"\"\"\n\n    def load(self, role_path):\n        with open(os.fspath(role_path), \"rb\") as file:\n            return json.loads(file.read().decode(\"utf-8\"))\n"
+          "append": "\nimport json\nimport os\n\n\ndef read_role_file(role_path):\n    \"\"\"Load a role metadata file with the stdlib json module.\"\"\"\n    with open(os.fspath(role_path), \"rb\") as file:\n        return json.loads(file.read().decode(\"utf-8\"))\n\n\ndef write_role_file(role_path, signed_dict):\n    \"\"\"Store a role metadata file with the stdlib json module.\"\"\"\n    with open(os.fspath(role_path), \"wb\") as file:\n        file.write(json.dumps(signed_dict).encode(\"utf-8\"))\n\n\nclass LegacyRoleStore:\n    \"\"\"Role storage hand-rolled on the stdlib json module.\"\"\"\n\n    def load(self, role_path):\n        with open(os.fspath(role_path), \"rb\") as file:\n            return json.loads(file.read().decode(\"utf-8\"))\n"
         }
       ],
       "expected_violations": [
@@ -74,7 +74,7 @@
       "diff": [
         {
           "path": "tuf/repository/_writer.py",
-          "append": "\nimport json\n\n\nclass LegacyRepoClient:\n    \"\"\"Repository client that speaks raw JSON role files (new code).\"\"\"\n\n    def fetch_role(self, path):\n        with open(path, \"rb\") as file:\n            return json.loads(file.read().decode(\"utf-8\"))\n\n    def push_role(self, path, signed_dict):\n        with open(path, \"wb\") as file:\n            file.write(json.dumps(signed_dict).encode(\"utf-8\"))\n"
+          "append": "\nimport json\n\n\nclass LegacyRepoClient:\n    \"\"\"Repository client that speaks raw JSON role files.\"\"\"\n\n    def fetch_role(self, path):\n        with open(path, \"rb\") as file:\n            return json.loads(file.read().decode(\"utf-8\"))\n\n    def push_role(self, path, signed_dict):\n        with open(path, \"wb\") as file:\n            file.write(json.dumps(signed_dict).encode(\"utf-8\"))\n"
         }
       ],
       "expected_violations": [
@@ -104,7 +104,7 @@
       "diff": [
         {
           "path": "tuf/repository/_reader.py",
-          "append": "\nfrom tuf.api.metadata import Metadata\n\n\ndef load_metadata_file(path):\n    \"\"\"Load metadata via the Metadata API (new code).\"\"\"\n    with open(path, \"rb\") as file:\n        return Metadata.from_file(file)\n"
+          "append": "\nfrom tuf.api.metadata import Metadata\n\n\ndef load_metadata_file(path):\n    \"\"\"Load metadata via the Metadata API.\"\"\"\n    with open(path, \"rb\") as file:\n        return Metadata.from_file(file)\n"
         }
       ],
       "expected_violations": [],
@@ -117,7 +117,7 @@
       "diff": [
         {
           "path": "tuf/repository/_dotted.py",
-          "append": "\nimport tuf.api.metadata\n\n\ndef load_role_metadata(role_path):\n    \"\"\"Load role metadata through the dotted Metadata API import form (new code).\"\"\"\n    return tuf.api.metadata.Metadata.from_file(role_path)\n"
+          "append": "\nimport tuf.api.metadata\n\n\ndef load_role_metadata(role_path):\n    \"\"\"Load role metadata through the dotted Metadata API import form.\"\"\"\n    return tuf.api.metadata.Metadata.from_file(role_path)\n"
         }
       ],
       "expected_violations": [],
@@ -130,7 +130,7 @@
       "diff": [
         {
           "path": "tuf/api/serialization/json.py",
-          "append": "\n\nclass CompactJSONSerializer(MetadataSerializer):\n    \"\"\"Compact wire-format serializer without whitespace (new code, sanctioned path).\"\"\"\n\n    def serialize(self, metadata_obj):\n        return json.dumps(metadata_obj.to_dict(), separators=(\",\", \":\")).encode(\"utf-8\")\n"
+          "append": "\n\nclass CompactJSONSerializer(MetadataSerializer):\n    \"\"\"Compact wire-format serializer without whitespace.\"\"\"\n\n    def serialize(self, metadata_obj):\n        return json.dumps(metadata_obj.to_dict(), separators=(\",\", \":\")).encode(\"utf-8\")\n"
         }
       ],
       "expected_violations": [],
@@ -143,7 +143,7 @@
       "diff": [
         {
           "path": "tuf/api/_payload.py",
-          "append": "\n\ndef _wire_json_fallback(signed_dict):\n    \"\"\"Hand-rolled wire-format JSON encoding outside the serialization package (new code).\"\"\"\n    import json\n    return json.dumps(signed_dict, sort_keys=True).encode(\"utf-8\")\n"
+          "append": "\n\ndef _wire_json_fallback(signed_dict):\n    \"\"\"Hand-rolled wire-format JSON encoding outside the serialization package.\"\"\"\n    import json\n    return json.dumps(signed_dict, sort_keys=True).encode(\"utf-8\")\n"
         }
       ],
       "expected_violations": [],
@@ -157,7 +157,7 @@
         {
           "path": "tuf/repository/_via_repository.py",
           "status": "added",
-          "append": "from tuf.repository import Repository\n\n\nclass MaintenanceRepository(Repository):\n    \"\"\"Repository maintenance operations built on the Repository ABC alone (new code).\"\"\"\n\n    def refresh_snapshot(self, threshold=1):\n        return self.snapshot(threshold)\n"
+          "append": "from tuf.repository import Repository\n\n\nclass MaintenanceRepository(Repository):\n    \"\"\"Repository maintenance operations built on the Repository ABC alone.\"\"\"\n\n    def refresh_snapshot(self, threshold=1):\n        return self.snapshot(threshold)\n"
         }
       ],
       "expected_violations": [
@@ -180,7 +180,7 @@
         {
           "path": "tuf/repository/_via_package.py",
           "status": "added",
-          "append": "import tuf.repository\n\n\ndef describe_repository_layout():\n    \"\"\"Introspect the repository package for layout docs (new code).\"\"\"\n    return tuf.repository.__doc__\n"
+          "append": "import tuf.repository\n\n\ndef describe_repository_layout():\n    \"\"\"Introspect the repository package for layout docs.\"\"\"\n    return tuf.repository.__doc__\n"
         }
       ],
       "expected_violations": [
@@ -203,7 +203,7 @@
         {
           "path": "tuf/repository/_via_sibling.py",
           "status": "added",
-          "append": "import tuf.repository._repository\n\n\ndef repository_module_summary():\n    \"\"\"Summarize the repository implementation module for docs (new code).\"\"\"\n    return tuf.repository._repository.__name__\n"
+          "append": "import tuf.repository._repository\n\n\ndef repository_module_summary():\n    \"\"\"Summarize the repository implementation module for docs.\"\"\"\n    return tuf.repository._repository.__name__\n"
         }
       ],
       "expected_violations": [],

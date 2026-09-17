@@ -14,7 +14,7 @@
       "diff": [
         {
           "path": "flowclient/flowclient/legacy_query.py",
-          "append": "\nimport flowmachine\n\n\ndef build_legacy_query(connection, name):\n    \"\"\"Construct a query directly against the backend library, bypassing the HTTP API (new code).\"\"\"\n    return flowmachine.core.Query(connection=connection)\n"
+          "append": "\nimport flowmachine\n\n\ndef build_legacy_query(connection, name):\n    \"\"\"Construct a query directly against the backend library, bypassing the HTTP API.\"\"\"\n    return flowmachine.core.Query(connection=connection)\n"
         }
       ],
       "expected_violations": [
@@ -36,7 +36,7 @@
       "diff": [
         {
           "path": "flowapi/flowapi/legacy_backend.py",
-          "append": "\nimport flowmachine\n\n\ndef run_query_locally(query_id):\n    \"\"\"Reach into the backend library directly instead of via zeromq (new code).\"\"\"\n    return flowmachine.core.Query.lookup(query_id)\n"
+          "append": "\nimport flowmachine\n\n\ndef run_query_locally(query_id):\n    \"\"\"Reach into the backend library directly instead of via zeromq.\"\"\"\n    return flowmachine.core.Query.lookup(query_id)\n"
         }
       ],
       "expected_violations": [
@@ -82,7 +82,7 @@
       "diff": [
         {
           "path": "flowapi/flowapi/legacy_endpoints.py",
-          "append": "\nfrom quart import Blueprint, request\n\nblueprint = Blueprint(\"legacy\", __name__)\n\n\n@blueprint.route(\"/legacy/run\", methods=[\"POST\"])\nasync def run_legacy_query():\n    \"\"\"Run a query without any JWT access control (new code).\"\"\"\n    return {\"status\": \"accepted\"}\n"
+          "append": "\nfrom quart import Blueprint, request\n\nblueprint = Blueprint(\"legacy\", __name__)\n\n\n@blueprint.route(\"/legacy/run\", methods=[\"POST\"])\nasync def run_legacy_query():\n    \"\"\"Run a query without any JWT access control.\"\"\"\n    return {\"status\": \"accepted\"}\n"
         }
       ],
       "expected_violations": [
@@ -112,7 +112,7 @@
       "diff": [
         {
           "path": "flowmachine/flowmachine/core/in_memory_state.py",
-          "append": "\nimport logging\n\nlogger = logging.getLogger(\"flowmachine\").getChild(__name__)\n\n\n\nclass InMemoryQueryState:\n    \"\"\"Query state tracker backed by a plain dict instead of redis (new code).\"\"\"\n\n    def __init__(self):\n        self._states = {}\n\n    def record(self, query_id, state):\n        self._states[query_id] = state\n        return state\n\n    def current(self, query_id):\n        return self._states.get(query_id)\n"
+          "append": "\nimport logging\n\nlogger = logging.getLogger(\"flowmachine\").getChild(__name__)\n\n\n\nclass InMemoryQueryState:\n    \"\"\"Query state tracker backed by a plain dict instead of redis.\"\"\"\n\n    def __init__(self):\n        self._states = {}\n\n    def record(self, query_id, state):\n        self._states[query_id] = state\n        return state\n\n    def current(self, query_id):\n        return self._states.get(query_id)\n"
         }
       ],
       "expected_violations": [
@@ -134,7 +134,7 @@
       "diff": [
         {
           "path": "flowapi/flowapi/client_proxy.py",
-          "append": "\nimport flowclient\n\n\ndef submit_query_via_client(query_spec):\n    \"\"\"Submit a query through the flowclient library instead of the zmq channel (new code).\"\"\"\n    return flowclient.aggregates.spatial_aggregate(query_spec)\n"
+          "append": "\nimport flowclient\n\n\ndef submit_query_via_client(query_spec):\n    \"\"\"Submit a query through the flowclient library instead of the zmq channel.\"\"\"\n    return flowclient.aggregates.spatial_aggregate(query_spec)\n"
         }
       ],
       "expected_violations": [
@@ -181,7 +181,7 @@
       "diff": [
         {
           "path": "flowclient/flowclient/async_probe.py",
-          "append": "\nimport httpx\n\n\nasync def fetch_api_status(base_url, token):\n    \"\"\"Poll the FlowAPI status endpoint over HTTP (new code, sanctioned path).\"\"\"\n    async with httpx.AsyncClient(verify=False) as client:\n        response = await client.get(f\"{base_url}/get/status\", headers={\"Authorization\": f\"Bearer {token}\"})\n        return response.json()\n"
+          "append": "\nimport httpx\n\n\nasync def fetch_api_status(base_url, token):\n    \"\"\"Poll the FlowAPI status endpoint over HTTP.\"\"\"\n    async with httpx.AsyncClient(verify=False) as client:\n        response = await client.get(f\"{base_url}/get/status\", headers={\"Authorization\": f\"Bearer {token}\"})\n        return response.json()\n"
         }
       ],
       "expected_violations": [],
@@ -194,7 +194,7 @@
       "diff": [
         {
           "path": "flowapi/flowapi/date_endpoints.py",
-          "append": "\nfrom quart import Blueprint, request\nfrom quart_jwt_extended import jwt_required\nimport zmq\n\nblueprint = Blueprint(\"dates\", __name__)\n\n\n@blueprint.route(\"/available_dates\", methods=[\"GET\"])\n@jwt_required\nasync def get_available_dates():\n    \"\"\"Return available dates, enforcing JWT access control (new code, sanctioned pattern).\"\"\"\n    context = zmq.asyncio.Context()\n    socket = context.socket(zmq.REQ)\n    return {\"dates\": []}\n"
+          "append": "\nfrom quart import Blueprint, request\nfrom quart_jwt_extended import jwt_required\nimport zmq\n\nblueprint = Blueprint(\"dates\", __name__)\n\n\n@blueprint.route(\"/available_dates\", methods=[\"GET\"])\n@jwt_required\nasync def get_available_dates():\n    \"\"\"Return available dates, enforcing JWT access control.\"\"\"\n    context = zmq.asyncio.Context()\n    socket = context.socket(zmq.REQ)\n    return {\"dates\": []}\n"
         }
       ],
       "expected_violations": [],
@@ -207,7 +207,7 @@
       "diff": [
         {
           "path": "flowmachine/flowmachine/core/redis_coordinator.py",
-          "append": "\nfrom redis import StrictRedis\n\n\nclass RedisCoordinator:\n    \"\"\"Coordinate backend workers through redis (new code, sanctioned pattern).\"\"\"\n\n    def __init__(self, redis_client: StrictRedis):\n        self._redis = redis_client\n\n    def announce(self, worker_id):\n        return self._redis.set(f\"worker:{worker_id}\", \"active\")\n"
+          "append": "\nfrom redis import StrictRedis\n\n\nclass RedisCoordinator:\n    \"\"\"Coordinate backend workers through redis.\"\"\"\n\n    def __init__(self, redis_client: StrictRedis):\n        self._redis = redis_client\n\n    def announce(self, worker_id):\n        return self._redis.set(f\"worker:{worker_id}\", \"active\")\n"
         }
       ],
       "expected_violations": [],
@@ -220,7 +220,7 @@
       "diff": [
         {
           "path": "flowmachine/flowmachine/features/location/legacy_aggregate.py",
-          "append": "\nimport pandas as pd\n\n\ndef aggregate_locations(df):\n    \"\"\"Aggregate location counts with plain pandas, no redis involvement (new code).\"\"\"\n    grouped = df.groupby([\"location_id\"])\n    return grouped.size()\n"
+          "append": "\nimport pandas as pd\n\n\ndef aggregate_locations(df):\n    \"\"\"Aggregate location counts with plain pandas, no redis involvement.\"\"\"\n    grouped = df.groupby([\"location_id\"])\n    return grouped.size()\n"
         }
       ],
       "expected_violations": [],
@@ -263,7 +263,7 @@
         {
           "path": "flowclient/flowclient/backend_shim.py",
           "status": "added",
-          "append": "\"\"\"Client-side query planning against a local shim (new code).\"\"\"\n\n\ndef plan_legacy_query(connection, name):\n    \"\"\"Build a query plan via a local variable named flowmachine (new code).\"\"\"\n    flowmachine = connection.plan(name)\n    return flowmachine.core.Query(connection)\n"
+          "append": "\"\"\"Client-side query planning against a local shim.\"\"\"\n\n\ndef plan_legacy_query(connection, name):\n    \"\"\"Build a query plan via a local variable named flowmachine.\"\"\"\n    flowmachine = connection.plan(name)\n    return flowmachine.core.Query(connection)\n"
         }
       ],
       "expected_violations": [],
@@ -277,7 +277,7 @@
         {
           "path": "flowclient/flowclient/backend_var.py",
           "status": "added",
-          "append": "\"\"\"Client-side shim configured at module scope (new code).\"\"\"\nflowmachine = None  # set by connect()\n\n\ndef plan_legacy_query(connection, name):\n    \"\"\"Build a query plan via the module-level shim named flowmachine (new code).\"\"\"\n    return flowmachine.core.Query(connection)\n"
+          "append": "\"\"\"Client-side shim configured at module scope.\"\"\"\nflowmachine = None  # set by connect()\n\n\ndef plan_legacy_query(connection, name):\n    \"\"\"Build a query plan via the module-level shim named flowmachine.\"\"\"\n    return flowmachine.core.Query(connection)\n"
         }
       ],
       "expected_violations": [],
@@ -299,7 +299,7 @@
       "diff": [
         {
           "path": "flowetl/flowetl/legacy_migration.py",
-          "append": "\nimport logging\n\nlogger = logging.getLogger(\"flowetl\")\n\n\ndef migrate_legacy_tables(conn):\n    \"\"\"Run a legacy table migration against flowdb (new code).\"\"\"\n    logger.info(\"migrating legacy tables\")\n    return conn.execute(\"SELECT 1\")\n"
+          "append": "\nimport logging\n\nlogger = logging.getLogger(\"flowetl\")\n\n\ndef migrate_legacy_tables(conn):\n    \"\"\"Run a legacy table migration against flowdb.\"\"\"\n    logger.info(\"migrating legacy tables\")\n    return conn.execute(\"SELECT 1\")\n"
         }
       ],
       "expected_violations": [],
@@ -307,7 +307,7 @@
     }
   ],
   "baseline_note": "EMPIRICAL BASELINE (verified at the pin 24d88247d, 2026-09-12, full-tree parse_repo: 2494 nodes / 7507 edges): the NameResolver suffix-index resolves the bare name 'logging' (logging.getLogger(...) calls) to flowmachine.flowmachine.core.logging \u2014 the only known FQN ending in '.logging' (python-tuf bare-json quirk). This pollutes the baseline graph with CALLS edges from HEAD modules in flowclient and flowapi to flowmachine.flowmachine.core.logging, so the two ADR-0003 structural prohibits fire on HEAD module FQNs on EVERY run, diff-independent. POST-#150 RECOUNT (2026-09-15, re-verified empirically): 12 baseline firings, not 13 \u2014 flowapi.flowapi.api_spec no longer reaches the flowmachine namespace (its path ran through a namespace import onto a package node whose CONTAINS descent issue #150 removed), so its baseline row is retired; the surviving 12 are flowclient.flowclient.{aggregates, async_api_query, async_client, async_connection, api_query, client, connection} and flowapi.flowapi.{config, geography, main, query_endpoints, stream_results}. These baseline firings accompany every case; expected_violations lists only the CASE-SPECIFIC firings beyond this baseline, and any firing outside (baseline + expected_violations) is an over-trigger false positive. The decisive true findings are unaffected: appended direct imports register verbatim IMPORTS targets and report at the import-owning module.",
-  "verification": "verified 2026-09-12: full-tree parse_repo at the pin, gold constraints injected in-memory (no Neo4j persistence, no LLM resolver), each case's Diff processed via services/cpt/diff_processor.process_diff and run through ADGPipeline().run_prepared; every expected_violation fired with the exact subject/object/matched_fqn recorded, and non-baseline extra firings were folded into the gold as documented expectations (ADR-0003 corrections in flowkit_gold.json note, transitive case expectations). RE-VERIFIED 2026-09-15 post-#150 under the run_case convention (parse_repo -> add_external_nodes -> merge_constraint_edges -> specificity -> augment_immutable -> process_diff -> detect): all cases pass; baseline recounted 13 -> 12 (flowapi.flowapi.api_spec retired, see baseline_note), and the flowapi-direct-flowmachine requires triple promoted from note-only documentation to expected units (subject breadth-by-design, matching the transitive case's convention). Two new cases authored and verified 2026-09-15 (decoy-name pair: function-local assignment guarded = silent; module-level assignment escapes the guard = documented false positive).",
+  "verification": "verified 2026-09-12: full-tree parse_repo at the pin, gold constraints injected in-memory (no Neo4j persistence, no LLM resolver), each case's Diff processed via services/cpt/diff_processor.process_diff and run through ADGPipeline().run_prepared; every expected_violation fired with the exact subject/object/matched_fqn recorded, and non-baseline extra firings were folded into the gold as documented expectations (ADR-0003 corrections in flowkit_gold.json note, transitive case expectations). RE-VERIFIED 2026-09-15 post-#150 under the run_case convention (parse_repo -> add_external_nodes -> merge_constraint_edges -> specificity -> augment_immutable -> process_diff -> detect): all cases pass; baseline recounted 13 -> 12 (flowapi.flowapi.api_spec retired, see baseline_note), and the flowapi-direct-flowmachine requires triple promoted from note-only documentation to expected units (subject breadth-by-design, matching the transitive case's convention). Two new cases authored and verified 2026-09-15 (decoy-name pair: function-local assignment guarded = silent; module-level assignment escapes the guard = documented false positive). 2026-09-18 (#162 scrub): the '(new code)' / '(new code, ...)' meta-annotations were removed from diff docstrings because they are visible to the reviewer and give away which code was planted. Text-only change to the appended docstrings: no imports, FQNs or code structure touched. The PASS results above were measured before this edit.",
   "baseline_firings": [
     [
       "ADR-0003",

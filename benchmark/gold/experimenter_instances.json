@@ -5,7 +5,7 @@
   "pin_commit": "d61a2b8efcb7fd77a849c9f9dc163130473b7f16",
   "pin_date": "2026-08-31",
   "adr_dir": "docs/adrs",
-  "verification": "passed: all 9 cases verified empirically at the pin (in-memory ADG from parse_repo + gold constraints, process_diff + ADGPipeline().run_prepared); baseline detect at d61a2b8 yields zero violations; the historical case verified against a temp worktree at a2de3aeb (removed after verification); every expected_violation fired with exact subject/object/matched_fqn and every probe scored zero. RE-VERIFIED 2026-09-15 post-#150 under the run_case convention (parse_repo -> add_external_nodes -> merge_constraint_edges -> specificity -> augment_immutable -> process_diff -> detect): that merge step creates EXTERNAL nodes for constraint objects, so ADR-0003 requires is active on every run; the three jetstream modules lacking a GCS import (db_snapshot scopes, the a2de3aeb client) fire it as documented_false_positives (over-broad-subject class), and the gcs-bypass mechanism note was corrected accordingly (from-import binds the exact object target once the node exists). Two new cases authored and verified 2026-09-15 (multi-fire jetstream cluster: 8 genuine units + 2 documented over-broad-subject FPs; historical adoption-gap pin 9857c48a: 1 genuine unit + 1 documented FP), plus the 9857c48a historical_pins entry.",
+  "verification": "passed: all 9 cases verified empirically at the pin (in-memory ADG from parse_repo + gold constraints, process_diff + ADGPipeline().run_prepared); baseline detect at d61a2b8 yields zero violations; the historical case verified against a temp worktree at a2de3aeb (removed after verification); every expected_violation fired with exact subject/object/matched_fqn and every probe scored zero. RE-VERIFIED 2026-09-15 post-#150 under the run_case convention (parse_repo -> add_external_nodes -> merge_constraint_edges -> specificity -> augment_immutable -> process_diff -> detect): that merge step creates EXTERNAL nodes for constraint objects, so ADR-0003 requires is active on every run; the three jetstream modules lacking a GCS import (db_snapshot scopes, the a2de3aeb client) fire it as documented_false_positives (over-broad-subject class), and the gcs-bypass mechanism note was corrected accordingly (from-import binds the exact object target once the node exists). Two new cases authored and verified 2026-09-15 (multi-fire jetstream cluster: 8 genuine units + 2 documented over-broad-subject FPs; historical adoption-gap pin 9857c48a: 1 genuine unit + 1 documented FP), plus the 9857c48a historical_pins entry.; 2026-09-18 (#162 scrub): the '(new code)' / '(new code, ...)' meta-annotations were removed from diff docstrings because they are visible to the reviewer and give away which code was planted. Text-only change to the appended docstrings: no imports, FQNs or code structure touched. The PASS results above were measured before this edit.",
   "historical_pins": [
     {
       "commit": "a2de3aebd37bbc6bc76f15ff2704f082c864e856",
@@ -53,7 +53,7 @@
       "diff": [
         {
           "path": "experimenter/experimenter/nimbus_ui/legacy_graphql.py",
-          "append": "\nimport graphene\n\n\nclass LegacyGraphQLDashboardView:\n    \"\"\"Dashboard data served through the retired GraphQL stack (new code).\n\n    Reintroduces graphene, which ADR-0008 removed because 'using GraphQL\n    significantly hinders the performance of the Experimenter'.\n    \"\"\"\n\n    def dashboard_query(self, slug):\n        schema = graphene.Schema()\n        return schema.execute(\"{ experiment(slug: \\\"%s\\\") }\" % slug)\n"
+          "append": "\nimport graphene\n\n\nclass LegacyGraphQLDashboardView:\n    \"\"\"Dashboard data served through the retired GraphQL stack.\n\n    Reintroduces graphene, which ADR-0008 removed because 'using GraphQL\n    significantly hinders the performance of the Experimenter'.\n    \"\"\"\n\n    def dashboard_query(self, slug):\n        schema = graphene.Schema()\n        return schema.execute(\"{ experiment(slug: \\\"%s\\\") }\" % slug)\n"
         }
       ],
       "expected_violations": [
@@ -75,7 +75,7 @@
       "diff": [
         {
           "path": "experimenter/experimenter/jetstream/db_snapshot.py",
-          "append": "\nimport json\n\nfrom experimenter.experiments.models import NimbusExperiment\n\n\ndef snapshot_results_data(experiment_id):\n    \"\"\"Persist analysis results straight into the Django database (new code).\"\"\"\n    experiment = NimbusExperiment.objects.get(id=experiment_id)\n    raw = experiment.results_data or {}\n    experiment.results_data = json.loads(json.dumps(raw))\n    experiment.save()\n    return experiment.results_data\n\n\ndef purge_stale_snapshots(slug):\n    \"\"\"Delete cached analysis rows for a slug from the database (new code).\"\"\"\n    return NimbusExperiment.objects.filter(slug=slug).update(results_data={})\n\n\nclass DbResultsCache:\n    \"\"\"Database-backed cache for Jetstream analysis output (new code).\"\"\"\n\n    def load(self, experiment_id):\n        return NimbusExperiment.objects.get(id=experiment_id).results_data\n\n    def store(self, experiment_id, payload):\n        NimbusExperiment.objects.filter(id=experiment_id).update(results_data=payload)\n"
+          "append": "\nimport json\n\nfrom experimenter.experiments.models import NimbusExperiment\n\n\ndef snapshot_results_data(experiment_id):\n    \"\"\"Persist analysis results straight into the Django database.\"\"\"\n    experiment = NimbusExperiment.objects.get(id=experiment_id)\n    raw = experiment.results_data or {}\n    experiment.results_data = json.loads(json.dumps(raw))\n    experiment.save()\n    return experiment.results_data\n\n\ndef purge_stale_snapshots(slug):\n    \"\"\"Delete cached analysis rows for a slug from the database.\"\"\"\n    return NimbusExperiment.objects.filter(slug=slug).update(results_data={})\n\n\nclass DbResultsCache:\n    \"\"\"Database-backed cache for Jetstream analysis output.\"\"\"\n\n    def load(self, experiment_id):\n        return NimbusExperiment.objects.get(id=experiment_id).results_data\n\n    def store(self, experiment_id, payload):\n        NimbusExperiment.objects.filter(id=experiment_id).update(results_data=payload)\n"
         }
       ],
       "expected_violations": [
@@ -137,7 +137,7 @@
       "diff": [
         {
           "path": "experimenter/experimenter/jetstream/manual_ingest.py",
-          "append": "\nimport google.cloud.storage\n\n\ndef validate_statistics_payload(payload):\n    \"\"\"Hand-rolled shape check for Jetstream statistics (new code).\"\"\"\n    if not isinstance(payload, list):\n        raise ValueError(\"statistics payload must be a list\")\n    for point in payload:\n        if not isinstance(point, dict) or \"metric\" not in point or \"statistic\" not in point:\n            raise ValueError(\"malformed statistics point\")\n    return payload\n\n\ndef validate_metadata_payload(payload):\n    \"\"\"Hand-rolled shape check for Jetstream metadata (new code).\"\"\"\n    if not isinstance(payload, dict) or \"analysis_start_time\" not in payload:\n        raise ValueError(\"malformed metadata payload\")\n    return payload\n"
+          "append": "\nimport google.cloud.storage\n\n\ndef validate_statistics_payload(payload):\n    \"\"\"Hand-rolled shape check for Jetstream statistics.\"\"\"\n    if not isinstance(payload, list):\n        raise ValueError(\"statistics payload must be a list\")\n    for point in payload:\n        if not isinstance(point, dict) or \"metric\" not in point or \"statistic\" not in point:\n            raise ValueError(\"malformed statistics point\")\n    return payload\n\n\ndef validate_metadata_payload(payload):\n    \"\"\"Hand-rolled shape check for Jetstream metadata.\"\"\"\n    if not isinstance(payload, dict) or \"analysis_start_time\" not in payload:\n        raise ValueError(\"malformed metadata payload\")\n    return payload\n"
         }
       ],
       "expected_violations": [
@@ -167,11 +167,11 @@
       "diff": [
         {
           "path": "experimenter/experimenter/jetstream/requests_fetch.py",
-          "append": "\nimport requests\nfrom mozilla_nimbus_schemas.jetstream import Statistics\n\n\ndef fetch_statistics_via_http(slug, window):\n    \"\"\"Fetch Jetstream statistics over plain HTTP instead of GCS (new code).\"\"\"\n    response = requests.get(f\"https://jetstream.example/statistics_{slug}_{window}.json\")\n    return Statistics.model_validate(response.json())\n\n\ndef fetch_metadata_via_http(slug):\n    \"\"\"Fetch Jetstream metadata over plain HTTP instead of GCS (new code).\"\"\"\n    response = requests.get(f\"https://jetstream.example/metadata_{slug}.json\")\n    return response.json()\n"
+          "append": "\nimport requests\nfrom mozilla_nimbus_schemas.jetstream import Statistics\n\n\ndef fetch_statistics_via_http(slug, window):\n    \"\"\"Fetch Jetstream statistics over plain HTTP instead of GCS.\"\"\"\n    response = requests.get(f\"https://jetstream.example/statistics_{slug}_{window}.json\")\n    return Statistics.model_validate(response.json())\n\n\ndef fetch_metadata_via_http(slug):\n    \"\"\"Fetch Jetstream metadata over plain HTTP instead of GCS.\"\"\"\n    response = requests.get(f\"https://jetstream.example/metadata_{slug}.json\")\n    return response.json()\n"
         },
         {
           "path": "experimenter/experimenter/jetstream/gcs_helper.py",
-          "append": "\nimport google.cloud.storage\nfrom mozilla_nimbus_schemas.jetstream import Metadata\n\n\ndef load_metadata_from_gcs(path):\n    \"\"\"Load Jetstream metadata through the sanctioned GCS path (new code).\"\"\"\n    client = google.cloud.storage.Client()\n    blob = client.bucket(\"analysis\").blob(path)\n    return Metadata.model_validate_json(blob.download_as_bytes())\n"
+          "append": "\nimport google.cloud.storage\nfrom mozilla_nimbus_schemas.jetstream import Metadata\n\n\ndef load_metadata_from_gcs(path):\n    \"\"\"Load Jetstream metadata through the sanctioned GCS path.\"\"\"\n    client = google.cloud.storage.Client()\n    blob = client.bucket(\"analysis\").blob(path)\n    return Metadata.model_validate_json(blob.download_as_bytes())\n"
         }
       ],
       "expected_violations": [
@@ -202,17 +202,17 @@
         {
           "path": "experimenter/experimenter/jetstream/csv_export.py",
           "status": "added",
-          "append": "import csv\nimport io\n\n\ndef export_statistics_csv(analysis):\n    \"\"\"Serialize Jetstream statistics to CSV by hand (new code).\"\"\"\n    buffer = io.StringIO()\n    writer = csv.writer(buffer)\n    for point in analysis:\n        writer.writerow([point.get(\"metric\"), point.get(\"statistic\")])\n    return buffer.getvalue()\n\n\ndef export_metadata_csv(metadata):\n    \"\"\"Serialize Jetstream metadata to CSV by hand (new code).\"\"\"\n    buffer = io.StringIO()\n    writer = csv.writer(buffer)\n    writer.writerow(metadata.keys())\n    return buffer.getvalue()\n"
+          "append": "import csv\nimport io\n\n\ndef export_statistics_csv(analysis):\n    \"\"\"Serialize Jetstream statistics to CSV by hand.\"\"\"\n    buffer = io.StringIO()\n    writer = csv.writer(buffer)\n    for point in analysis:\n        writer.writerow([point.get(\"metric\"), point.get(\"statistic\")])\n    return buffer.getvalue()\n\n\ndef export_metadata_csv(metadata):\n    \"\"\"Serialize Jetstream metadata to CSV by hand.\"\"\"\n    buffer = io.StringIO()\n    writer = csv.writer(buffer)\n    writer.writerow(metadata.keys())\n    return buffer.getvalue()\n"
         },
         {
           "path": "experimenter/experimenter/jetstream/http_pull.py",
           "status": "added",
-          "append": "import requests\n\n\ndef pull_statistics_over_http(slug, window):\n    \"\"\"Pull Jetstream statistics over plain HTTP (new code).\"\"\"\n    response = requests.get(f\"https://jetstream.example/statistics_{slug}_{window}.json\")\n    return response.json()\n\n\ndef pull_metadata_over_http(slug):\n    \"\"\"Pull Jetstream metadata over plain HTTP (new code).\"\"\"\n    response = requests.get(f\"https://jetstream.example/metadata_{slug}.json\")\n    return response.json()\n"
+          "append": "import requests\n\n\ndef pull_statistics_over_http(slug, window):\n    \"\"\"Pull Jetstream statistics over plain HTTP.\"\"\"\n    response = requests.get(f\"https://jetstream.example/statistics_{slug}_{window}.json\")\n    return response.json()\n\n\ndef pull_metadata_over_http(slug):\n    \"\"\"Pull Jetstream metadata over plain HTTP.\"\"\"\n    response = requests.get(f\"https://jetstream.example/metadata_{slug}.json\")\n    return response.json()\n"
         },
         {
           "path": "experimenter/experimenter/jetstream/gcs_raw.py",
           "status": "added",
-          "append": "import google.cloud.storage\n\n\ndef load_raw_from_gcs(path):\n    \"\"\"Load analysis blobs from GCS and validate by hand (new code).\"\"\"\n    client = google.cloud.storage.Client()\n    raw = client.bucket(\"analysis\").blob(path).download_as_bytes()\n    if not isinstance(raw, bytes):\n        raise ValueError(\"malformed blob\")\n    return raw\n\n\nclass RawEnvelopeCache:\n    \"\"\"Cache of unvalidated analysis envelopes (new code).\"\"\"\n\n    def store(self, path, raw):\n        self._blobs[path] = raw\n"
+          "append": "import google.cloud.storage\n\n\ndef load_raw_from_gcs(path):\n    \"\"\"Load analysis blobs from GCS and validate by hand.\"\"\"\n    client = google.cloud.storage.Client()\n    raw = client.bucket(\"analysis\").blob(path).download_as_bytes()\n    if not isinstance(raw, bytes):\n        raise ValueError(\"malformed blob\")\n    return raw\n\n\nclass RawEnvelopeCache:\n    \"\"\"Cache of unvalidated analysis envelopes.\"\"\"\n\n    def store(self, path, raw):\n        self._blobs[path] = raw\n"
         }
       ],
       "expected_violations": [
@@ -332,7 +332,7 @@
       "diff": [
         {
           "path": "experimenter/experimenter/jetstream/schema_client.py",
-          "append": "\nimport google.cloud.storage\nfrom mozilla_nimbus_schemas.jetstream import SampleSizes, Statistics\n\n\ndef load_sizing_from_gcs(path):\n    \"\"\"Load population sizing through GCS and validate via the shared schema (new code).\"\"\"\n    client = google.cloud.storage.Client()\n    raw = client.bucket(\"analysis\").blob(path).download_as_bytes()\n    return SampleSizes.model_validate_json(raw)\n\n\ndef validate_statistics_blob(raw):\n    \"\"\"Validate a statistics blob against the shared schema (new code).\"\"\"\n    return Statistics.model_validate_json(raw)\n"
+          "append": "\nimport google.cloud.storage\nfrom mozilla_nimbus_schemas.jetstream import SampleSizes, Statistics\n\n\ndef load_sizing_from_gcs(path):\n    \"\"\"Load population sizing through GCS and validate via the shared schema.\"\"\"\n    client = google.cloud.storage.Client()\n    raw = client.bucket(\"analysis\").blob(path).download_as_bytes()\n    return SampleSizes.model_validate_json(raw)\n\n\ndef validate_statistics_blob(raw):\n    \"\"\"Validate a statistics blob against the shared schema.\"\"\"\n    return Statistics.model_validate_json(raw)\n"
         }
       ],
       "expected_violations": [],
@@ -345,7 +345,7 @@
       "diff": [
         {
           "path": "experimenter/experimenter/nimbus_ui/new/summary_views.py",
-          "append": "\nfrom django.shortcuts import render\nfrom django.views.generic import TemplateView\n\nfrom experimenter.experiments.models import NimbusExperiment\n\n\nclass ExperimentSummaryView(TemplateView):\n    \"\"\"Server-rendered experiment summary page, no GraphQL (new code).\"\"\"\n\n    template_name = \"nimbus_ui/experiment_summary.html\"\n\n    def get_context_data(self, **kwargs):\n        context = super().get_context_data(**kwargs)\n        context[\"experiment\"] = NimbusExperiment.objects.get(slug=kwargs[\"slug\"])\n        return context\n\n\ndef summary_fragment(request, slug):\n    \"\"\"HTMX fragment endpoint returning a partial render (new code).\"\"\"\n    experiment = NimbusExperiment.objects.get(slug=slug)\n    return render(request, \"nimbus_ui/fragments/summary.html\", {\"experiment\": experiment})\n"
+          "append": "\nfrom django.shortcuts import render\nfrom django.views.generic import TemplateView\n\nfrom experimenter.experiments.models import NimbusExperiment\n\n\nclass ExperimentSummaryView(TemplateView):\n    \"\"\"Server-rendered experiment summary page, no GraphQL.\"\"\"\n\n    template_name = \"nimbus_ui/experiment_summary.html\"\n\n    def get_context_data(self, **kwargs):\n        context = super().get_context_data(**kwargs)\n        context[\"experiment\"] = NimbusExperiment.objects.get(slug=kwargs[\"slug\"])\n        return context\n\n\ndef summary_fragment(request, slug):\n    \"\"\"HTMX fragment endpoint returning a partial render.\"\"\"\n    experiment = NimbusExperiment.objects.get(slug=slug)\n    return render(request, \"nimbus_ui/fragments/summary.html\", {\"experiment\": experiment})\n"
         }
       ],
       "expected_violations": [],
@@ -358,7 +358,7 @@
       "diff": [
         {
           "path": "schemas/mozilla_nimbus_schemas/jetstream/population.py",
-          "append": "\nfrom pydantic import BaseModel, Field\n\n\nclass PopulationEstimate(BaseModel):\n    \"\"\"Population sizing estimate shared between Experimenter and Jetstream (new code).\"\"\"\n\n    window: str = Field(description=\"analysis window, e.g. daily, weekly, overall\")\n    estimate: float\n    is_significant: bool\n\n\nclass PopulationEstimates(BaseModel):\n    \"\"\"Container for per-branch population estimates (new code).\"\"\"\n\n    branches: dict[str, PopulationEstimate] = Field(default_factory=dict)\n"
+          "append": "\nfrom pydantic import BaseModel, Field\n\n\nclass PopulationEstimate(BaseModel):\n    \"\"\"Population sizing estimate shared between Experimenter and Jetstream.\"\"\"\n\n    window: str = Field(description=\"analysis window, e.g. daily, weekly, overall\")\n    estimate: float\n    is_significant: bool\n\n\nclass PopulationEstimates(BaseModel):\n    \"\"\"Container for per-branch population estimates.\"\"\"\n\n    branches: dict[str, PopulationEstimate] = Field(default_factory=dict)\n"
         }
       ],
       "expected_violations": [],
@@ -371,7 +371,7 @@
       "diff": [
         {
           "path": "experimenter/experimenter/jetstream/results_store.py",
-          "append": "\nimport google.cloud.storage\nfrom mozilla_nimbus_schemas.jetstream import Statistics\nfrom experimenter.experiments.models import NimbusExperiment\n\n\ndef refresh_results_data(experiment_id):\n    \"\"\"Re-fetch analysis data from GCS and refresh the stored results (new code).\"\"\"\n    client = google.cloud.storage.Client()\n    raw = client.bucket(\"analysis\").blob(f\"statistics_{experiment_id}.json\").download_as_bytes()\n    Statistics.model_validate_json(raw)\n    NimbusExperiment.objects.filter(id=experiment_id).update(results_data={\"v3\": {}})\n    return True\n"
+          "append": "\nimport google.cloud.storage\nfrom mozilla_nimbus_schemas.jetstream import Statistics\nfrom experimenter.experiments.models import NimbusExperiment\n\n\ndef refresh_results_data(experiment_id):\n    \"\"\"Re-fetch analysis data from GCS and refresh the stored results.\"\"\"\n    client = google.cloud.storage.Client()\n    raw = client.bucket(\"analysis\").blob(f\"statistics_{experiment_id}.json\").download_as_bytes()\n    Statistics.model_validate_json(raw)\n    NimbusExperiment.objects.filter(id=experiment_id).update(results_data={\"v3\": {}})\n    return True\n"
         }
       ],
       "expected_violations": [],

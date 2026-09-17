@@ -5,7 +5,7 @@
   "pin_commit": "31f1dcadb3ff113d8a77ce132657237ea01c307b",
   "pin_date": "2025-08-14",
   "adr_dir": "docs/development/adr",
-  "verification": "verified 2026-09-14: all 7 cases run empirically at the pin (in-memory ADG from parse_repo + gold constraints injected via merge_constraint_edges, augment_immutable + process_diff + detect, mirroring app/tests/services/cpt/test_cpt_detect_eval.py run_case); baseline detect at 31f1dcad yields zero violations (ADR-0008 surfaces as an orphan because no example deep-imports structurizr.api at HEAD); the ab5adc9 mid-2021 pin and the 6af4134 pre-pydantic skeleton pin verified as zero-violation historical baselines on detached worktrees (removed after); layout note: module FQNs carry the src-layout prefix (src.structurizr.*) while IMPORTS edge targets are the literal dotted import (structurizr.api.structurizr_client, pydantic) — this src-layout asymmetry is this repo's documented layout rule. RE-VERIFIED 2026-09-15 post-#150 under the run_case convention (all 7 original cases PASS unchanged) plus 2 new cases authored and verified the same day (plain-statement deep import fires at the module; tests-dir deep import stays silent).",
+  "verification": "verified 2026-09-14: all 7 cases run empirically at the pin (in-memory ADG from parse_repo + gold constraints injected via merge_constraint_edges, augment_immutable + process_diff + detect, mirroring app/tests/services/cpt/test_cpt_detect_eval.py run_case); baseline detect at 31f1dcad yields zero violations (ADR-0008 surfaces as an orphan because no example deep-imports structurizr.api at HEAD); the ab5adc9 mid-2021 pin and the 6af4134 pre-pydantic skeleton pin verified as zero-violation historical baselines on detached worktrees (removed after); layout note: module FQNs carry the src-layout prefix (src.structurizr.*) while IMPORTS edge targets are the literal dotted import (structurizr.api.structurizr_client, pydantic) — this src-layout asymmetry is this repo's documented layout rule. RE-VERIFIED 2026-09-15 post-#150 under the run_case convention (all 7 original cases PASS unchanged) plus 2 new cases authored and verified the same day (plain-statement deep import fires at the module; tests-dir deep import stays silent). 2026-09-18 (#162 scrub): the '(new code)' / '(new code, ...)' meta-annotations were removed from diff docstrings because they are visible to the reviewer and give away which code was planted. Text-only change to the appended docstrings: no imports, FQNs or code structure touched. The PASS results above were measured before this edit.",
   "historical_pins": [
     {
       "commit": "6af413490b3c620a797f2f0bd01ce5aff1f3c7a2",
@@ -27,7 +27,7 @@
         {
           "path": "src/structurizr/api/_legacy_response.py",
           "status": "added",
-          "append": "\"\"\"Legacy API response handling on the stdlib json module (new code).\"\"\"\nimport json\n\n\ndef parse_response(raw):\n    \"\"\"Parse a raw API response payload with the stdlib json module (new code).\"\"\"\n    return json.loads(raw.decode(\"utf-8\"))\n\n\ndef dump_response(payload):\n    \"\"\"Serialize an API response payload with the stdlib json module (new code).\"\"\"\n    return json.dumps(payload).encode(\"utf-8\")\n\n\nclass LegacyResponseStore:\n    \"\"\"Response storage hand-rolled on the stdlib json module (new code).\"\"\"\n\n    def load(self, raw):\n        return json.loads(raw.decode(\"utf-8\"))\n"
+          "append": "\"\"\"Legacy API response handling on the stdlib json module.\"\"\"\nimport json\n\n\ndef parse_response(raw):\n    \"\"\"Parse a raw API response payload with the stdlib json module.\"\"\"\n    return json.loads(raw.decode(\"utf-8\"))\n\n\ndef dump_response(payload):\n    \"\"\"Serialize an API response payload with the stdlib json module.\"\"\"\n    return json.dumps(payload).encode(\"utf-8\")\n\n\nclass LegacyResponseStore:\n    \"\"\"Response storage hand-rolled on the stdlib json module.\"\"\"\n\n    def load(self, raw):\n        return json.loads(raw.decode(\"utf-8\"))\n"
         }
       ],
       "expected_violations": [
@@ -66,7 +66,7 @@
         {
           "path": "src/structurizr/api/_legacy_client.py",
           "status": "added",
-          "append": "import json\n\n\nclass LegacyApiClient:\n    \"\"\"API client that speaks raw JSON envelopes (new code).\"\"\"\n\n    def fetch(self, raw):\n        return json.loads(raw.decode(\"utf-8\"))\n\n    def push(self, payload):\n        return json.dumps(payload).encode(\"utf-8\")\n"
+          "append": "import json\n\n\nclass LegacyApiClient:\n    \"\"\"API client that speaks raw JSON envelopes.\"\"\"\n\n    def fetch(self, raw):\n        return json.loads(raw.decode(\"utf-8\"))\n\n    def push(self, payload):\n        return json.dumps(payload).encode(\"utf-8\")\n"
         }
       ],
       "expected_violations": [
@@ -103,7 +103,7 @@
         {
           "path": "src/structurizr/api/_io_helper.py",
           "status": "added",
-          "append": "\"\"\"Sanctioned API IO helper on pydantic (new code).\"\"\"\nfrom pydantic import BaseModel\n\n\nclass IOResponse(BaseModel):\n    \"\"\"IO model describing the JSON data of a response (new code).\"\"\"\n    status: str\n"
+          "append": "\"\"\"Sanctioned API IO helper on pydantic.\"\"\"\nfrom pydantic import BaseModel\n\n\nclass IOResponse(BaseModel):\n    \"\"\"IO model describing the JSON data of a response.\"\"\"\n    status: str\n"
         }
       ],
       "expected_violations": [],
@@ -117,7 +117,7 @@
         {
           "path": "examples/direct_api_client.py",
           "status": "added",
-          "append": "\"\"\"Example that reaches into the api package directly (new code).\"\"\"\nfrom structurizr.api.structurizr_client import StructurizrClient\n\n\ndef upload(workspace):\n    \"\"\"Upload a workspace via a deep api import (new code).\"\"\"\n    client = StructurizrClient(api_key=\"x\", api_secret=\"y\", workspace_id=1)\n    return client.put_workspace(workspace)\n"
+          "append": "\"\"\"Example that reaches into the api package directly.\"\"\"\nfrom structurizr.api.structurizr_client import StructurizrClient\n\n\ndef upload(workspace):\n    \"\"\"Upload a workspace via a deep api import.\"\"\"\n    client = StructurizrClient(api_key=\"x\", api_secret=\"y\", workspace_id=1)\n    return client.put_workspace(workspace)\n"
         }
       ],
       "expected_violations": [
@@ -140,7 +140,7 @@
         {
           "path": "examples/toplevel_client.py",
           "status": "added",
-          "append": "\"\"\"Example using the sanctioned top-level public interface (new code).\"\"\"\nfrom structurizr import StructurizrClient, StructurizrClientSettings\n\n\ndef upload(workspace):\n    \"\"\"Upload a workspace through the top-level exports (new code).\"\"\"\n    settings = StructurizrClientSettings()\n    client = StructurizrClient(settings=settings)\n    return client.put_workspace(workspace)\n"
+          "append": "\"\"\"Example using the sanctioned top-level public interface.\"\"\"\nfrom structurizr import StructurizrClient, StructurizrClientSettings\n\n\ndef upload(workspace):\n    \"\"\"Upload a workspace through the top-level exports.\"\"\"\n    settings = StructurizrClientSettings()\n    client = StructurizrClient(settings=settings)\n    return client.put_workspace(workspace)\n"
         }
       ],
       "expected_violations": [],
@@ -154,7 +154,7 @@
         {
           "path": "examples/plain_api_client.py",
           "status": "added",
-          "append": "\"\"\"Example importing the api package with a plain statement (new code).\"\"\"\nimport structurizr.api.structurizr_client\n\n\ndef upload(workspace):\n    \"\"\"Upload a workspace via a plain-statement deep api import (new code).\"\"\"\n    client = structurizr.api.structurizr_client.StructurizrClient(api_key=\"x\", api_secret=\"y\", workspace_id=1)\n    return client.put_workspace(workspace)\n"
+          "append": "\"\"\"Example importing the api package with a plain statement.\"\"\"\nimport structurizr.api.structurizr_client\n\n\ndef upload(workspace):\n    \"\"\"Upload a workspace via a plain-statement deep api import.\"\"\"\n    client = structurizr.api.structurizr_client.StructurizrClient(api_key=\"x\", api_secret=\"y\", workspace_id=1)\n    return client.put_workspace(workspace)\n"
         }
       ],
       "expected_violations": [
@@ -177,7 +177,7 @@
         {
           "path": "tests/unit/api/test_deep_client.py",
           "status": "added",
-          "append": "\"\"\"Unit tests importing the api package directly (new code).\"\"\"\nfrom structurizr.api.structurizr_client import StructurizrClient\n\n\ndef test_client_constructs():\n    client = StructurizrClient(api_key=\"x\", api_secret=\"y\", workspace_id=1)\n    assert client is not None\n"
+          "append": "\"\"\"Unit tests importing the api package directly.\"\"\"\nfrom structurizr.api.structurizr_client import StructurizrClient\n\n\ndef test_client_constructs():\n    client = StructurizrClient(api_key=\"x\", api_secret=\"y\", workspace_id=1)\n    assert client is not None\n"
         }
       ],
       "expected_violations": [],
