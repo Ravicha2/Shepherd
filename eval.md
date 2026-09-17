@@ -565,6 +565,29 @@ Real-repo aggregate: exact 6 / partial 7 / miss 2, FP 10 (run1) vs 11 (run2); bl
 
 **Comparability:** the benchmark FP column is diffable against `2026-09-16T23-56-00` (same protocol, same gold) and the legacy column against the #146 committed baselines — that is the whole point of the movement instrument. **Detection tallies are diffable only in the #154 violation-level convention**, and the pattern-equality bridge column is carried in `_movement.md`. Axis-2 numbers are a new instrument with no prior row: they are not comparable to any earlier eval row, only to a future re-run of the same scorer against the same labels. Not comparable to the #149 pilot (its FP rows predate #146 and #157).
 
+### 2026-09-17: issue #165 wildcard-prohibits skip-filter (perf; no re-baseline, equivalence evidence only)
+
+**Change:** `check_structural_predicates` ran one full forward BFS (`_reachable_paths`, O(V+E)) **per subject match** per prohibits constraint, so a wildcard subject cost (subject matches x graph). At the HA pin that is 79,875 subject matches x ~18 ms = ~48.6 min per `detect()` for the two HA gold constraints, projecting HA's 16-call benchmark cell to ~13 h CPU and keeping HA out of the #160 denominator. New `_reverse_candidates(adjacency, kinds, object_strs)` (`app/services/cpt/engine.py`) is one **reverse** pass per constraint used purely as a **skip-filter** in front of the unchanged forward BFS: the subject loop `continue`s when neither the subject nor its seeded enclosing module is in the candidate set. The candidate set mirrors the #150 traversal shape (CONTAINS descent from the start, then dependency edges with no further CONTAINS): the dependency-only reverse closure of the object nodes, plus every node owning a dependency edge into that closure, plus the CONTAINS ancestors of all of those. The only over-approximation is ignoring edge roles (the forward BFS skips `DEV_TOOL` targets). The filter only *skips*, so violations, `evidence` strings, `path_hops`, the `_path_excused` shortest-path read and the `changed_fqn` representative are produced by the same code as before: output-identical, not merely reachability-equivalent. Pins in `app/tests/services/cpt/test_engine.py`: completeness for every firing shape (CONTAINS-first path, seeded enclosing-module edge, a cycle, a node both subject and object) and the no-op pin (filter monkeypatched to the whole node universe, projected violations equal).
+
+**Numbers, filter bite (HA pin `e4b01b65d306`, full graph, gold constraints as deterministic input, `PYTHONHASHSEED=0`):**
+
+| quantity | ADR-0004 `selenium` | ADR-0019 `gpiozero` |
+|---|---|---|
+| subject matches for `homeassistant.components.*` | 79,875 | 79,875 |
+| reverse-pass candidates | **0** | **7** |
+| forward BFS runs after the filter | **0** | **7** (from 79,875) |
+| reverse-pass seconds | 0.43 | 0.93 |
+
+Graph: 84,851 parsed nodes / 343,058 edges, 88,508 nodes after `add_external_nodes` + `merge_constraint_edges` (the census's 88,508 exactly). 88,405 of those FQNs are distinct, and `match_constraints` iterates the distinct-FQN set. **`detect()` = 4.0 s** (was ~48.6 min projected; an unfixed run was killed at 59 min inside one call). Breakdown: `match_constraints` 1.25 s (the pre-existing O(c x n) scan, #165's declared out-of-scope sibling) + reverse passes 1.36 s + the 7 surviving BFS runs, resolve and location stamping. So HA's 16-call cell projects to ~1 min of detect instead of ~13 h, and the kill criterion ("not seconds-to-low-minutes") is met with room.
+
+**Output equivalence (the re-baseline evidence for this row):** 46 cases over the 4 non-HA repos (experimenter, flowkit, python-tuf, structurizr), before vs after, at `PYTHONHASHSEED=0`, **46/46 byte-identical** — per-unit scores, diagnostics, fires including evidence strings, ordering, `path_hops`. `tests/services/cpt/` 163 passed. HA full graph returns **exactly the one gold unit**: `ADR-0019 prohibits_dependency homeassistant.components.* -> gpiozero` at `matched_fqn homeassistant.components.remote_rpi_gpio`, matching `ha-bench-pin-baseline`'s `expected_violations` verbatim — this also closes the census §7 caveat that full-graph confirmation (all components, no other transitive subjects) "remains with the deferred report-only run", for the engine half.
+
+**Impact / Decision: no re-baseline.** This is a performance change with a proven no-op output contract, so no quality number on any prior row moves and no committed baseline is touched. The 4-repo timing movement measured during the change (experimenter 26.5 -> 13.8 s, flowkit 45.8 -> 40.4 s, python-tuf 3.7 -> 2.7 s, structurizr 2.1 -> 1.6 s, batched, 46 cases) lands in the harness `cost` block on the next batch re-run; those cells refresh their own `detect_seconds` there rather than being recorded here.
+
+**Comparability:** this row carries no metric that compares to any other row. `detect()` seconds are machine- and graph-specific (full-graph HA, one seed build), and the equivalence claim is against the pre-#165 engine at the same hash seed, not against any earlier eval row. Unblocks #160's one-cell full-graph requirement.
+
+**Incidental finding (own issue):** at *unpinned* hash seed the same 46-case comparison shows ordering differences in structural `changed_fqn` representatives (e.g. flowkit `...aggregates.total_network_objects` vs `...aggregates.location_event_counts`) with identical fire sets. Cause is pre-existing: `match_constraints` iterates `all_fqns = {node.fqn for node in adg.nodes}` (`engine.py:215`), a set, so subject order is hash order. The arms harness pins `PYTHONHASHSEED=0`; the CLI/pipeline paths are unverified.
+
 ## Curation mode
 
 
