@@ -23,7 +23,8 @@ import pytest
 
 from services.adg.treesitter import parse_repo
 from services.adg.unified_resolver import _materialize_edges, _parse_edges
-from services.models import ConstraintScope
+from services.cpt.engine import CPTResult, detect
+from services.models import ADG, ChangedFQN, ConstraintEdge, ConstraintScope, DiffResult
 from tests.services.adg.test_benchmark_arms_eval import _load_gold
 from tests.services.adg.test_unified_resolver_eval import _score_constraint, _repo_root
 
@@ -239,3 +240,56 @@ def test_recall_safety_adrs_carry_no_none_verdict() -> None:
             row = by_key[(repo_id, adr_id)]
             assert row["n_none"] == 0, (repo_id, adr_id)
             assert "none" not in row["verdicts"], (repo_id, adr_id)
+
+
+# -- #159: engine-side skip (TOOLING edges are invisible to detect) ------------
+
+
+def _retag(constraint: ConstraintEdge, scope: ConstraintScope) -> ConstraintEdge:
+    return ConstraintEdge(
+        subject=constraint.subject,
+        predicate=constraint.predicate,
+        object=constraint.object,
+        justification=constraint.justification,
+        adr_id=constraint.adr_id,
+        adr_path=constraint.adr_path,
+        specificity=constraint.specificity,
+        scope=scope,
+    )
+
+
+def test_tooling_scope_silences_real_corpus_fires(adgs) -> None:
+    """#159 at the engine seam, on the real parsed graph rather than a synthetic
+    pattern: the committed flowkit fixture replay fires real violations; tagging
+    exactly those same edges `tooling` silences every one of them, and detect then
+    sees them nowhere at all (no violation, no orphan).
+
+    The runtime run is asserted first because the fixture's OWN tooling verdicts
+    (flowkit ADR-0001/0002) happen to be orphans that fire nothing: a bare
+    "tooling fires == 0" would pass on an inert edge set and prove nothing."""
+    adg = adgs["flowkit"]
+    fixture = _fixture("flowkit")
+    edges: list[ConstraintEdge] = []
+    for entry in fixture["adrs"]:
+        parsed, _ = _parse_raw(entry["raw_response"], entry["adr_id"], entry["adr_path"])
+        edges.extend(_materialize_edges(parsed, adg))
+
+    diff = DiffResult(
+        to_sha="baseline",
+        changed_fqns=[
+            ChangedFQN(fqn=node.fqn, change_type="modified", file_path=node.file_path,
+                       enclosing_module=None, enclosing_class=None)
+            for node in adg.nodes
+        ],
+    )
+
+    def run(constraint_edges: list[ConstraintEdge]) -> CPTResult:
+        return detect(diff, ADG(nodes=adg.nodes, edges=adg.edges, constraint_edges=constraint_edges))
+
+    runtime_result = run(edges)
+    assert runtime_result.violations, "fixture replay should fire (non-vacuity guard)"
+    assert {v.constraint.adr_id for v in runtime_result.violations} >= {"ADR-0003", "ADR-0011"}
+
+    tooling_result = run([_retag(c, ConstraintScope.TOOLING) for c in edges])
+    assert tooling_result.violations == []
+    assert tooling_result.orphans == []

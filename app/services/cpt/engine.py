@@ -4,7 +4,7 @@ import logging
 from dataclasses import dataclass, field
 
 from services.fqn import FQN
-from services.models import ADG, ChangedFQN, ConstraintEdge, DependencyRole, DiffResult, Edge, FQNKind, PredicateType
+from services.models import ADG, ChangedFQN, ConstraintEdge, ConstraintScope, DependencyRole, DiffResult, Edge, FQNKind, PredicateType
 from services.cpt.resolution import Violation, resolve, suppress_outweighed_prohibits, suppress_outweighed_requires
 from services.resolver import MatchStatus, fqn_matches_pattern
 from collections.abc import Iterable
@@ -350,9 +350,18 @@ def detect(diff_result: DiffResult, adg: ADG) -> CPTResult:
     node_roles = {str(node.fqn): node.role for node in adg.nodes}
     module_scope = _enclosing_module_map(adg)
 
+    # #159: TOOLING-scoped constraints are out of detect's world entirely, neither
+    # enforced nor reported as orphans (an orphan is an ungrounded constraint; a
+    # tooling edge is a grounded one that the import graph does not govern).
+    # Scope-blind matching at ingestion still lets them satisfy gold (#136, ADR 019).
+    enforced_edges = [
+        constraint for constraint in adg.constraint_edges
+        if constraint.scope is not ConstraintScope.TOOLING
+    ]
+
     # filter self-loop constraints (subject == object), surface as informational
     self_loop_constraints: list[ConstraintEdge] = [
-        constraint for constraint in adg.constraint_edges if constraint.subject == constraint.object
+        constraint for constraint in enforced_edges if constraint.subject == constraint.object
     ]
 
     if self_loop_constraints:
@@ -362,7 +371,7 @@ def detect(diff_result: DiffResult, adg: ADG) -> CPTResult:
             [(constraint.adr_id, constraint.subject) for constraint in self_loop_constraints],
         )
 
-    safe_edges = [constraint for constraint in adg.constraint_edges if constraint.subject != constraint.object] # filter self loop
+    safe_edges = [constraint for constraint in enforced_edges if constraint.subject != constraint.object] # filter self loop
     safe_adg = ADG(nodes=adg.nodes, edges=adg.edges, constraint_edges=safe_edges)
     matched = match_constraints(safe_adg)
 
@@ -400,7 +409,7 @@ def detect(diff_result: DiffResult, adg: ADG) -> CPTResult:
                 hop["file_path"] = hop_node.file_path
 
     orphans: list[ConstraintEdge] = []
-    for constraint in adg.constraint_edges:
+    for constraint in enforced_edges:
         if id(constraint) not in matched:
             orphans.append(constraint)
 

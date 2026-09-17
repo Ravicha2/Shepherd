@@ -19,6 +19,7 @@ from services.models import (
     ADG,
     ChangedFQN,
     ConstraintEdge,
+    ConstraintScope,
     DependencyRole,
     DiffResult,
     Edge,
@@ -882,6 +883,45 @@ class TestDetect:
         result = detect(diff, adg)
         assert len(result.orphans) >= 1
         assert any(c.adr_id == "ADR-999" for c in result.orphans)
+
+    def test_detect_skips_tooling_scoped_constraints(
+        self, sample_adg: ADG, sample_constraints: list[ConstraintEdge]
+    ) -> None:
+        """#159: a TOOLING edge is not enforced, and is not reported as an orphan
+        either (it is not ungrounded, it is deliberately out of detect's scope).
+
+        The tooling edge is the runtime twin of `sample_constraints[0]` (ADR-003,
+        which fires on this diff): the silence is the scope tag, not an inert
+        pattern."""
+        from services.cpt.engine import detect
+
+        runtime_edge = sample_constraints[0]
+        tooling_edge = ConstraintEdge(
+            subject=runtime_edge.subject,
+            predicate=runtime_edge.predicate,
+            object=runtime_edge.object,
+            justification=runtime_edge.justification,
+            adr_id="ADR-900",
+            adr_path="docs/adr/900-tooling.md",
+            scope=ConstraintScope.TOOLING,
+        )
+        diff = DiffResult(
+            to_sha="abc123",
+            from_sha="def456",
+            changed_files=[FileChange(path="app/api/orders.py", status="modified")],
+            changed_fqns=[_changed_fqn("app.api.orders")],
+        )
+
+        def run(edge: ConstraintEdge):
+            adg = ADG(nodes=sample_adg.nodes, edges=sample_adg.edges, constraint_edges=[edge])
+            return detect(diff, adg)
+
+        runtime_result = run(runtime_edge)
+        assert [v.constraint.adr_id for v in runtime_result.violations] == ["ADR-003"]
+
+        tooling_result = run(tooling_edge)
+        assert tooling_result.violations == []
+        assert tooling_result.orphans == []
 
     def test_detect_specificity_resolution(self, sample_adg: ADG) -> None:
         from services.cpt.engine import detect
