@@ -208,11 +208,17 @@ def match_constraints(adg: ADG) -> dict[int, MatchedConstraint]:
     match all constraint with all nodes O(c x n) 
     TODO: do we need to check all constraints? optimize?
     """
+    # The set dedups adg.nodes (88,508 nodes carry 88,405 distinct FQNs on the HA
+    # full graph); the sort makes match order process-independent. Without it,
+    # PYTHONHASHSEED decides which match anchors a violation's changed_fqn and
+    # which object FQN variant its evidence names (#165). Hoisted out of the
+    # constraint loop: it is constraint-independent, so one sort, not c sorts.
+    all_fqns = sorted({node.fqn for node in adg.nodes}, key=str)
+
     matched: dict[int, MatchedConstraint] = {}
     for constraint in adg.constraint_edges:
         subject_matches: list[tuple[FQN, MatchStatus]] = []
         object_matches: list[tuple[FQN, MatchStatus]] = []
-        all_fqns = {node.fqn for node in adg.nodes}
         for fqn in all_fqns:
             subj_status = fqn_matches_pattern(fqn, constraint.subject)
             if subj_status != MatchStatus.NO_MATCH:

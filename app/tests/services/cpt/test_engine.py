@@ -12,6 +12,9 @@ Resolution logic tested separately in test_resolution.py.
 
 from __future__ import annotations
 
+import textwrap
+from pathlib import Path
+
 import pytest
 
 from services.fqn import FQN
@@ -149,6 +152,38 @@ def _changed_fqn(fqn_str: str, change_type: str = "modified") -> ChangedFQN:
 # 1. match_constraints: single-pass matching against all ADG nodes
 # ===========================================================================
 
+# Run in a child process (see test_detect_output_is_hash_seed_independent): a
+# wildcard subject over sibling functions in one module, so match order decides
+# which function anchors the violation.
+_HASH_SEED_PROBE = textwrap.dedent(
+    """
+    from services.fqn import FQN
+    from services.models import ADG, ConstraintEdge, DiffResult, Edge, FQNKind, FQNNode, PredicateType
+    from services.cpt.engine import detect
+
+    def node(dotted, kind=FQNKind.MODULE):
+        return FQNNode(fqn=FQN.from_dotted_safe(dotted), kind=kind,
+                       file_path="x.py", line_start=1, line_end=2)
+
+    adg = ADG(
+        nodes=[node("app"), node("app.mod"),
+               node("app.mod.first_function", FQNKind.FUNCTION),
+               node("app.mod.second_function", FQNKind.FUNCTION),
+               node("app.db")],
+        edges=[Edge("app", "app.mod", "CONTAINS"),
+               Edge("app.mod", "app.mod.first_function", "CONTAINS"),
+               Edge("app.mod", "app.mod.second_function", "CONTAINS"),
+               Edge("app.mod.first_function", "app.db", "IMPORTS"),
+               Edge("app.mod.second_function", "app.db", "IMPORTS")],
+        constraint_edges=[ConstraintEdge(
+            subject="app.*", predicate=PredicateType.PROHIBITS_DEPENDENCY, object="app.db",
+            justification="probe", adr_id="ADR-0001", adr_path="docs/adr/0001.md")],
+    )
+    for violation in detect(DiffResult(to_sha="deadbeef"), adg).violations:
+        print(violation.changed_fqn, violation.matched_fqn, violation.evidence)
+    """
+)
+
 
 class TestMatchConstraints:
     """For each constraint, match all ADG node FQNs against subject/object."""
@@ -212,6 +247,30 @@ class TestMatchConstraints:
         adg = ADG(nodes=sample_adg.nodes, edges=sample_adg.edges, constraint_edges=constraints)
         matched = match_constraints(adg)
         assert len(matched) == 0
+
+
+def test_detect_output_is_hash_seed_independent() -> None:
+    """Cross-process determinism can only be checked in two processes (#165): a
+    wildcard constraint over several sibling subjects must name the same anchor
+    and the same evidence at any PYTHONHASHSEED."""
+    import os
+    import subprocess
+    import sys
+
+    app_dir = Path(__file__).resolve().parents[3]
+    outputs = []
+    for seed in ("0", "1"):  # seed 1 is the one that moves without the sort
+        completed = subprocess.run(
+            [sys.executable, "-c", _HASH_SEED_PROBE],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=app_dir,
+            env={**os.environ, "PYTHONHASHSEED": seed, "PYTHONPATH": str(app_dir)},
+        )
+        outputs.append(completed.stdout)
+
+    assert outputs[0] == outputs[1], f"detect() output follows PYTHONHASHSEED:\n{outputs[0]}\nvs\n{outputs[1]}"
 
 
 # ===========================================================================
