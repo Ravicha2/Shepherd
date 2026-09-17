@@ -1,0 +1,434 @@
+{
+  "_meta": {
+    "generated_at": "2026-09-17T20-26-54",
+    "git_commit": "e4d9e6b",
+    "arm": "baseline",
+    "semble_version": "0.5.6",
+    "semble_model": "minishlab/potion-code-16M-v2",
+    "resolver_model": "google/gemini-3.1-flash-lite"
+  },
+  "repo_id": "structurizr-python",
+  "arm": "node_on",
+  "run_index": 2,
+  "pin_commit": "31f1dcadb3ff113d8a77ce132657237ea01c307b",
+  "ingestion": {
+    "exact": 0,
+    "partial": 1,
+    "miss": 1,
+    "total": 2,
+    "false_positives": 0,
+    "false_positive_edges": [],
+    "credited_fragments": [],
+    "excluded_tooling_edges": [
+      {
+        "adr_id": "ADR-0003",
+        "subject": "examples.*",
+        "predicate": "prohibits_dependency",
+        "object": "python2.7"
+      },
+      {
+        "adr_id": "ADR-0003",
+        "subject": "src.*",
+        "predicate": "prohibits_dependency",
+        "object": "python2.7"
+      },
+      {
+        "adr_id": "ADR-0003",
+        "subject": "examples.*",
+        "predicate": "prohibits_dependency",
+        "object": "python3.5"
+      },
+      {
+        "adr_id": "ADR-0003",
+        "subject": "src.*",
+        "predicate": "prohibits_dependency",
+        "object": "python3.5"
+      },
+      {
+        "adr_id": "ADR-0004",
+        "subject": "src.*",
+        "predicate": "requires_dependency",
+        "object": "versioneer"
+      },
+      {
+        "adr_id": "ADR-0005",
+        "subject": "examples.*",
+        "predicate": "requires_dependency",
+        "object": "isort"
+      },
+      {
+        "adr_id": "ADR-0005",
+        "subject": "src.*",
+        "predicate": "requires_dependency",
+        "object": "isort"
+      },
+      {
+        "adr_id": "ADR-0005",
+        "subject": "examples.*",
+        "predicate": "requires_dependency",
+        "object": "black"
+      },
+      {
+        "adr_id": "ADR-0005",
+        "subject": "src.*",
+        "predicate": "requires_dependency",
+        "object": "black"
+      },
+      {
+        "adr_id": "ADR-0005",
+        "subject": "examples.*",
+        "predicate": "requires_dependency",
+        "object": "flake8"
+      },
+      {
+        "adr_id": "ADR-0005",
+        "subject": "src.*",
+        "predicate": "requires_dependency",
+        "object": "flake8"
+      },
+      {
+        "adr_id": "ADR-0006",
+        "subject": "src.*",
+        "predicate": "requires_dependency",
+        "object": "tox"
+      },
+      {
+        "adr_id": "ADR-0007",
+        "subject": "src.*",
+        "predicate": "requires_dependency",
+        "object": "pytest"
+      }
+    ],
+    "accuracy": 0.25,
+    "per_constraint": [
+      {
+        "adr_id": "ADR-0008",
+        "expected": {
+          "subject": "examples.*",
+          "predicate": "prohibits_dependency",
+          "object": "structurizr.api.*",
+          "justification": "ADR-0008 exports important classes and functions to the top level to expose a public interface; the full api surface (StructurizrClient, StructurizrClientException, StructurizrClientSettings) is exported at src/structurizr/__init__.py, so client code must consume the api through the top level, not by reaching into structurizr.api directly"
+        },
+        "score": "miss",
+        "resolved_subject": null,
+        "resolved_object": null
+      },
+      {
+        "adr_id": "ADR-0009",
+        "expected": {
+          "subject": "src.structurizr.api.*",
+          "predicate": "requires_dependency",
+          "object": "pydantic",
+          "justification": "ADR-0009 chooses pydantic for JSON (de-)serialization; the api package performs the remote-workspace (de)serialization and its settings/response modules depend on pydantic (src/structurizr/api/api_response.py:21, src/structurizr/api/structurizr_client_settings.py:31)"
+        },
+        "score": "partial_match",
+        "resolved_subject": "src.structurizr.*",
+        "resolved_object": "pydantic",
+        "class": "B/C"
+      }
+    ],
+    "class_split": {
+      "B/C": {
+        "matched": 1,
+        "false_positive_edges": 0
+      }
+    }
+  },
+  "detection": {
+    "cases": [
+      {
+        "case_id": "struct-bench-api-legacy-json-response",
+        "type": "injected",
+        "detect_seconds": 0.5769467910286039,
+        "per_unit": [
+          {
+            "expected_fqn": "src.structurizr.api._legacy_response.parse_response",
+            "score": "exact_match",
+            "subject": "src.structurizr.api.*",
+            "object": "pydantic",
+            "pattern_score": "miss"
+          },
+          {
+            "expected_fqn": "src.structurizr.api._legacy_response.dump_response",
+            "score": "exact_match",
+            "subject": "src.structurizr.api.*",
+            "object": "pydantic",
+            "pattern_score": "miss"
+          },
+          {
+            "expected_fqn": "src.structurizr.api._legacy_response.LegacyResponseStore",
+            "score": "exact_match",
+            "subject": "src.structurizr.api.*",
+            "object": "pydantic",
+            "pattern_score": "miss"
+          }
+        ],
+        "exact": 3,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 3,
+        "total": 3,
+        "diagnostics": {
+          "expected_triples": 30,
+          "actual_triples": 489,
+          "overlap": 30,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "struct-bench-api-legacy-json-client-class",
+        "type": "injected",
+        "detect_seconds": 0.011495625018142164,
+        "per_unit": [
+          {
+            "expected_fqn": "src.structurizr.api._legacy_client.LegacyApiClient",
+            "score": "exact_match",
+            "subject": "src.structurizr.api.*",
+            "object": "pydantic",
+            "pattern_score": "miss"
+          }
+        ],
+        "exact": 1,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 1,
+        "total": 1,
+        "diagnostics": {
+          "expected_triples": 30,
+          "actual_triples": 489,
+          "overlap": 30,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "struct-bench-probe-api-settings-seeded",
+        "type": "compliant_probe",
+        "detect_seconds": 0.01624237501528114,
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 0,
+        "diagnostics": {
+          "expected_triples": 0,
+          "actual_triples": 0,
+          "overlap": 0,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "struct-bench-probe-api-pydantic-module",
+        "type": "compliant_probe",
+        "detect_seconds": 0.010123749962076545,
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 0,
+        "diagnostics": {
+          "expected_triples": 0,
+          "actual_triples": 0,
+          "overlap": 0,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "struct-bench-example-deep-import",
+        "type": "injected",
+        "detect_seconds": 0.012403832981362939,
+        "per_unit": [
+          {
+            "expected_fqn": "examples.direct_api_client",
+            "score": "miss",
+            "subject": "examples.*",
+            "object": "structurizr.api.*",
+            "pattern_score": "miss"
+          }
+        ],
+        "exact": 0,
+        "partial": 0,
+        "miss": 1,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 1,
+        "total": 1,
+        "diagnostics": {
+          "expected_triples": 9,
+          "actual_triples": 0,
+          "overlap": 0,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "struct-bench-probe-example-toplevel",
+        "type": "compliant_probe",
+        "detect_seconds": 0.017767459037713706,
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 0,
+        "diagnostics": {
+          "expected_triples": 0,
+          "actual_triples": 0,
+          "overlap": 0,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "struct-bench-example-plain-deep-import",
+        "type": "injected",
+        "detect_seconds": 0.010564582888036966,
+        "per_unit": [
+          {
+            "expected_fqn": "examples.plain_api_client",
+            "score": "miss",
+            "subject": "examples.*",
+            "object": "structurizr.api.*",
+            "pattern_score": "miss"
+          }
+        ],
+        "exact": 0,
+        "partial": 0,
+        "miss": 1,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 1,
+        "total": 1,
+        "diagnostics": {
+          "expected_triples": 9,
+          "actual_triples": 0,
+          "overlap": 0,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "struct-bench-probe-tests-deep-import",
+        "type": "compliant_probe",
+        "detect_seconds": 0.009236874990165234,
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 0,
+        "diagnostics": {
+          "expected_triples": 0,
+          "actual_triples": 0,
+          "overlap": 0,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      },
+      {
+        "case_id": "struct-bench-hist-2021-compliant",
+        "type": "historical",
+        "detect_seconds": 1.9553675409406424,
+        "per_unit": [],
+        "exact": 0,
+        "partial": 0,
+        "miss": 0,
+        "pattern_exact": 0,
+        "pattern_partial": 0,
+        "pattern_miss": 0,
+        "total": 0,
+        "diagnostics": {
+          "expected_triples": 0,
+          "actual_triples": 0,
+          "overlap": 0,
+          "stale_gold_units": 0
+        },
+        "fires": {
+          "structural": [],
+          "merge_mechanism": [],
+          "arm_candidates": []
+        }
+      }
+    ],
+    "exact": 4,
+    "partial": 0,
+    "miss": 2,
+    "total": 6,
+    "pattern_exact": 0,
+    "pattern_partial": 0,
+    "pattern_miss": 6,
+    "stale_gold_units": 0,
+    "diagnostic_overlap": 60,
+    "structural": 0,
+    "merge_mechanism": 0,
+    "arm_candidates": 0
+  },
+  "cost": {
+    "parse_seconds": 0.584,
+    "resolve_seconds": 48.052,
+    "detect_seconds": 2.623,
+    "per_case_detect_seconds": [
+      0.577,
+      0.011,
+      0.016,
+      0.01,
+      0.012,
+      0.018,
+      0.011,
+      0.009,
+      1.955
+    ],
+    "prompt_tokens": 130642,
+    "completion_tokens": 2129,
+    "sessions": 9
+  }
+}
