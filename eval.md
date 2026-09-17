@@ -586,7 +586,7 @@ Graph: 84,851 parsed nodes / 343,058 edges, 88,508 nodes after `add_external_nod
 
 **Comparability:** this row carries no metric that compares to any other row. `detect()` seconds are machine- and graph-specific (full-graph HA, one seed build), and the equivalence claim is against the pre-#165 engine at the same hash seed, not against any earlier eval row. Unblocks #160's one-cell full-graph requirement.
 
-**Incidental finding (own issue):** at *unpinned* hash seed the same 46-case comparison shows ordering differences in structural `changed_fqn` representatives (e.g. flowkit `...aggregates.total_network_objects` vs `...aggregates.location_event_counts`) with identical fire sets. Cause is pre-existing: `match_constraints` iterates `all_fqns = {node.fqn for node in adg.nodes}` (`engine.py:215`), a set, so subject order is hash order. The arms harness pins `PYTHONHASHSEED=0`; the CLI/pipeline paths are unverified.
+**Incidental finding (recorded on #165, not split out):** at *unpinned* hash seed the same 46-case comparison shows ordering differences in structural `changed_fqn` representatives (e.g. flowkit `...aggregates.total_network_objects` vs `...aggregates.location_event_counts`) with identical fire sets. Cause is pre-existing: `match_constraints` iterates `all_fqns = {node.fqn for node in adg.nodes}` (`engine.py:215`), a set, so subject order is hash order. Not fixed here: `sorted(all_fqns, key=str)` would move existing pinned representatives and needs its own re-baseline. The arms harness pins `PYTHONHASHSEED=0`; the CLI/pipeline paths are unverified.
 
 ## Curation mode
 
