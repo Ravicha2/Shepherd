@@ -1,0 +1,63 @@
+{
+  "repo_id": "python-tuf",
+  "roots": [
+    "docs",
+    "examples",
+    "tuf"
+  ],
+  "pin_commit": "6889cfbffbb90a17930fbdedf12ae050be775fe3",
+  "model_id": "google/gemini-3.1-flash-lite",
+  "recorded_at": "2026-09-17T05:41:24+00:00",
+  "adrs": [
+    {
+      "adr_id": "ADR-0000",
+      "adr_path": "docs/adr/0000-use-markdown-architectural-decision-records.md",
+      "raw_response": "[]"
+    },
+    {
+      "adr_id": "ADR-0001",
+      "adr_path": "docs/adr/0001-python-version-3-6-plus.md",
+      "raw_response": "[\n  {\n    \"subject\": \"tuf.*\",\n    \"object\": \"python2.7\",\n    \"predicate\": \"prohibits_dependency\",\n    \"scope\": \"tooling\",\n    \"justification\": \"The ADR mandates support only for Python 3.6+, explicitly rejecting Python 2.7 as end-of-life.\",\n    \"adr_id\": \"ADR-0001\",\n    \"adr_path\": \"docs/adr/0001-default-to-python-3-6-or-newer-for-new-development.md\"\n  },\n  {\n    \"subject\": \"tuf.*\",\n    \"object\": \"python3.5\",\n    \"predicate\": \"prohibits_dependency\",\n    \"scope\": \"tooling\",\n    \"justification\": \"The ADR mandates support only for Python 3.6+, explicitly rejecting Python 3.5 as end-of-life.\",\n    \"adr_id\": \"ADR-0001\",\n    \"adr_path\": \"docs/adr/0001-default-to-python-3-6-or-newer-for-new-development.md\"\n  }\n]"
+    },
+    {
+      "adr_id": "ADR-0002",
+      "adr_path": "docs/adr/0002-pre-1-0-deprecation-strategy.md",
+      "raw_response": "The provided ADR describes a process and governance policy regarding the support of legacy versions of the `tuf` library prior to the 1.0.0 release.\n\nThe decision outcome is: \"Support the old code on a best-effort basis once the refactored code is released.\" This is a policy decision regarding maintenance, bug reporting, and pull request handling. It does not mandate any specific architectural, structural, or dependency changes within the codebase itself.\n\nAs the ADR does not define any enforceable architectural constraints (such as required dependencies, prohibited imports, or mandatory inheritance patterns), there are no edges to emit.\n\n[]"
+    },
+    {
+      "adr_id": "ADR-0003",
+      "adr_path": "docs/adr/0003-where-to-develop-TUF-1-0-0.md",
+      "raw_response": "The provided ADR describes a process-oriented decision regarding the development strategy for TUF 1.0.0 (specifically, developing it within a subdirectory of the existing codebase to allow for gradual migration).\n\nThis decision is a process and organizational strategy for development, not an architectural constraint on the runtime behavior, dependency graph, or implementation patterns of the code itself. The ADR does not mandate specific imports, inheritance hierarchies, or prohibitions that would govern the codebase's structure or runtime dependencies.\n\nTherefore, there are no enforceable architectural constraints to resolve.\n\n```json\n[]\n```"
+    },
+    {
+      "adr_id": "ADR-0004",
+      "adr_path": "docs/adr/0004-extent-of-OOP-in-metadata-model.md",
+      "raw_response": "[\n  {\n    \"subject\": \"tuf.*\",\n    \"object\": \"securesystemslib.formats\",\n    \"predicate\": \"prohibits_dependency\",\n    \"scope\": \"runtime\",\n    \"justification\": \"The ADR explicitly states the goal to replace securesystemslib schema validation with self-validation behavior in the new class-based metadata model.\",\n    \"adr_id\": \"ADR-2020-11-30\",\n    \"adr_path\": \"docs/adr/2020-11-30-add-classes-for-complex-metadata-attributes.md\"\n  }\n]"
+    },
+    {
+      "adr_id": "ADR-0005",
+      "adr_path": "docs/adr/0005-use-google-python-style-guide.md",
+      "raw_response": "[]"
+    },
+    {
+      "adr_id": "ADR-0006",
+      "adr_path": "docs/adr/0006-where-to-implemenent-model-serialization.md",
+      "raw_response": "The ADR \"Separate metadata serialization from metadata class model but keep helpers\" establishes a clear architectural pattern for the TUF metadata system. It mandates that serialization logic must be decoupled from the metadata class model, while dict conversion helpers (e.g., `to_dict()`) remain on the metadata classes themselves to facilitate idiomatic type casting and support custom serializers.\n\nThe following constraints reflect this architectural decision:\n\n```json\n[\n  {\n    \"subject\": \"tuf.api.metadata.*\",\n    \"object\": \"tuf.api.serialization.*\",\n    \"predicate\": \"requires_dependency\",\n    \"scope\": \"runtime\",\n    \"justification\": \"The ADR mandates that serialization logic be separated from the metadata class model, requiring metadata classes to depend on the serialization interface/implementations.\",\n    \"adr_id\": \"ADR-0006\",\n    \"adr_path\": \"docs/adr/0006-where-to-implemenent-model-serialization.md\"\n  },\n  {\n    \"subject\": \"tuf.api.serialization.*\",\n    \"object\": \"tuf.api.metadata.Metadata.to_dict\",\n    \"predicate\": \"requires_implementation\",\n    \"scope\": \"runtime\",\n    \"justification\": \"The ADR mandates that the 'meat' of serialization (conversion to dict) be implemented on the metadata classes, which serializers then use as a minimal wrapper.\",\n    \"adr_id\": \"ADR-0006\",\n    \"adr_path\": \"docs/adr/0006-where-to-implemenent-model-serialization.md\"\n  }\n]\n```"
+    },
+    {
+      "adr_id": "ADR-0008",
+      "adr_path": "docs/adr/0008-accept-unrecognised-fields.md",
+      "raw_response": "[\n  {\n    \"subject\": \"tuf.api.metadata.Metadata\",\n    \"object\": \"tuf.api._payload.Signed\",\n    \"predicate\": \"requires_implementation\",\n    \"scope\": \"runtime\",\n    \"justification\": \"The ADR mandates that unrecognized fields should be stored as an additional attribute, except for specific dictionary-based structures (keys, roles, meta, hashes, targets). The implementation of `Metadata` and `Signed` classes already includes `unrecognized_fields` support, and the ADR confirms this as the chosen architectural direction for metadata handling.\",\n    \"adr_id\": \"ADR-0008\",\n    \"adr_path\": \"docs/adr/0008-accept-unrecognised-fields.md\"\n  },\n  {\n    \"subject\": \"tuf.api._payload.Role\",\n    \"object\": \"tuf.api._payload.Signed\",\n    \"predicate\": \"prohibits_implementation\",\n    \"scope\": \"runtime\",\n    \"justification\": \"The ADR explicitly excludes specific structures like 'roles' from supporting unrecognized fields because they are dictionaries where such fields are not meaningful. Therefore, classes representing these structures must not implement the `unrecognized_fields` pattern used by `Metadata` and `Signed`.\",\n    \"adr_id\": \"ADR-0008\",\n    \"adr_path\": \"docs/adr/0008-accept-unrecognised-fields.md\"\n  },\n  {\n    \"subject\": \"tuf.api._payload.MetaFile\",\n    \"object\": \"tuf.api._payload.Signed\",\n    \"predicate\": \"prohibits_implementation\",\n    \"scope\": \"runtime\",\n    \"justification\": \"The ADR explicitly excludes 'meta' from supporting unrecognized fields. Classes representing these structures must not implement the `unrecognized_fields` pattern.\",\n    \"adr_id\": \"ADR-0008\",\n    \"adr_path\": \"docs/adr/0008-accept-unrecognised-fields.md\"\n  },\n  {\n    \"subject\": \"tuf.api._payload.Targets\",\n    \"object\": \"tuf.api._payload.Signed\",\n    \"predicate\": \"prohibits_implementation\",\n    \"scope\": \"runtime\",\n    \"justification\": \"The ADR explicitly excludes 'targets' from supporting unrecognized fields. Classes representing these structures must not implement the `unrecognized_fields` pattern.\",\n    \"adr_id\": \"ADR-0008\",\n    \"adr_path\": \"docs/adr/0008-accept-unrecognised-fields.md\"\n  }\n]"
+    },
+    {
+      "adr_id": "ADR-0009",
+      "adr_path": "docs/adr/0009-what-is-a-reference-implementation.md",
+      "raw_response": "The provided ADR defines the primary purpose of the reference implementation as an \"exemplary reference,\" focusing on providing a safe, consistent API for users and a good architecture for other implementations to mimic.\n\nThis ADR describes a high-level design philosophy and goal for the project's architecture rather than mandating specific technical constraints, dependencies, or inheritance patterns that can be enforced via static analysis or dependency checking. It does not prohibit specific libraries, mandate specific base classes, or require specific dependencies.\n\nAs such, there are no enforceable architectural constraints to map to FQN patterns.\n\n[]"
+    },
+    {
+      "adr_id": "ADR-0010",
+      "adr_path": "docs/adr/0010-repository-library-design.md",
+      "raw_response": "[\n  {\n    \"subject\": \"tuf.repository.*\",\n    \"object\": \"tuf.api.metadata\",\n    \"predicate\": \"requires_dependency\",\n    \"scope\": \"runtime\",\n    \"justification\": \"The ADR mandates that the new repository library must be built on top of the existing Metadata API.\",\n    \"adr_id\": \"ADR-0010\",\n    \"adr_path\": \"docs/adr/0010-repository-library-design.md\"\n  }\n]"
+    }
+  ]
+}

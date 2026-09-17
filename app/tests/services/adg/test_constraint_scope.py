@@ -1,74 +1,22 @@
-"""Constraint scope classification pins for issue #136 (decision (a), tag-not-skip).
+"""ConstraintEdge scope pins + the eval-accounting seam (issue #136 decision (a)).
 
 Tooling/CI constraints live in pyproject.toml / setup.cfg / noxfile, never in
 the governed package's import graph, so the eval holds them out of scope by
-declaration. The classifier reads ROLE language in the ADR text, never package
-names: a toolchain this suite has never seen must still classify as tooling
-(the issue's generality test), and runtime ADRs whose prose brushes against
-tooling vocabulary in passing must stay runtime.
+declaration. Scope is now a per-edge verdict produced by the resolver's LLM
+session (ADR 019, issue #157); the old whole-ADR `classify_adr_scope` regex and
+its role-word calibration tests are deleted. The calibration *intentions* moved
+to the corpus pins in `test_scope_corpus.py`; what stays here is the
+scoring-side seam that never depended on the classifier:
+
+- `ConstraintEdge` carries the tag with a back-compat `runtime` default;
+- an unmatched TOOLING edge lands in `excluded_tooling_edges` (itemized,
+  reversible), an unmatched RUNTIME edge still counts as FP, and matching stays
+  scope-blind (a tooling-tagged edge can still satisfy a gold row).
 """
 from __future__ import annotations
 
-import pytest
-
-from services.adg.unified_resolver import classify_adr_scope
 from services.models import ConstraintEdge, ConstraintScope, PredicateType
 from tests.services.adg import test_unified_resolver_eval as harness
-
-
-# -- Generality (issue AC): unseen toolchain, no package-name matching -------
-
-def test_unseen_tool_classifies_as_tooling() -> None:
-    """A tooling ADR naming a tool outside this suite's toolchains (ruff)
-    must classify as tooling. A hardcoded package list would miss this."""
-    assert classify_adr_scope(
-        "# 21. Linting\n\n## Decision\n\nAdopt ruff for linting."
-    ) is ConstraintScope.TOOLING
-
-
-# -- Positive calibration: fragments of the actual eval-repo ADRs ------------
-
-TOOLING_ADR_FRAGMENTS = [
-    pytest.param("# 2. Linting and formatting\n\nFor linting, use flake8.", id="tamr-0002-lint"),
-    pytest.param("For formatting, use black.", id="tamr-0002-formatting"),
-    pytest.param("# 4. Documentation and docstrings", id="tamr-0004-docstring"),
-    pytest.param("Doc compilation will be done via sphinx.", id="tamr-0004-doc-compilation"),
-    pytest.param("Type-check via mypy.", id="tamr-0006-type-check"),
-    pytest.param("Use Black code formatter.", id="openlobby-0013-formatter"),
-    pytest.param("We need to choose main programming language for this project.", id="openlobby-0005-language"),
-    pytest.param("We need to choose framework for tests.", id="openlobby-0008-test-framework"),
-    pytest.param("Pytest will be our test framework.", id="generic-test-framework"),
-    pytest.param(
-        "Manage dependencies via poetry. Define tests via nox. "
-        "Run tests in automation/CI via Github Actions.",
-        id="tamr-0003-ci",
-    ),
-]
-
-
-@pytest.mark.parametrize("adr_text", TOOLING_ADR_FRAGMENTS)
-def test_tooling_adr_fragments_classify_as_tooling(adr_text: str) -> None:
-    assert classify_adr_scope(adr_text) is ConstraintScope.TOOLING
-
-
-# -- Negative calibration: runtime ADRs that brush against tooling vocabulary --
-
-RUNTIME_ADR_FRAGMENTS = [
-    pytest.param(
-        "Metadata implementations and wire formats. The wire format is decoupled "
-        "from the class model.",
-        id="tuf-0006-wire-formats",
-    ),
-    pytest.param("Strict mapping to the Document formats in the specification.", id="tuf-0009-document-formats"),
-    pytest.param("Saves a lot of time of writing API documentation.", id="openlobby-0004-api-documentation"),
-    pytest.param("Use Elasticsearch for fulltext search over the lobby data.", id="openlobby-0002-elasticsearch"),
-    pytest.param("", id="empty"),
-]
-
-
-@pytest.mark.parametrize("adr_text", RUNTIME_ADR_FRAGMENTS)
-def test_runtime_adr_fragments_stay_runtime(adr_text: str) -> None:
-    assert classify_adr_scope(adr_text) is ConstraintScope.RUNTIME
 
 
 # -- ConstraintEdge carries the tag (back-compat default) ---------------------

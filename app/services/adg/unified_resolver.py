@@ -25,37 +25,6 @@ log = logging.getLogger(__name__)
 
 TOOL_CALL_CAP = 20
 
-# #136 decision (a): tooling/CI constraints are classified by ROLE language in
-# the ADR text, never by package name, so an unseen toolchain ("adopt ruff for
-# linting") still classifies. `formatt` matches formatter/formatting but not
-# runtime "wire formats"; bare "documentation"/"test" are deliberately absent
-# (passing mentions in runtime ADRs: openlobby ADR-0004 "writing API
-# documentation"). ponytail: whole-ADR classification, per-edge justification
-# wording is LLM variance; a mixed ADR tags wholesale (accepted ceiling).
-_TOOLING_ROLE_PATTERN = re.compile(
-    r"\blint"
-    r"|formatt"
-    r"|type[ -]?check"
-    r"|docstring"
-    r"|doc compilation"
-    r"|framework for tests"
-    r"|test framework"
-    r"|programming language"
-    r"|\bci\b"
-    r"|continuous integration",
-    re.IGNORECASE,
-)
-
-
-def classify_adr_scope(adr_text: str) -> ConstraintScope:
-    """Classify an ADR's constraints as runtime (import-graph) or tooling/CI.
-
-    Reads the full ADR text; one scope per ADR.
-    """
-    if _TOOLING_ROLE_PATTERN.search(adr_text):
-        return ConstraintScope.TOOLING
-    return ConstraintScope.RUNTIME
-
 # ADR 017 decision 4: serialized-length ceiling on every tool result (~4K tokens
 # at 4 chars/token; 20 calls x 4K tokens = 80K tokens worst case).
 TOOL_RESULT_CHAR_LIMIT = 16_000
@@ -178,6 +147,10 @@ class ResolutionTrace:
     hit_cap: bool = False
     parse_failed: bool = False
     pre_validation_edges: list[dict] = field(default_factory=list)
+    # ADR 019: edges the LLM returned with a `none` scope verdict. They never
+    # materialize as constraints, but a wrong `none` silently deletes a real
+    # constraint — the worst failure — so the residue stays auditable (#158).
+    none_verdict_edges: list[dict] = field(default_factory=list)
     # #153 cost instrument, same change class as the #137 provenance: per-session
     # totals {"prompt_tokens", "completion_tokens", "llm_calls"} and session wall time.
     usage: dict = field(default_factory=dict)
@@ -267,6 +240,31 @@ language, emit no requires edge.
 The prohibition side is unchanged: a rejected alternative named in a prescriptive Decision
 still yields `prohibits_*` (see "Negative constraints from prescriptive decisions"), and a
 `prohibits_*` object MAY be a package the codebase does not import.
+
+## Scope verdict
+
+Every edge you emit carries a `scope` verdict describing which part of the project the
+constraint governs, not which section of the ADR it came from.
+
+- `runtime` — the constraint governs how the shipped/importable code depends on or
+  implements something. This is the default when the decision is about application
+  architecture, module boundaries, data flow, or external runtime dependencies.
+- `tooling` — the constraint is real, but it governs the development toolchain instead
+  of the imported code: linters, formatters, type checkers, doc build tools, test
+  frameworks, package managers, CI, and language-version or interpreter-support
+  decisions. Tag these even when they name packages that exist in the codebase's imports.
+- `none` — the decision is not a dependency or implementation relation at all: process
+  or documentation conventions, business policy or thresholds, naming conventions,
+  configuration values, data-model or schema redesigns with no import/inheritance
+  relation to the governed code. Emit nothing — no edge — for these.
+
+Judge each edge independently from the ADR as a whole: a single ADR can produce
+`runtime`, `tooling`, and `none` verdicts in the same answer. A decision about test
+frameworks may sit next to a decision about API boundaries in one ADR; the verdict
+follows what the edge constrains.
+
+When you emit the JSON array, add `"scope": "runtime" | "tooling" | "none"` to every
+object. An edge without a `scope` key is treated as `runtime`.
 
 ## Subject and object rules
 
@@ -379,6 +377,7 @@ Respond with a JSON array of constraint objects. Each object has:
 - subject: FQN pattern
 - object: FQN pattern
 - predicate: one of the four predicate types above
+- scope: one of "runtime" | "tooling" | "none" (see "Scope verdict")
 - justification: short explanation citing the ADR text
 - adr_id: "{adr_id}"
 - adr_path: "{adr_path}"
@@ -446,7 +445,46 @@ def _extract_json(text: str) -> str:
     return stripped
 
 
-def _parse_edges(response_content: str, adr_id: str, adr_path: str) -> list[ConstraintEdge]:
+_SCOPE_BY_NAME = {
+    "runtime": ConstraintScope.RUNTIME,
+    "tooling": ConstraintScope.TOOLING,
+}
+_NONE_SCOPE = "none"
+
+
+def _verdict_for(item: dict, subject: str, object_: str, predicate: PredicateType,
+                  none_verdict_edges: list[dict] | None) -> ConstraintScope | None:
+    """Resolve one item's scope verdict.
+
+    ADR 019 decision 3: `none` returns None (the caller drops the edge) and is
+    retained in `none_verdict_edges` when a collector is passed, so a wrong
+    `none` stays auditable. A missing or invalid scope defaults loud to
+    `runtime`: untagged edges stay in FP accounting, never silently sheltered.
+    """
+    scope_name = item.get("scope")
+    if scope_name == _NONE_SCOPE:
+        if none_verdict_edges is not None:
+            none_verdict_edges.append({
+                "subject": subject,
+                "object": object_,
+                "predicate": predicate.value,
+                "scope": _NONE_SCOPE,
+            })
+        return None
+    return _SCOPE_BY_NAME.get(scope_name, ConstraintScope.RUNTIME)
+
+
+def _parse_edges(
+    response_content: str,
+    adr_id: str,
+    adr_path: str,
+    none_verdict_edges: list[dict] | None = None,
+) -> list[ConstraintEdge]:
+    """Parse a resolver response into edges, applying the per-edge scope verdict.
+
+    ADR 019 decision 1: `scope` is a per-edge key (`runtime` | `tooling` |
+    `none`); a `none` verdict emits no edge (see `_verdict_for`).
+    """
     cleaned = _extract_json(response_content)
     try:
         data = json.loads(cleaned)
@@ -472,19 +510,49 @@ def _parse_edges(response_content: str, adr_id: str, adr_path: str) -> list[Cons
         except ValueError:
             log.warning("unified_resolver: unknown predicate %s, skipping", predicate_str)
             continue
+        scope = _verdict_for(item, subject, object_, predicate, none_verdict_edges)
+        if scope is None:
+            continue
         try:
-            edge = ConstraintEdge(
+            edges.append(ConstraintEdge(
                 subject=subject,
                 predicate=predicate,
                 object=object_,
                 justification=item.get("justification", ""),
                 adr_id=item.get("adr_id", adr_id),
                 adr_path=item.get("adr_path", adr_path),
-            )
-            edges.append(edge)
+                scope=scope,
+            ))
         except ValueError:
             log.warning("unified_resolver: invalid edge skipped: %s", item)
             continue
+    return edges
+
+
+def _materialize_edges(parsed_edges: list[ConstraintEdge], adg: ADG) -> list[ConstraintEdge]:
+    """Apply module wildcarding to each parsed edge, preserving its scope verdict.
+
+    #135: wildcarding is applied per edge with a self-loop guard — module
+    wildcarding can equalize subject and object the LLM kept distinct
+    (`tamr_client.*` requires `tamr_client` -> both sides `tamr_client.*`),
+    which ConstraintEdge rejects; a self-loop carries no architectural
+    information, so it is dropped here rather than crashing the session.
+    """
+    edges: list[ConstraintEdge] = []
+    for parsed in parsed_edges:
+        subject = _add_wildcard_for_modules(parsed.subject, adg)
+        object_ = _add_wildcard_for_modules(parsed.object, adg) if _is_internal(parsed.object, adg) else parsed.object
+        if subject == object_:
+            continue
+        edges.append(ConstraintEdge(
+            subject=subject,
+            predicate=parsed.predicate,
+            object=object_,
+            justification=parsed.justification,
+            adr_id=parsed.adr_id,
+            adr_path=parsed.adr_path,
+            scope=parsed.scope,
+        ))
     return edges
 
 
@@ -601,6 +669,7 @@ def _log_trace(
             for e in edges
         ],
         "pre_validation_edges": trace.pre_validation_edges,
+        "none_verdict_edges": trace.none_verdict_edges,
         "hit_cap": trace.hit_cap,
         "parse_failed": trace.parse_failed,
         "usage": trace.usage,
@@ -640,7 +709,6 @@ def resolve_adr_constraints(
     root_packages = ", ".join(sorted(_root_segments(adg) - _ENTRY_POINT_ROOTS)) or "(none)"
     external_packages = _external_packages(adg)
     external_packages_hint = ", ".join(sorted(external_packages)) if external_packages else "(none)"
-    scope = classify_adr_scope(adr_text)
 
     system_prompt = _SYSTEM_PROMPT_TEMPLATE.format(
         adr_text=adr_text, adr_id=adr_id, adr_path=adr_path,
@@ -686,33 +754,16 @@ def resolve_adr_constraints(
 
         if not msg.tool_calls:
             if msg.content:
-                # #135: wildcarding is applied per edge with a self-loop guard —
-                # module wildcarding can equalize subject and object the LLM kept
-                # distinct (`tamr_client.*` requires `tamr_client` -> both sides
-                # `tamr_client.*`), which ConstraintEdge rejects; a self-loop
-                # carries no architectural information, so it is dropped here
-                # rather than crashing the session.
-                edges = []
-                for parsed in _parse_edges(msg.content, adr_id, adr_path):
-                    subject = _add_wildcard_for_modules(parsed.subject, adg)
-                    object_ = _add_wildcard_for_modules(parsed.object, adg) if _is_internal(parsed.object, adg) else parsed.object
-                    if subject == object_:
-                        continue
-                    edges.append(ConstraintEdge(
-                        subject=subject,
-                        predicate=parsed.predicate,
-                        object=object_,
-                        justification=parsed.justification,
-                        adr_id=parsed.adr_id,
-                        adr_path=parsed.adr_path,
-                        scope=scope,
-                    ))
+                none_verdict_edges: list[dict] = []
+                edges = _materialize_edges(
+                    _parse_edges(msg.content, adr_id, adr_path, none_verdict_edges), adg
+                )
                 valid_edges = [e for e in edges if _validate_edge(e, adg, external_packages)]
                 if len(valid_edges) < len(edges):
                     dropped = [e for e in edges if e not in valid_edges]
                     log.warning("unified_resolver: dropped %d edges with nonexistent FQNs for %s", len(dropped), adr_id)
                 pre_val = [{"subject": e.subject, "object": e.object, "predicate": e.predicate.value, "valid": e in valid_edges} for e in edges]
-                trace = ResolutionTrace(tool_calls=tool_call_trace, hit_cap=False, parse_failed=False, pre_validation_edges=pre_val, **_session_cost())
+                trace = ResolutionTrace(tool_calls=tool_call_trace, hit_cap=False, parse_failed=False, pre_validation_edges=pre_val, none_verdict_edges=none_verdict_edges, **_session_cost())
                 _log_trace(adr_id, adr_path, valid_edges, trace)
                 return valid_edges
             log.warning("unified_resolver: LLM returned empty response for %s", adr_id)
@@ -751,29 +802,16 @@ def resolve_adr_constraints(
         response = _complete(messages=messages)
         content = response.choices[0].message.content
         if content:
-            # #135: per-edge wildcarding with self-loop guard, same as the
-            # main path (see comment there).
-            edges = []
-            for parsed in _parse_edges(content, adr_id, adr_path):
-                subject = _add_wildcard_for_modules(parsed.subject, adg)
-                object_ = _add_wildcard_for_modules(parsed.object, adg) if _is_internal(parsed.object, adg) else parsed.object
-                if subject == object_:
-                    continue
-                edges.append(ConstraintEdge(
-                    subject=subject,
-                    predicate=parsed.predicate,
-                    object=object_,
-                    justification=parsed.justification,
-                    adr_id=parsed.adr_id,
-                    adr_path=parsed.adr_path,
-                    scope=scope,
-                ))
+            none_verdict_edges: list[dict] = []
+            edges = _materialize_edges(
+                _parse_edges(content, adr_id, adr_path, none_verdict_edges), adg
+            )
             valid_edges = [e for e in edges if _validate_edge(e, adg, external_packages)]
             if len(valid_edges) < len(edges):
                 dropped = [e for e in edges if e not in valid_edges]
                 log.warning("unified_resolver: dropped %d edges with nonexistent FQNs for %s", len(dropped), adr_id)
             pre_val = [{"subject": e.subject, "object": e.object, "predicate": e.predicate.value, "valid": e in valid_edges} for e in edges]
-            trace = ResolutionTrace(tool_calls=tool_call_trace, hit_cap=True, parse_failed=False, pre_validation_edges=pre_val, **_session_cost())
+            trace = ResolutionTrace(tool_calls=tool_call_trace, hit_cap=True, parse_failed=False, pre_validation_edges=pre_val, none_verdict_edges=none_verdict_edges, **_session_cost())
             _log_trace(adr_id, adr_path, valid_edges, trace)
             return valid_edges
     except Exception:

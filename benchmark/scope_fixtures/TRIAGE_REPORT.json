@@ -1,0 +1,497 @@
+{
+  "note": "One recorded run per benchmark ADR (benchmark/scope_fixtures). Quality is reported, gated in #158 (k>=2). Layer 1 (#157) pins plumbing and recall-safety only (ADR 019).",
+  "n_adrs": 47,
+  "named_expectation_matches": 8,
+  "named_expectation_checked": 13,
+  "rows": [
+    {
+      "repo_id": "python-tuf",
+      "adr_id": "ADR-0000",
+      "verdicts": [],
+      "n_edges": 0,
+      "n_none": 0,
+      "named_expected": null,
+      "named_match": null
+    },
+    {
+      "repo_id": "python-tuf",
+      "adr_id": "ADR-0001",
+      "verdicts": [
+        "tooling"
+      ],
+      "n_edges": 2,
+      "n_none": 0,
+      "named_expected": null,
+      "named_match": null
+    },
+    {
+      "repo_id": "python-tuf",
+      "adr_id": "ADR-0002",
+      "verdicts": [],
+      "n_edges": 0,
+      "n_none": 0,
+      "named_expected": null,
+      "named_match": null
+    },
+    {
+      "repo_id": "python-tuf",
+      "adr_id": "ADR-0003",
+      "verdicts": [],
+      "n_edges": 0,
+      "n_none": 0,
+      "named_expected": null,
+      "named_match": null
+    },
+    {
+      "repo_id": "python-tuf",
+      "adr_id": "ADR-0004",
+      "verdicts": [
+        "runtime"
+      ],
+      "n_edges": 1,
+      "n_none": 0,
+      "named_expected": null,
+      "named_match": null
+    },
+    {
+      "repo_id": "python-tuf",
+      "adr_id": "ADR-0005",
+      "verdicts": [],
+      "n_edges": 0,
+      "n_none": 0,
+      "named_expected": null,
+      "named_match": null
+    },
+    {
+      "repo_id": "python-tuf",
+      "adr_id": "ADR-0006",
+      "verdicts": [
+        "runtime"
+      ],
+      "n_edges": 2,
+      "n_none": 0,
+      "named_expected": null,
+      "named_match": null
+    },
+    {
+      "repo_id": "python-tuf",
+      "adr_id": "ADR-0008",
+      "verdicts": [
+        "runtime"
+      ],
+      "n_edges": 4,
+      "n_none": 0,
+      "named_expected": null,
+      "named_match": null
+    },
+    {
+      "repo_id": "python-tuf",
+      "adr_id": "ADR-0009",
+      "verdicts": [],
+      "n_edges": 0,
+      "n_none": 0,
+      "named_expected": null,
+      "named_match": null
+    },
+    {
+      "repo_id": "python-tuf",
+      "adr_id": "ADR-0010",
+      "verdicts": [
+        "runtime"
+      ],
+      "n_edges": 1,
+      "n_none": 0,
+      "named_expected": null,
+      "named_match": null
+    },
+    {
+      "repo_id": "flowkit",
+      "adr_id": "ADR-0001",
+      "verdicts": [
+        "tooling"
+      ],
+      "n_edges": 16,
+      "n_none": 0,
+      "named_expected": "tooling",
+      "named_match": true
+    },
+    {
+      "repo_id": "flowkit",
+      "adr_id": "ADR-0002",
+      "verdicts": [
+        "tooling"
+      ],
+      "n_edges": 16,
+      "n_none": 0,
+      "named_expected": "tooling",
+      "named_match": true
+    },
+    {
+      "repo_id": "flowkit",
+      "adr_id": "ADR-0003",
+      "verdicts": [
+        "runtime"
+      ],
+      "n_edges": 1,
+      "n_none": 0,
+      "named_expected": null,
+      "named_match": null
+    },
+    {
+      "repo_id": "flowkit",
+      "adr_id": "ADR-0004",
+      "verdicts": [
+        "runtime"
+      ],
+      "n_edges": 2,
+      "n_none": 0,
+      "named_expected": null,
+      "named_match": null
+    },
+    {
+      "repo_id": "flowkit",
+      "adr_id": "ADR-0005",
+      "verdicts": [
+        "runtime"
+      ],
+      "n_edges": 3,
+      "n_none": 0,
+      "named_expected": null,
+      "named_match": null
+    },
+    {
+      "repo_id": "flowkit",
+      "adr_id": "ADR-0006",
+      "verdicts": [
+        "runtime"
+      ],
+      "n_edges": 1,
+      "n_none": 0,
+      "named_expected": null,
+      "named_match": null
+    },
+    {
+      "repo_id": "flowkit",
+      "adr_id": "ADR-0007",
+      "verdicts": [
+        "runtime"
+      ],
+      "n_edges": 3,
+      "n_none": 0,
+      "named_expected": null,
+      "named_match": null
+    },
+    {
+      "repo_id": "flowkit",
+      "adr_id": "ADR-0008",
+      "verdicts": [
+        "runtime"
+      ],
+      "n_edges": 2,
+      "n_none": 0,
+      "named_expected": "tooling",
+      "named_match": false
+    },
+    {
+      "repo_id": "flowkit",
+      "adr_id": "ADR-0009",
+      "verdicts": [
+        "runtime"
+      ],
+      "n_edges": 2,
+      "n_none": 0,
+      "named_expected": "tooling",
+      "named_match": false
+    },
+    {
+      "repo_id": "flowkit",
+      "adr_id": "ADR-0010",
+      "verdicts": [
+        "runtime"
+      ],
+      "n_edges": 2,
+      "n_none": 0,
+      "named_expected": "tooling",
+      "named_match": false
+    },
+    {
+      "repo_id": "flowkit",
+      "adr_id": "ADR-0011",
+      "verdicts": [
+        "runtime"
+      ],
+      "n_edges": 1,
+      "n_none": 0,
+      "named_expected": "none",
+      "named_match": false
+    },
+    {
+      "repo_id": "flowkit",
+      "adr_id": "ADR-0012",
+      "verdicts": [
+        "runtime"
+      ],
+      "n_edges": 2,
+      "n_none": 0,
+      "named_expected": "none",
+      "named_match": false
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0001",
+      "verdicts": [],
+      "n_edges": 0,
+      "n_none": 0,
+      "named_expected": null,
+      "named_match": null
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0002",
+      "verdicts": [
+        "runtime"
+      ],
+      "n_edges": 4,
+      "n_none": 0,
+      "named_expected": null,
+      "named_match": null
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0003",
+      "verdicts": [
+        "runtime"
+      ],
+      "n_edges": 1,
+      "n_none": 0,
+      "named_expected": null,
+      "named_match": null
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0004",
+      "verdicts": [
+        "runtime"
+      ],
+      "n_edges": 1,
+      "n_none": 0,
+      "named_expected": null,
+      "named_match": null
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0005",
+      "verdicts": [],
+      "n_edges": 0,
+      "n_none": 0,
+      "named_expected": null,
+      "named_match": null
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0006",
+      "verdicts": [],
+      "n_edges": 0,
+      "n_none": 0,
+      "named_expected": null,
+      "named_match": null
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0007",
+      "verdicts": [],
+      "n_edges": 0,
+      "n_none": 0,
+      "named_expected": null,
+      "named_match": null
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0008",
+      "verdicts": [
+        "runtime"
+      ],
+      "n_edges": 2,
+      "n_none": 0,
+      "named_expected": null,
+      "named_match": null
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0009",
+      "verdicts": [
+        "runtime"
+      ],
+      "n_edges": 2,
+      "n_none": 0,
+      "named_expected": null,
+      "named_match": null
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0010",
+      "verdicts": [
+        "runtime"
+      ],
+      "n_edges": 1,
+      "n_none": 0,
+      "named_expected": null,
+      "named_match": null
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0011",
+      "verdicts": [
+        "runtime"
+      ],
+      "n_edges": 1,
+      "n_none": 0,
+      "named_expected": null,
+      "named_match": null
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0012",
+      "verdicts": [
+        "runtime"
+      ],
+      "n_edges": 1,
+      "n_none": 0,
+      "named_expected": null,
+      "named_match": null
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0013",
+      "verdicts": [],
+      "n_edges": 0,
+      "n_none": 0,
+      "named_expected": null,
+      "named_match": null
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0014",
+      "verdicts": [
+        "runtime"
+      ],
+      "n_edges": 1,
+      "n_none": 0,
+      "named_expected": null,
+      "named_match": null
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0015",
+      "verdicts": [
+        "runtime"
+      ],
+      "n_edges": 2,
+      "n_none": 0,
+      "named_expected": null,
+      "named_match": null
+    },
+    {
+      "repo_id": "experimenter",
+      "adr_id": "ADR-0016",
+      "verdicts": [],
+      "n_edges": 0,
+      "n_none": 0,
+      "named_expected": null,
+      "named_match": null
+    },
+    {
+      "repo_id": "structurizr-python",
+      "adr_id": "ADR-0001",
+      "verdicts": [],
+      "n_edges": 0,
+      "n_none": 0,
+      "named_expected": "none",
+      "named_match": true
+    },
+    {
+      "repo_id": "structurizr-python",
+      "adr_id": "ADR-0002",
+      "verdicts": [],
+      "n_edges": 0,
+      "n_none": 0,
+      "named_expected": "none",
+      "named_match": true
+    },
+    {
+      "repo_id": "structurizr-python",
+      "adr_id": "ADR-0003",
+      "verdicts": [
+        "tooling"
+      ],
+      "n_edges": 4,
+      "n_none": 0,
+      "named_expected": "tooling",
+      "named_match": true
+    },
+    {
+      "repo_id": "structurizr-python",
+      "adr_id": "ADR-0004",
+      "verdicts": [
+        "tooling"
+      ],
+      "n_edges": 1,
+      "n_none": 0,
+      "named_expected": "tooling",
+      "named_match": true
+    },
+    {
+      "repo_id": "structurizr-python",
+      "adr_id": "ADR-0005",
+      "verdicts": [
+        "tooling"
+      ],
+      "n_edges": 6,
+      "n_none": 0,
+      "named_expected": null,
+      "named_match": null
+    },
+    {
+      "repo_id": "structurizr-python",
+      "adr_id": "ADR-0006",
+      "verdicts": [
+        "tooling"
+      ],
+      "n_edges": 1,
+      "n_none": 0,
+      "named_expected": "tooling",
+      "named_match": true
+    },
+    {
+      "repo_id": "structurizr-python",
+      "adr_id": "ADR-0007",
+      "verdicts": [
+        "tooling"
+      ],
+      "n_edges": 1,
+      "n_none": 0,
+      "named_expected": "tooling",
+      "named_match": true
+    },
+    {
+      "repo_id": "structurizr-python",
+      "adr_id": "ADR-0008",
+      "verdicts": [],
+      "n_edges": 0,
+      "n_none": 0,
+      "named_expected": null,
+      "named_match": null
+    },
+    {
+      "repo_id": "structurizr-python",
+      "adr_id": "ADR-0009",
+      "verdicts": [
+        "runtime"
+      ],
+      "n_edges": 1,
+      "n_none": 0,
+      "named_expected": null,
+      "named_match": null
+    }
+  ]
+}
