@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -15,6 +16,7 @@ from rich.table import Table
 
 from cli.config import RepoConfig, load_config
 from services.adg import parse_repo
+from services.adg.gold import GOLD_ADR_PINS, GOLD_PINS, gold_path, gold_triples, triple_differences, triples
 from services.cpt import GitAdapter, process_diff
 from services.cpt.dismissal import Dismissal, compute_identity_hash, filter_dismissed, violation_identity, violation_short_id
 from services.cpt.resolution import Violation
@@ -24,6 +26,9 @@ from services.commit_update import UpdateResult, commit_update
 from services.pipeline import ADGPipeline, PipelineInputs
 
 console = Console()
+
+# Where `seed build --gold` records each seed it built (issue #167).
+GOLD_SEED_RECORD_DIR = Path(__file__).resolve().parents[2] / "benchmark" / "reports" / "gold_seeds"
 
 
 def _violation_to_dict(v: Violation) -> dict:
@@ -94,24 +99,30 @@ def _get_repo(repo: str):
         console.print(f"[red]Error:[/] {e}")
         raise typer.Exit(code=1)
 
+def _resolve_config_path(configured: str) -> Path:
+    """Resolve a repos.yaml path; relative ones resolve against the repos/ directory."""
+    path = Path(configured)
+    if not path.is_absolute():
+        path = Path(__file__).resolve().parents[2] / "repos" / path
+    return path.resolve()
+
+
 def _resolve_repo_path(repo_cfg) -> Path:
     """Resolve the repo URL to a local filesystem path"""
-    config_dir = Path(__file__).resolve().parents[2] / "repos"
-    path = Path(repo_cfg.url)
-    if not path.is_absolute():
-        path = config_dir / path
-    return path.resolve()
+    return _resolve_config_path(repo_cfg.url)
+
+
+def _resolve_adr_repo_path(repo_cfg) -> Path | None:
+    """The separate ADR repo checkout, when the repo config names one."""
+    if repo_cfg.adr_repo is None:
+        return None
+    return _resolve_config_path(repo_cfg.adr_repo)
 
 
 def _resolve_adr_dir(repo_cfg, repo_path: Path) -> Path:
     """Resolve the ADR directory, using the sibling adr_repo when configured."""
-    if repo_cfg.adr_repo is None:
-        return repo_path / repo_cfg.adr_dir
-    config_dir = Path(__file__).resolve().parents[2] / "repos"
-    adr_repo_path = Path(repo_cfg.adr_repo)
-    if not adr_repo_path.is_absolute():
-        adr_repo_path = config_dir / adr_repo_path
-    return adr_repo_path.resolve() / repo_cfg.adr_dir
+    adr_repo_path = _resolve_adr_repo_path(repo_cfg)
+    return (adr_repo_path or repo_path) / repo_cfg.adr_dir
 
 
 def _run_detection(repo: str, commit: str | None, base: str | None = None, head: str | None = None) -> DetectionResult:
@@ -537,6 +548,7 @@ def violation_dismiss(
 @seed_app.command("build")
 def seed_build(
     repo: str = typer.Option(..., "--repo", "-r", help="Repository ID from repos.yaml"),
+    gold: bool = typer.Option(False, "--gold", help="Merge benchmark gold constraints instead of running the resolver"),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ) -> None:
     """Build an ADG seed snapshot from scratch."""
@@ -553,11 +565,7 @@ def seed_build(
     adg = parse_repo(repo_path)
     console.print(f"  Found {len(adg.nodes)} nodes, {len(adg.edges)} edges")
 
-    # resolve ADRs via unified agent
-    console.print("[bold]Step 2:[/] Resolving ADR constraints (unified agent)...")
-    pipeline = ADGPipeline()
-    adr_dir = _resolve_adr_dir(repo_cfg, repo_path)
-    merged = pipeline.build_seed(adg, adr_dir, project_root=repo_path, config=config.langextract)
+    merged = _merge_constraints(repo_cfg, repo_path, adg, gold, config)
     external_count = sum(1 for n in merged.nodes if n.kind == FQNKind.EXTERNAL)
     console.print(f"  {len(merged.constraint_edges)} constraint edges, {external_count} EXTERNAL nodes")
 
@@ -574,7 +582,19 @@ def seed_build(
     store.clear_all()  # ponytail: wipe entire graph to prevent cross-repo contamination
     console.print("  Cleared previous graph data")
     store.store_adg(merged)
+    read_back = triples(store.load_adg().constraint_edges) if gold else None
     store.close()
+
+    if gold:
+        missing, extra = _check_gold_seed(repo, repo_path, merged, read_back)
+        if missing or extra:
+            console.print(f"[red]Error:[/] the seed for [cyan]{repo}[/] does not match the gold:")
+            for triple in missing:
+                console.print(f"  [red]in gold, not in seed:[/] {triple}")
+            for triple in extra:
+                console.print(f"  [red]in seed, not in gold:[/] {triple}")
+            raise typer.Exit(code=1)
+        console.print(f"  Read back {len(read_back)} constraint edges, identical to the gold")
 
     if json_output:
         output = {
@@ -584,10 +604,85 @@ def seed_build(
             "constraint_edges": len(merged.constraint_edges),
             "external_nodes": external_count,
         }
+        if gold:
+            output["gold_read_back"] = len(read_back)
         console.print_json(json.dumps(output))
         return
 
     console.print(f"[bold green]Done[/] Seed built for [cyan]{repo}[/]")
+
+
+def _merge_constraints(repo_cfg, repo_path: Path, adg, gold: bool, config):
+    """Step 2: the gold merge (`--gold`) or the resolver extraction."""
+    pipeline = ADGPipeline()
+    if not gold:
+        console.print("[bold]Step 2:[/] Resolving ADR constraints (unified agent)...")
+        adr_dir = _resolve_adr_dir(repo_cfg, repo_path)
+        return pipeline.build_seed(adg, adr_dir, project_root=repo_path, config=config.langextract)
+
+    # census §5: a gold seed off its pin is a different benchmark.
+    _require_pin(GOLD_PINS.get(repo_cfg.id, ""), repo_path, "code checkout")
+    adr_repo_path = _resolve_adr_repo_path(repo_cfg)
+    if adr_repo_path is not None:
+        _require_pin(GOLD_ADR_PINS.get(repo_cfg.id, ""), adr_repo_path, "ADR checkout")
+    gold_file = gold_path(repo_cfg.id)
+    if not gold_file.exists():
+        console.print(f"[red]Error:[/] no benchmark gold for [cyan]{repo_cfg.id}[/]: {gold_file}")
+        raise typer.Exit(code=1)
+    console.print(f"[bold]Step 2:[/] Merging gold constraints from {gold_file.name} (resolver skipped)...")
+    return pipeline.build_gold_seed(adg, gold_file, project_root=repo_path)
+
+
+def _git_sha(path: Path) -> str | None:
+    """HEAD of a git checkout, or None if path is not one."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(path), "rev-parse", "HEAD"],
+            capture_output=True, text=True, check=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
+        return None
+    return result.stdout.strip()
+
+
+def _require_pin(expected: str, path: Path, label: str) -> None:
+    """Refuse a gold seed built off the census §5 pin."""
+    if not expected:
+        return
+    actual = _git_sha(path)
+    if actual is None:
+        console.print(f"[yellow]Warning:[/] cannot read the git HEAD of the {label} at {path}; "
+                      f"verify it is at the census §5 pin {expected[:10]}")
+        return
+    if actual != expected:
+        console.print(f"[red]Error:[/] {label} {path} is at {actual[:10]}, expected the census §5 pin "
+                      f"{expected[:10]}. Check out the pin before seeding.")
+        raise typer.Exit(code=1)
+
+
+def _check_gold_seed(repo: str, repo_path: Path, merged, read_back: list) -> tuple[list, list]:
+    """Compare the read-back seed to the gold, record the build, and return
+    the (missing, extra) disagreement so the caller can name it."""
+    missing, extra = triple_differences(gold_triples(repo), read_back)
+    record_dir = GOLD_SEED_RECORD_DIR
+    record_dir.mkdir(parents=True, exist_ok=True)
+    record = {
+        "repo": repo,
+        "repo_path": str(repo_path),
+        "checkout_sha": _git_sha(repo_path),
+        "pin": GOLD_PINS.get(repo),
+        "nodes": len(merged.nodes),
+        "edges": len(merged.edges),
+        "constraints_loaded": len(merged.constraint_edges),
+        "constraints_read_back": len(read_back),
+        "gold_missing": missing,
+        "gold_extra": extra,
+        "matches_gold": not missing and not extra,
+    }
+    (record_dir / f"{repo}.json").write_text(json.dumps(record, indent=2) + "\n")
+    console.print(f"  Recorded in benchmark/reports/gold_seeds/{repo}.json")
+    return missing, extra
+
 
 @seed_app.command("restore")
 def seed_restore(

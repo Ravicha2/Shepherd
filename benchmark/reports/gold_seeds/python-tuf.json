@@ -1,0 +1,13 @@
+{
+  "repo": "python-tuf",
+  "repo_path": "/Users/ravichasuksawasdinaayuthaya/UNSW/research/dataset-Shepherd/medium/python-tuf",
+  "checkout_sha": "6889cfbffbb90a17930fbdedf12ae050be775fe3",
+  "pin": "6889cfbffbb90a17930fbdedf12ae050be775fe3",
+  "nodes": 321,
+  "edges": 746,
+  "constraints_loaded": 4,
+  "constraints_read_back": 4,
+  "gold_missing": [],
+  "gold_extra": [],
+  "matches_gold": true
+}

@@ -9,12 +9,10 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from services.adg.merge import add_external_nodes, merge_constraint_edges
 from services.adg.treesitter import parse_repo
-from services.models import DiffResult
-from services.pipeline import adg_with_specificity
+from services.pipeline import ADGPipeline
 
-from time_ha_detect import gold_constraints
+from time_ha_detect import GOLD
 
 from services.cpt import engine
 
@@ -23,11 +21,8 @@ HA_ROOT = Path(__file__).resolve().parents[2] / "dataset-Shepherd" / "large" / "
 
 def main() -> None:
     root = HA_ROOT.resolve()
-    edges = gold_constraints()
     adg = parse_repo(root)
-    seed = adg_with_specificity(
-        merge_constraint_edges(add_external_nodes(adg, project_root=root), edges, project_root=root)
-    )
+    seed = ADGPipeline.build_gold_seed(adg, GOLD, project_root=root)
 
     t = time.perf_counter()
     matched = engine.match_constraints(seed)

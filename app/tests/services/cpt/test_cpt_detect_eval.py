@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+from services.adg.gold import load_gold_edges
 from services.adg.merge import add_external_nodes, merge_constraint_edges
 from services.adg.treesitter import parse_repo
 from services.cpt.diff_processor import process_diff
@@ -45,21 +46,9 @@ def _repo_root(repo_id: str) -> Path:
 
 
 def _gold_constraints(repo_id: str) -> list[ConstraintEdge]:
-    path = GROUND_TRUTH_DIR / f"{repo_id.replace('-', '_')}_ground_truth.json"
-    with open(path) as f:
-        gt = json.load(f)
-    edges: list[ConstraintEdge] = []
-    for entry in gt:
-        for constraint in entry.get("constraints", []):
-            edges.append(ConstraintEdge(
-                subject=constraint["subject"],
-                predicate=PredicateType(constraint["predicate"]),
-                object=constraint["object"],
-                justification=constraint["justification"],
-                adr_id=entry["adr_id"],
-                adr_path=entry["adr_path"],
-            ))
-    return edges
+    # Same gold JSON shape as the benchmark set, so one reader for both
+    # (services.adg.gold); this file is the frozen eval gold.
+    return load_gold_edges(GROUND_TRUTH_DIR / f"{repo_id.replace('-', '_')}_ground_truth.json")
 
 
 def _load_cases() -> dict[str, dict]:

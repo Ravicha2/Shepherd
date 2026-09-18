@@ -177,3 +177,16 @@ class ADGPipeline:
         merged = merge_constraint_edges(adg, all_edges, project_root=project_root)
         merged = add_external_nodes(merged, project_root=project_root)
         return adg_with_specificity(merged)
+
+    @staticmethod
+    def build_gold_seed(adg: ADG, gold_file: Path, project_root: Path | None = None) -> ADG:
+        """Merge the benchmark gold constraints into the ADG, skipping the resolver.
+
+        Same merge as build_seed, fed from benchmark/gold/<repo>_gold.json
+        instead of the resolver. For `cpt seed build --gold` (#167).
+        """
+        from services.adg.gold import load_gold_edges
+
+        edges = load_gold_edges(gold_file)
+        merged = merge_constraint_edges(add_external_nodes(adg, project_root=project_root), edges, project_root=project_root)
+        return adg_with_specificity(merged)

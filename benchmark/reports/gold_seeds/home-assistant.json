@@ -1,0 +1,13 @@
+{
+  "repo": "home-assistant",
+  "repo_path": "/Users/ravichasuksawasdinaayuthaya/UNSW/research/dataset-Shepherd/large/home-assistant",
+  "checkout_sha": "e4b01b65d306cf4ffcd692b9eb7c7d2ce4f794e4",
+  "pin": "e4b01b65d306cf4ffcd692b9eb7c7d2ce4f794e4",
+  "nodes": 88508,
+  "edges": 343058,
+  "constraints_loaded": 2,
+  "constraints_read_back": 2,
+  "gold_missing": [],
+  "gold_extra": [],
+  "matches_gold": true
+}

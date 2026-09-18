@@ -1,0 +1,13 @@
+{
+  "repo": "flowkit",
+  "repo_path": "/Users/ravichasuksawasdinaayuthaya/UNSW/research/dataset-Shepherd/large/flowkit",
+  "checkout_sha": "24d88247d57987fe33f6b8915540d7bf09b58033",
+  "pin": "24d88247d57987fe33f6b8915540d7bf09b58033",
+  "nodes": 2895,
+  "edges": 7507,
+  "constraints_loaded": 6,
+  "constraints_read_back": 6,
+  "gold_missing": [],
+  "gold_extra": [],
+  "matches_gold": true
+}

@@ -613,6 +613,16 @@ Pre-fix to post-fix at the *same* seed (0): **8 of 32 cases** move, and every on
 
 **Comparability:** this row's HA numbers are NOT diffable against any earlier row — HA has never been measured in the harness, and a k=1 single cell has no run-to-run spread to read, so the ADR 018 worst-run discipline does not apply yet. The four-repo rows are untouched. The detection convention (violation-level key) matches `2026-09-17T20-09-41`, so an HA row there in a future k>=2 batch is diffable against this one. Traces local at `logs/benchmark-arms-160/home_assistant_node_on_run1/` (#140 convention, gitignored).
 
+### 2026-09-18: issue #167 benchmark seeds built from the gold constraints (setup; no metric)
+
+**Change:** `cpt seed build --gold` (`app/cli/main.py`) merges the benchmark gold constraints and never calls the resolver, so the two-arm run's CPT arm fires on the same constraints Tier A's expected violations are written against. The gold JSON has one reader, `app/services/adg/gold.py` (`load_gold_edges`), used by the CLI, by `benchmark/time_ha_detect.py` / `profile_ha_detect.py` (whose local third copy is deleted) and by the eval suite's own gold loader (`tests/services/cpt/test_cpt_detect_eval.py`), so the paths cannot drift. Two guards the criterion needs: `--gold` refuses a checkout whose HEAD is not the census §5 pin (hard exit, and for HA the same check on the separate ADR repo), and after persisting it loads the graph back and compares the read-back constraint set to the gold by (adr_id, predicate, subject, object), naming every missing and extra triple and exiting non-zero on any disagreement. Each build records `benchmark/reports/gold_seeds/<repo>.json` (checkout sha, pin, node/edge counts, constraints loaded vs read back, the disagreement).
+
+**Numbers (the five builds, read back):** python-tuf 321 nodes / 746 edges / 4 constraints, flowkit 2895 / 7507 / 6, experimenter 3283 / 10694 / 4, structurizr-python 568 / 1339 / 2, home-assistant 88508 / 343058 / 2. **18/18 constraints read back identical to the gold, all five checkouts at their census §5 pin, no repo disagreed.** HA's 88,508 nodes / 343,058 edges are the census §7 figures exactly, which is the cross-check that the pin path parses the tree the census annotated.
+
+**Evidence (no LLM, no Neo4j):** `app/tests/services/adg/test_gold_seed.py` (`ADGPipeline.build_gold_seed` over an empty ADG per repo: constraint set == the gold, 4+6+4+2+2 = 18, every pin a full sha, HA's ADR pin distinct from its code pin, and a planted disagreement naming both sides) and `app/tests/cli/test_seed_build_gold.py` (the `--gold` branch with the graph, Neo4j and the resolver stubbed: the resolver is asserted not-called, the seed carries the gold, a disagreeing seed exits 1 with the triples named, the record is written, a repo without gold is refused).
+
+**Comparability:** no metric and no re-baseline: this row builds benchmark inputs, it does not measure the system. The seeds are not durable artifacts — each build wipes the graph, so the record JSON above is the evidence, and #163 rebuilds the seed it needs before its arm fires. The record is also the pin certificate: `checkout_sha == pin` on every row.
+
 ## Curation mode
 
 
