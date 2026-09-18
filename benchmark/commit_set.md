@@ -113,7 +113,7 @@ Real commits are a side tier because a clean merged commit is the normal case, s
 
 ## Run settings
 
-- Reviewer: `deepseek-v4.1-flash`, passed explicitly with `--model` on every run and recorded in each `metrics.json`. Different model family from the resolver (`google/gemini-3.1-flash-lite`), on purpose.
+- Reviewer: `deepseek-v4.1-flash:cloud`, passed explicitly with `--model` on every run and recorded in each `metrics.json`. Different model family from the resolver (`google/gemini-3.1-flash-lite`), on purpose. The id is pinned in `run.py` as `REVIEWER_MODEL`, which is the `--model` default, so no run can fall through to the machine's Pi config. Full id needed: the `:cloud` tag is part of the ollama model name, and bare `deepseek-v4.1-flash` exits "Model not found". The id also had to be added to `~/.pi/agent/models.json`, whose ollama list is hand-maintained and was stale (`glm-5.1:cloud` is no longer served); the model itself is live on the local ollama, `ollama.com` remote, 1M context, tools+thinking.
 - Runs per arm per commit: 1. `pi` exposes no temperature flag and no seed, so the stance is provider defaults with run-to-run variation uncontrolled. A noise floor means repeats on one repo, the #149 way, not repeats everywhere.
 - Constraints: the CPT arm fires on the gold-seeded graphs built by #167, not on constraints re-extracted per run.
 - Same reviewer model in both arms, recorded per record.
