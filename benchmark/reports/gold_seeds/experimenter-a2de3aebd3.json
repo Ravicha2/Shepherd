@@ -1,0 +1,13 @@
+{
+  "repo": "experimenter",
+  "repo_path": "/Users/ravichasuksawasdinaayuthaya/UNSW/research/dataset-Shepherd/medium/mozilla-experimenter",
+  "checkout_sha": "a2de3aebd37bbc6bc76f15ff2704f082c864e856",
+  "pin": "d61a2b8efcb7fd77a849c9f9dc163130473b7f16",
+  "nodes": 1966,
+  "edges": 6230,
+  "constraints_loaded": 4,
+  "constraints_read_back": 4,
+  "gold_missing": [],
+  "gold_extra": [],
+  "matches_gold": true
+}
