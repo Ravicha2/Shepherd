@@ -21,7 +21,7 @@ from services.cpt import GitAdapter, process_diff
 from services.cpt.dismissal import Dismissal, compute_identity_hash, filter_dismissed, violation_identity, violation_short_id
 from services.cpt.resolution import Violation
 from services.graph.connector import GraphStore
-from services.models import Diff, DiffResult, FQNKind
+from services.models import ChangedFQN, Diff, DiffResult, FQNKind
 from services.commit_update import UpdateResult, commit_update
 from services.pipeline import ADGPipeline, PipelineInputs
 
@@ -125,8 +125,46 @@ def _resolve_adr_dir(repo_cfg, repo_path: Path) -> Path:
     return (adr_repo_path or repo_path) / repo_cfg.adr_dir
 
 
-def _run_detection(repo: str, commit: str | None, base: str | None = None, head: str | None = None) -> DetectionResult:
-    """Shared detection pipeline. Loads ADG from Neo4j (seeded via `seed build`)."""
+def scoped_changes(adg, scopes: list[str]) -> DiffResult:
+    """A synthetic changed-FQN set: every node under each scope prefix (#163).
+
+    The benchmark's historical cases carry no commit diff. Their changed set is
+    the node set under the case's expected probe scopes, which is what the
+    harness convention measures (`test_benchmark_arms_eval._module_scopes_changed`).
+    This is the CLI-side twin, so `--changed-scopes` fires the CPT arm on the same
+    set the harness measured instead of on whatever the historical commit touched.
+
+    A case whose expected set is empty (a compliant historical case) is spelled as
+    one empty prefix, `--changed-scopes ''`: the empty set is still a decision, and
+    passing it is what stops the git diff from driving detection instead.
+    """
+    changed = [
+        ChangedFQN(
+            fqn=node.fqn,
+            change_type="modified",
+            file_path=node.file_path,
+            enclosing_module=None,
+            enclosing_class=None,
+        )
+        for node in adg.nodes
+        if any(str(node.fqn) == scope or str(node.fqn).startswith(scope + ".") for scope in scopes)
+    ]
+    return DiffResult(to_sha="changed-scopes", changed_fqns=changed)
+
+
+def _run_detection(
+    repo: str,
+    commit: str | None,
+    base: str | None = None,
+    head: str | None = None,
+    changed_scopes: list[str] | None = None,
+) -> DetectionResult:
+    """Shared detection pipeline. Loads ADG from Neo4j (seeded via `seed build`).
+
+    With changed_scopes, the git diff is not read at all: the changed set is the
+    synthetic one (`scoped_changes`), which is what a historical benchmark case
+    with no diff of its own means.
+    """
     from services.cpt.engine import CPTResult
 
     repo_cfg = _get_repo(repo)
@@ -137,16 +175,20 @@ def _run_detection(repo: str, commit: str | None, base: str | None = None, head:
         raise typer.Exit(code=1)
 
     adapter = GitAdapter()
-    try:
-        if base and head:
-            diff = adapter.get_pr_diff(repo_path, base_ref=base, head_ref=head)
-        else:
-            diff = adapter.get_diff(repo_path, to_sha=commit)
-    except ValueError as e:
-        console.print(f"[red]Git error:[/] {e}")
-        raise typer.Exit(code=1)
+    diff_result: DiffResult | None = None
+    if changed_scopes:
+        diff = Diff(to_sha=commit or "changed-scopes", from_sha=None)
+    else:
+        try:
+            if base and head:
+                diff = adapter.get_pr_diff(repo_path, base_ref=base, head_ref=head)
+            else:
+                diff = adapter.get_diff(repo_path, to_sha=commit)
+        except ValueError as e:
+            console.print(f"[red]Git error:[/] {e}")
+            raise typer.Exit(code=1)
 
-    diff_result: DiffResult = process_diff(diff)
+        diff_result = process_diff(diff)
 
     # ponytail: load seeded ADG from Neo4j instead of re-parsing repo + re-extracting ADRs
     store = GraphStore(
@@ -158,6 +200,9 @@ def _run_detection(repo: str, commit: str | None, base: str | None = None, head:
     store.connect()
     adg = store.load_adg()
     store.close()
+
+    if diff_result is None:
+        diff_result = scoped_changes(adg, changed_scopes or [])
 
     pipeline = ADGPipeline()
     pipeline_inputs = PipelineInputs(
@@ -186,6 +231,11 @@ def detect(
     commit: str | None = typer.Option(None, "--commit", "-c", help="Commit SHA (default: HEAD)"),
     base: str | None = typer.Option(None, "--base", help="Base ref for PR diff (requires --head)"),
     head: str | None = typer.Option(None, "--head", help="Head ref for PR diff (requires --base)"),
+    changed_scopes: list[str] = typer.Option(
+        None, "--changed-scopes",
+        help="Treat every node under each prefix as the changed set, ignoring the git "
+             "diff; pass an empty prefix for a case whose changed set is empty (#163)",
+    ),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ) -> None:
     """Run CPT violation detection on a repository."""
@@ -193,7 +243,7 @@ def detect(
         console.print("[red]Error:[/] --base and --head must be used together")
         raise typer.Exit(code=1)
 
-    dr = _run_detection(repo, commit, base=base, head=head)
+    dr = _run_detection(repo, commit, base=base, head=head, changed_scopes=changed_scopes)
 
     if json_output:
         output = {
@@ -430,11 +480,16 @@ def report(
 def violation_list(
     repo: str = typer.Option(..., "--repo", "-r", help="Repository ID from repos.yaml"),
     commit: str | None = typer.Option(None, "--commit", "-c", help="Commit SHA (default: HEAD)"),
+    changed_scopes: list[str] = typer.Option(
+        None, "--changed-scopes",
+        help="Treat every node under each prefix as the changed set, ignoring the git "
+             "diff; pass an empty prefix for a case whose changed set is empty (#163)",
+    ),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ) -> None:
     """List violations, filtering out dismissed ones."""
     console.print(f"[bold]Detecting[/] violations in [cyan]{repo}[/] (commit: {commit or 'HEAD'})")
-    dr = _run_detection(repo, commit)
+    dr = _run_detection(repo, commit, changed_scopes=changed_scopes)
     console.print(f"  Found {len(dr.cpt_result.violations)} violation(s) before dismissal filter")
 
     store = GraphStore(
@@ -549,6 +604,10 @@ def violation_dismiss(
 def seed_build(
     repo: str = typer.Option(..., "--repo", "-r", help="Repository ID from repos.yaml"),
     gold: bool = typer.Option(False, "--gold", help="Merge benchmark gold constraints instead of running the resolver"),
+    allow_off_pin: bool = typer.Option(
+        False, "--allow-off-pin",
+        help="Build a gold seed off the census §5 pin, for a benchmark historical case (#163)",
+    ),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ) -> None:
     """Build an ADG seed snapshot from scratch."""
@@ -565,7 +624,7 @@ def seed_build(
     adg = parse_repo(repo_path)
     console.print(f"  Found {len(adg.nodes)} nodes, {len(adg.edges)} edges")
 
-    merged = _merge_constraints(repo_cfg, repo_path, adg, gold, config)
+    merged = _merge_constraints(repo_cfg, repo_path, adg, gold, config, allow_off_pin=allow_off_pin)
     external_count = sum(1 for n in merged.nodes if n.kind == FQNKind.EXTERNAL)
     console.print(f"  {len(merged.constraint_edges)} constraint edges, {external_count} EXTERNAL nodes")
 
@@ -612,7 +671,7 @@ def seed_build(
     console.print(f"[bold green]Done[/] Seed built for [cyan]{repo}[/]")
 
 
-def _merge_constraints(repo_cfg, repo_path: Path, adg, gold: bool, config):
+def _merge_constraints(repo_cfg, repo_path: Path, adg, gold: bool, config, allow_off_pin: bool = False):
     """Step 2: the gold merge (`--gold`) or the resolver extraction."""
     pipeline = ADGPipeline()
     if not gold:
@@ -620,8 +679,13 @@ def _merge_constraints(repo_cfg, repo_path: Path, adg, gold: bool, config):
         adr_dir = _resolve_adr_dir(repo_cfg, repo_path)
         return pipeline.build_seed(adg, adr_dir, project_root=repo_path, config=config.langextract)
 
-    # census §5: a gold seed off its pin is a different benchmark.
-    _require_pin(GOLD_PINS.get(repo_cfg.id, ""), repo_path, "code checkout")
+    # census §5: a gold seed off its pin is a different benchmark. A benchmark
+    # historical case is exactly that on purpose, so it has to say so (#163).
+    if allow_off_pin:
+        console.print(f"[yellow]Note:[/] seeding off the census §5 pin at {(_git_sha(repo_path) or 'unknown')[:10]} "
+                      f"(the ADR checkout is still pin-checked)")
+    else:
+        _require_pin(GOLD_PINS.get(repo_cfg.id, ""), repo_path, "code checkout")
     adr_repo_path = _resolve_adr_repo_path(repo_cfg)
     if adr_repo_path is not None:
         _require_pin(GOLD_ADR_PINS.get(repo_cfg.id, ""), adr_repo_path, "ADR checkout")
@@ -660,6 +724,16 @@ def _require_pin(expected: str, path: Path, label: str) -> None:
         raise typer.Exit(code=1)
 
 
+def _seed_record_name(repo: str, repo_path: Path) -> str:
+    """The pin build keeps `<repo>.json` (#167); an off-pin build gets its own
+    file, so a historical case's seed cannot overwrite the pin's record."""
+    sha = _git_sha(repo_path)
+    pin = GOLD_PINS.get(repo, "")
+    if sha and pin and sha != pin:
+        return f"{repo}-{sha[:10]}.json"
+    return f"{repo}.json"
+
+
 def _check_gold_seed(repo: str, repo_path: Path, merged, read_back: list) -> tuple[list, list]:
     """Compare the read-back seed to the gold, record the build, and return
     the (missing, extra) disagreement so the caller can name it."""
@@ -679,8 +753,9 @@ def _check_gold_seed(repo: str, repo_path: Path, merged, read_back: list) -> tup
         "gold_extra": extra,
         "matches_gold": not missing and not extra,
     }
-    (record_dir / f"{repo}.json").write_text(json.dumps(record, indent=2) + "\n")
-    console.print(f"  Recorded in benchmark/reports/gold_seeds/{repo}.json")
+    name = _seed_record_name(repo, repo_path)
+    (record_dir / name).write_text(json.dumps(record, indent=2) + "\n")
+    console.print(f"  Recorded in benchmark/reports/gold_seeds/{name}")
     return missing, extra
 
 

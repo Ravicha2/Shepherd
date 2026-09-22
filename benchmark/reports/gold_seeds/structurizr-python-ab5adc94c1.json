@@ -1,0 +1,13 @@
+{
+  "repo": "structurizr-python",
+  "repo_path": "/Users/ravichasuksawasdinaayuthaya/UNSW/research/dataset-Shepherd/small/structurizr-python",
+  "checkout_sha": "ab5adc94c188c8e4bbd05d064fce4603a22e8255",
+  "pin": "31f1dcadb3ff113d8a77ce132657237ea01c307b",
+  "nodes": 568,
+  "edges": 1339,
+  "constraints_loaded": 2,
+  "constraints_read_back": 2,
+  "gold_missing": [],
+  "gold_extra": [],
+  "matches_gold": true
+}
