@@ -36,3 +36,6 @@ repos/
 
 # versioned eval run artifacts (kept on disk, not in git)
 tests/ground_truth/reports/
+
+# research-run artifacts (plans, drafts); the durable copies are archived in notes/
+outputs/
