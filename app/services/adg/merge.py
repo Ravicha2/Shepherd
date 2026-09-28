@@ -9,12 +9,10 @@ import logging
 import re
 from pathlib import Path
 
-from services.fqn import FQN
 from services.models import (
     ADG,
     ConstraintEdge,
     DependencyRole,
-    FQNKind,
     FQNNode,
 )
 
@@ -125,77 +123,62 @@ def _classify_external_role(
     return DependencyRole.UNKNOWN
 
 
-def add_external_nodes(adg: ADG, project_root: Path | None = None) -> ADG:
-    """Create EXTERNAL nodes for import targets not defined in the repo.
+def with_external_nodes(adg: ADG, project_root: Path | None = None) -> ADG:
+    """The one externalizer: a placeholder for every FQN the graph does not define.
+
+    Both reference sources are read here — import targets from structural edges
+    and the endpoints of constraint edges — so the two merge paths cannot
+    disagree about which EXTERNAL nodes exist (#174).
+
+    A wildcard pattern (app.api.*) is not a concrete FQN: resolve it to its base
+    namespace (app.api) before the membership test, so the pattern itself never
+    becomes a node. The base might still be an orphan, and then it does.
 
     project_root: optional path to repo root for dev-tool classification
                   via pyproject.toml / setup.cfg extras.
     """
     extra_dev_packages = _load_dev_packages_from_config(project_root)
 
-    known_fqns = {str(node.fqn) for node in adg.nodes}
-    import_targets = {edge.target for edge in adg.edges if edge.kind == "IMPORTS"}
+    referenced = {edge.target for edge in adg.edges if edge.kind == "IMPORTS"}
+    for edge in adg.constraint_edges:
+        referenced.add(edge.subject)
+        referenced.add(edge.object)
 
-    external_fqns = sorted(import_targets - known_fqns)
+    known_fqns = adg.fqn_set
+    external_fqns = sorted(
+        base
+        for base in (fqn.removesuffix(".*") for fqn in referenced)
+        if base and base not in known_fqns
+    )
     if external_fqns:
-        log.info("add_external_nodes: creating %d EXTERNAL nodes for unresolved imports: %s", len(external_fqns), external_fqns)
+        log.info("with_external_nodes: creating %d EXTERNAL nodes for unresolved FQNs: %s", len(external_fqns), external_fqns)
     else:
-        log.debug("add_external_nodes: no unresolved imports")
-    external_nodes = [
-        FQNNode(
-            fqn=FQN.from_dotted(fqn),
-            kind=FQNKind.EXTERNAL,
-            file_path="",
-            line_start=-1,
-            line_end=-1,
-            role=_classify_external_role(fqn, extra_dev_packages),
-        )
-        for fqn in external_fqns
-    ]
+        log.debug("with_external_nodes: no unresolved FQNs")
 
-    return ADG(nodes=adg.nodes + external_nodes, edges=adg.edges, constraint_edges=adg.constraint_edges)
+    return adg.with_nodes(*(
+        FQNNode.external(fqn, role=_classify_external_role(fqn, extra_dev_packages))
+        for fqn in external_fqns
+    ))
+
+
+def add_external_nodes(adg: ADG, project_root: Path | None = None) -> ADG:
+    """One-line delegate to the externalizer, kept for existing callers.
+
+    NOT imports-only, despite the name. Since #174 this reads constraint-edge
+    endpoints as well as IMPORTS targets, so a hand-built graph can gain an
+    EXTERNAL node for an endpoint it never had — grounding a constraint that
+    used to be an orphan. That widening is the point of the one-externalizer
+    decision; `run_prepared` is the production caller, and in the CLI path
+    `build_seed` already externalized those endpoints, so it is a no-op there.
+    Pinned by test_delegate_covers_constraint_endpoints_not_just_imports.
+    """
+    return with_external_nodes(adg, project_root)
 
 
 def merge_constraint_edges(adg: ADG, constraint_edges: list[ConstraintEdge], project_root: Path | None = None) -> ADG:
-    """Merge resolved ConstraintEdges into the ADG, adding EXTERNAL nodes for orphans.
+    """Attach resolved constraints, then externalize — the single merge order.
 
-    project_root: optional path to repo root for dev-tool classification
-                  via pyproject.toml / setup.cfg extras.
+    `build_seed`, `build_gold_seed` and `commit_update` all route through here,
+    so externalize-then-merge cannot come back as a second idiom (#174).
     """
-    log.info("merge_constraint_edges: merging %d constraint edges into ADG with %d nodes", len(constraint_edges), len(adg.nodes))
-
-    extra_dev_packages = _load_dev_packages_from_config(project_root)
-
-    all_edge_fqns: set[str] = set()
-    for edge in constraint_edges:
-        all_edge_fqns.add(edge.subject)
-        all_edge_fqns.add(edge.object)
-
-    known_fqns = {str(n.fqn) for n in adg.nodes}
-
-    # Wildcard patterns (app.api.*) are not concrete FQNs;
-    # resolve to the base namespace and check that instead.
-    orphan_fqns = sorted(
-        base
-        for base in (fqn.removesuffix(".*") for fqn in all_edge_fqns)
-        if base and base not in known_fqns
-    )
-    external_nodes = [
-        FQNNode(
-            fqn=FQN.from_dotted(fqn),
-            kind=FQNKind.EXTERNAL,
-            file_path="",
-            line_start=-1,
-            line_end=-1,
-            role=_classify_external_role(fqn, extra_dev_packages),
-        )
-        for fqn in orphan_fqns
-    ]
-    if external_nodes:
-        log.info("merge_constraint_edges: adding %d EXTERNAL nodes for orphans: %s", len(external_nodes), orphan_fqns)
-
-    return ADG(
-        nodes=adg.nodes + external_nodes,
-        edges=adg.edges,
-        constraint_edges=adg.constraint_edges + constraint_edges,
-    )
+    return with_external_nodes(adg.with_constraints(*constraint_edges), project_root)

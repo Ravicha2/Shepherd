@@ -7,8 +7,10 @@ from services.fqn import FQN
 from services.models import ADG, ChangedFQN, ConstraintEdge, ConstraintScope, DependencyRole, DiffResult, Edge, FQNKind, PredicateType
 from services.cpt.resolution import Violation, resolve, suppress_outweighed_prohibits, suppress_outweighed_requires
 from services.resolver import MatchStatus, fqn_matches_pattern
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from collections import deque, defaultdict
+
+Adjacency = Mapping[str, tuple[Edge, ...]]
 
 log = logging.getLogger(__name__)
 
@@ -17,7 +19,7 @@ _PRIORITY = {MatchStatus.EXACT: 3, MatchStatus.WILDCARD: 2}
 _DEPENDENCY_EDGE_KINDS = frozenset({"IMPORTS", "CALLS", "INHERITS"})
 
 
-def _outgoing_dependency_edges(fqn_str: str, adjacency: dict[str, list[Edge]]) -> list[dict]:
+def _outgoing_dependency_edges(fqn_str: str, adjacency: Adjacency) -> list[dict]:
     # ponytail: uncapped; cap if large modules flood the reviewer context
     return [
         {"kind": edge.kind, "target": edge.target}
@@ -40,11 +42,10 @@ class MatchedConstraint:
     object_matches: list[tuple[FQN, MatchStatus]]
 
 
-def _build_adjacency(edges: Iterable[Edge]) -> dict[str, list[Edge]]:
-    adjacency: dict[str, list[Edge]] = defaultdict(list)
-    for edge in edges:
-        adjacency[edge.source].append(edge)
-    return adjacency
+def _build_adjacency(edges: Iterable[Edge]) -> Adjacency:
+    """ADG owns the bucketing (#173); this stays a free function because ~60
+    test sites hand it a raw edge iterable rather than a graph."""
+    return ADG(edges=tuple(edges)).out_edges
 
 
 def _enclosing_module_map(adg: ADG) -> dict[str, str]:
@@ -67,7 +68,7 @@ def _enclosing_module_map(adg: ADG) -> dict[str, str]:
 
 def _reachable_paths(
     start: str,
-    adjacency: dict[str, list[Edge]],
+    adjacency: Adjacency,
     kinds: set[str],
     node_roles: dict[str, DependencyRole] | None = None,
     skip_roles: set[DependencyRole] | None = None,
@@ -127,7 +128,7 @@ def _reachable_paths(
 
 
 def _reverse_candidates(
-    adjacency: dict[str, list[Edge]],
+    adjacency: Adjacency,
     kinds: set[str],
     object_strs: set[str],
 ) -> set[str]:
@@ -203,19 +204,30 @@ def _path_excused(path: list[Edge], object_str: str, requires: list[ConstraintEd
     return True
 
 
-def match_constraints(adg: ADG) -> dict[int, MatchedConstraint]:
+def constraint_key(constraint: ConstraintEdge) -> tuple[str, PredicateType, str, str]:
+    """Value identity for a constraint: (adr_id, predicate, subject, object).
+
+    `id()` was the old key and is not copy-safe: a `dataclasses.replace`d edge is
+    structurally identical but a different object, so matching silently lost it.
+    adr_id is a file stem (unique per ADR), so the only collision is resolver
+    dupes within one ADR — dedup on this same key in `with_constraints` makes it
+    unique by construction."""
+    return (constraint.adr_id, constraint.predicate, constraint.subject, constraint.object)
+
+
+def match_constraints(adg: ADG) -> dict[tuple, MatchedConstraint]:
     """
     match all constraint with all nodes O(c x n) 
     TODO: do we need to check all constraints? optimize?
     """
-    # The set dedups adg.nodes (88,508 nodes carry 88,405 distinct FQNs on the HA
-    # full graph); the sort makes match order process-independent. Without it,
-    # PYTHONHASHSEED decides which match anchors a violation's changed_fqn and
-    # which object FQN variant its evidence names (#165). Hoisted out of the
-    # constraint loop: it is constraint-independent, so one sort, not c sorts.
-    all_fqns = sorted({node.fqn for node in adg.nodes}, key=str)
+    # The index dedups adg.nodes (88,508 nodes carry 88,405 distinct FQNs on the HA
+    # full graph) and sorts by str, so match order is process-independent. Without
+    # the sort, PYTHONHASHSEED decides which match anchors a violation's changed_fqn
+    # and which object FQN variant its evidence names (#165). Constraint-independent,
+    # so it stays hoisted out of the constraint loop: one sort, not c sorts.
+    all_fqns = adg.fqns
 
-    matched: dict[int, MatchedConstraint] = {}
+    matched: dict[tuple, MatchedConstraint] = {}
     for constraint in adg.constraint_edges:
         subject_matches: list[tuple[FQN, MatchStatus]] = []
         object_matches: list[tuple[FQN, MatchStatus]] = []
@@ -228,18 +240,20 @@ def match_constraints(adg: ADG) -> dict[int, MatchedConstraint]:
                 object_matches.append((fqn, obj_status))
         # Skip constraints where either bucket is empty (orphan)
         if subject_matches and object_matches:
-            matched[id(constraint)] = MatchedConstraint(
+            # first wins on a value-key collision; equal keys yield equal matches,
+            # so only which edge object is stored can differ
+            matched.setdefault(constraint_key(constraint), MatchedConstraint(
                 constraint=constraint,
                 subject_matches=subject_matches,
                 object_matches=object_matches,
-            )
+            ))
     return matched
 
 
 def check_structural_predicates(
-    matched_constraints: dict[int, MatchedConstraint],
-    adjacency: dict[str, list[Edge]],
-    node_roles: dict[str, DependencyRole] | None = None,
+    matched_constraints: dict[tuple, MatchedConstraint],
+    adjacency: Adjacency,
+    node_roles: Mapping[str, DependencyRole] | None = None,
     module_scope: dict[str, str] | None = None,
 ) -> list[Violation]:
     """
@@ -330,10 +344,10 @@ def check_structural_predicates(
 
 
 def check_change_triggered_predicates(
-    matched_constraints: dict[int, MatchedConstraint],
-    adjacency: dict[str, list[Edge]],
+    matched_constraints: dict[tuple, MatchedConstraint],
+    adjacency: Adjacency,
     changed_fqns: list[ChangedFQN],
-    node_roles: dict[str, DependencyRole] | None = None,
+    node_roles: Mapping[str, DependencyRole] | None = None,
     module_scope: dict[str, str] | None = None,
 ) -> list[Violation]:
     """
@@ -421,8 +435,10 @@ def check_change_triggered_predicates(
 
 
 def detect(diff_result: DiffResult, adg: ADG) -> CPTResult:
-    adjacency = _build_adjacency(adg.edges)
-    node_roles = {str(node.fqn): node.role for node in adg.nodes}
+    # Index reads, not four map builds (#173): out_edges / role_of / node_of are
+    # memoised on the graph and shared by every check below.
+    adjacency = adg.out_edges
+    node_roles = adg.role_of
     module_scope = _enclosing_module_map(adg)
 
     # #159: TOOLING-scoped constraints are out of detect's world entirely, neither
@@ -434,7 +450,14 @@ def detect(diff_result: DiffResult, adg: ADG) -> CPTResult:
         if constraint.scope is not ConstraintScope.TOOLING
     ]
 
-    # filter self-loop constraints (subject == object), surface as informational
+    # filter self-loop constraints (subject == object), surface as informational.
+    #
+    # Complementary to ConstraintEdge.__post_init__'s guard, not redundant with
+    # it. That one rejects construction; this one catches self-loops formed
+    # AFTER construction, which is where real ones come from: the unified
+    # resolver wildcards both sides of `X.* requires X` into `X.* -> X.*`
+    # (#135, tamr ADR-0007), and an edge loaded back from the store never ran
+    # __post_init__ at all. Keep both.
     self_loop_constraints: list[ConstraintEdge] = [
         constraint for constraint in enforced_edges if constraint.subject == constraint.object
     ]
@@ -447,7 +470,10 @@ def detect(diff_result: DiffResult, adg: ADG) -> CPTResult:
         )
 
     safe_edges = [constraint for constraint in enforced_edges if constraint.subject != constraint.object] # filter self loop
-    safe_adg = ADG(nodes=adg.nodes, edges=adg.edges, constraint_edges=safe_edges)
+    # replace() shares the node/edge tuples instead of aliasing them into a second
+    # construction site: nothing here can mutate the graph, and the frozen
+    # sequences make that a property of the type rather than of this call (#173).
+    safe_adg = adg.replace(constraint_edges=tuple(safe_edges))
     matched = match_constraints(safe_adg)
 
     all_violations: list[Violation] = []
@@ -468,7 +494,7 @@ def detect(diff_result: DiffResult, adg: ADG) -> CPTResult:
             active_prohibits.append(match_constraint.constraint)
     violations = suppress_outweighed_requires(violations, active_prohibits)
 
-    node_by_fqn = {str(node.fqn): node for node in adg.nodes}
+    node_by_fqn = adg.node_of
     for violation in violations:
         # structural prohibits report at the evidence-owning node (issue 126):
         # changed_fqn is just the wildcard subject's match anchor; the location
@@ -485,7 +511,7 @@ def detect(diff_result: DiffResult, adg: ADG) -> CPTResult:
 
     orphans: list[ConstraintEdge] = []
     for constraint in enforced_edges:
-        if id(constraint) not in matched:
+        if constraint_key(constraint) not in matched:
             orphans.append(constraint)
 
     return CPTResult(violations=violations, orphans=orphans, self_loop_constraints=self_loop_constraints)

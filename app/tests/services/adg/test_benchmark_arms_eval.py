@@ -41,8 +41,8 @@ load_dotenv(Path(__file__).resolve().parents[4] / ".env")
 from services.adg.merge import add_external_nodes, merge_constraint_edges
 from services.adg.treesitter import parse_repo
 from services.models import ConstraintEdge, Diff, DiffResult, FileChange, FQNKind
-from services.pipeline import adg_with_specificity, augment_immutable
-from services.cpt.diff_processor import process_diff
+from services.pipeline import adg_with_specificity
+from services.cpt.diff_processor import augmented, process_diff
 from services.cpt.engine import detect
 from tests.eval_paths import write_report
 from tests.services.adg.test_unified_resolver_eval import (
@@ -399,7 +399,7 @@ def _run_detection(instances: dict, repo_root: Path, all_edges: list,
                 pin_baseline = [_fire_summary(v) for v in detect(_empty_diff_result(), seed).violations]
                 pin_internal = _internal_fqns(seed)
             diff = _build_case_diff(repo_root, case)
-            violations = detect(process_diff(diff), augment_immutable(seed, diff)).violations
+            violations = detect(process_diff(diff), augmented(seed, diff)).violations
             empirical = pin_baseline
             case_internal = pin_internal
 

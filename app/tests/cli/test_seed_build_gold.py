@@ -35,9 +35,14 @@ def _run(tmp_path, repo="python-tuf", read_back=None):
     store = MagicMock()
     store.load_adg.return_value = ADG(constraint_edges=read_back if read_back is not None else [])
 
+    # GraphStore is patched by NAME in cli.main, never via GraphStore.__new__:
+    # mock restores the class attribute but CPython does not revert the type's
+    # tp_new slot, so every later GraphStore(uri=...) in the same process raises
+    # TypeError. That leak turned the DB-gated tests into errors whenever this
+    # module ran first.
     with patch.object(main, "load_config", return_value=config), \
          patch.object(main, "parse_repo", return_value=ADG()), \
-         patch.object(main.GraphStore, "__new__", return_value=store), \
+         patch.object(main, "GraphStore", return_value=store), \
          patch("services.pipeline.ADGPipeline.build_seed",
                side_effect=AssertionError("resolver called on the --gold path")), \
          patch.object(main, "GOLD_SEED_RECORD_DIR", tmp_path / "records"):

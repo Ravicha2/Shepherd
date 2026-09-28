@@ -3,7 +3,7 @@
 import logging
 
 from services.fqn import FQN
-from services.models import ADG, ChangedFQN, Diff, DiffResult, FileChange, FQNKind
+from services.models import ADG, ChangedFQN, Diff, DiffResult, Edge, FileChange, FQNKind, FQNNode
 from services.adg import parse_file
 
 log = logging.getLogger(__name__)
@@ -168,11 +168,13 @@ def _maybe_emit_module_fqn(
     )
 
 
-def augment_adg(adg: ADG, diff: Diff) -> None:
-    """Merge new/modified file contents from a diff into the ADG in-place.
+def _collect_augmentations(adg: ADG, diff: Diff) -> tuple[list[FQNNode], list[Edge]]:
+    """Collect the nodes and edges that `augmented` must merge in. Nothing is mutated.
 
     Without this, BFS from added FQNs can't expand because those nodes
-    don't exist in the base ADG.
+    don't exist in the base ADG. Private: it returns (nodes, edges) for the
+    graph-building `augmented`, and the near-identical name invited callers to
+    treat the pair as a graph.
     """
     from tree_sitter import Parser
     from services.adg.treesitter import PY_LANGUAGE, walk_imports, walk_calls, walk_inherits, build_import_aliases, parse_file
@@ -181,6 +183,8 @@ def augment_adg(adg: ADG, diff: Diff) -> None:
     existing_fqns = {n.fqn for n in adg.nodes}
     existing_edges = {(e.source, e.target, e.kind) for e in adg.edges}
     diff_sources: dict[FQN, bytes] = {}
+    new_nodes: list[FQNNode] = []
+    new_edges: list[Edge] = []
 
     for file_change in diff.changed_files:
         path = file_change.path
@@ -202,12 +206,11 @@ def augment_adg(adg: ADG, diff: Diff) -> None:
         module_fqn = FQN.from_path(path)
         diff_sources[module_fqn] = source
 
-        # Ensure module_fqn and all parent packages exist in adg.nodes
-        from services.models import FQNNode, FQNKind, Edge
+        # Ensure module_fqn and all parent packages exist in the node set
         for i in range(1, len(module_fqn.parts) + 1):
             parent_fqn = FQN.from_dotted_safe(".".join(module_fqn.parts[:i]))
             if parent_fqn is not None and parent_fqn not in existing_fqns:
-                adg.nodes.append(FQNNode(
+                new_nodes.append(FQNNode(
                     fqn=parent_fqn,
                     kind=FQNKind.MODULE,
                     file_path=path if i == len(module_fqn.parts) else "",
@@ -225,18 +228,18 @@ def augment_adg(adg: ADG, diff: Diff) -> None:
             if parent_fqn is not None and child_fqn is not None:
                 key = (str(parent_fqn), str(child_fqn), "CONTAINS")
                 if key not in existing_edges:
-                    adg.edges.append(Edge(source=str(parent_fqn), target=str(child_fqn), kind="CONTAINS"))
+                    new_edges.append(Edge(source=str(parent_fqn), target=str(child_fqn), kind="CONTAINS"))
                     existing_edges.add(key)
 
-        new_nodes, new_edges = parse_file(source, module_fqn, path)
-        for node in new_nodes:
+        parsed_nodes, parsed_edges = parse_file(source, module_fqn, path)
+        for node in parsed_nodes:
             if node.fqn not in existing_fqns:
-                adg.nodes.append(node)
+                new_nodes.append(node)
                 existing_fqns.add(node.fqn)
-        for edge in new_edges:
+        for edge in parsed_edges:
             key = (edge.source, edge.target, edge.kind)
             if key not in existing_edges:
-                adg.edges.append(edge)
+                new_edges.append(edge)
                 existing_edges.add(key)
 
     # Pass 2: Extract IMPORTS, CALLS, and INHERITS edges for the diff files
@@ -254,16 +257,18 @@ def augment_adg(adg: ADG, diff: Diff) -> None:
     for edge in new_dep_edges:
         key = (edge.source, edge.target, edge.kind)
         if key not in existing_edges:
-            adg.edges.append(edge)
+            new_edges.append(edge)
             existing_edges.add(key)
             if edge.kind == "IMPORTS":
                 target_fqn = FQN.from_dotted_safe(edge.target)
                 if target_fqn is not None and target_fqn not in existing_fqns:
-                    adg.nodes.append(FQNNode(
-                        fqn=target_fqn,
-                        kind=FQNKind.EXTERNAL,
-                        file_path="",
-                        line_start=-1,
-                        line_end=-1,
-                    ))
+                    new_nodes.append(FQNNode.external(edge.target))
                     existing_fqns.add(target_fqn)
+
+    return new_nodes, new_edges
+
+
+def augmented(adg: ADG, diff: Diff) -> ADG:
+    """Return a NEW ADG with the diff's files merged in; the input is untouched."""
+    nodes, edges = _collect_augmentations(adg, diff)
+    return adg.with_nodes(*nodes).with_edges(*edges)

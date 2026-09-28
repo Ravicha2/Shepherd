@@ -18,10 +18,10 @@ import yaml
 from services.adg.gold import load_gold_edges
 from services.adg.merge import add_external_nodes, merge_constraint_edges
 from services.adg.treesitter import parse_repo
-from services.cpt.diff_processor import process_diff
+from services.cpt.diff_processor import augmented, process_diff
 from services.cpt.engine import detect
 from services.models import ConstraintEdge, Diff, FileChange, FQNKind, PredicateType
-from services.pipeline import adg_with_specificity, augment_immutable
+from services.pipeline import adg_with_specificity
 from tests.eval_paths import RUN_DIR, write_report
 from tests.services.adg.test_unified_resolver_eval import _score_fqn
 
@@ -82,7 +82,7 @@ def run_case(repo_id: str, case: dict):
     merged = merge_constraint_edges(merged, _gold_constraints(repo_id), project_root=repo_root)
     merged = adg_with_specificity(merged)
     diff = _build_diff(repo_root, case)
-    merged = augment_immutable(merged, diff)
+    merged = augmented(merged, diff)
     diff_result = process_diff(diff)
     return detect(diff_result, merged)
 

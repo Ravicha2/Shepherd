@@ -3,7 +3,7 @@
 Boundary tests for:
     pattern_specificity: constraint pattern depth + exact/wildcard bonus
     adg_with_specificity: patching ConstraintEdge.specificity after merge
-    augment_immutable: wrapping in-place augment_adg without mutating the input
+    augmented: merging a diff in without mutating the input
     ADGPipeline.run_prepared: pure-data pipeline without git/filesystem/LLM
 """
 
@@ -31,9 +31,10 @@ from services.pipeline import (
     ADGPipeline,
     PipelineInputs,
     adg_with_specificity,
-    augment_immutable,
     pattern_specificity,
 )
+from services.adg.merge import add_external_nodes, merge_constraint_edges
+from services.cpt.diff_processor import augmented
 from services.cpt.dismissal import Dismissal
 
 
@@ -156,7 +157,7 @@ class TestAdgWithSpecificity:
 
 
 # ---------------------------------------------------------------------------
-# augment_immutable
+# augmented
 # ---------------------------------------------------------------------------
 
 
@@ -180,7 +181,7 @@ class TestAugmentImmutable:
             from_contents={},
         )
 
-        result = augment_immutable(adg, diff)
+        result = augmented(adg, diff)
 
         # Input ADG should not be modified
         assert len(adg.nodes) == original_node_count
@@ -197,7 +198,7 @@ class TestAugmentImmutable:
             from_contents={},
         )
 
-        result = augment_immutable(adg, diff)
+        result = augmented(adg, diff)
 
         assert result is not adg
 
@@ -257,8 +258,7 @@ class TestADGPipelineRunPrepared:
         )
 
         def fires(scope: ConstraintScope) -> list[str]:
-            adg = _make_adg()
-            adg.constraint_edges = [
+            adg = _make_adg().replace(constraint_edges=[
                 ConstraintEdge(
                     subject="app.*",
                     predicate=PredicateType.PROHIBITS_DEPENDENCY,
@@ -268,7 +268,7 @@ class TestADGPipelineRunPrepared:
                     adr_path="docs/adr/010-tooling.md",
                     scope=scope,
                 ),
-            ]
+            ])
             result = ADGPipeline().run_prepared(PipelineInputs(adg=adg, diff_result=diff_result))
             return [v.constraint.adr_id for v in result.violations]
 
@@ -439,3 +439,75 @@ class TestADGPipelineRunWithDismissals:
         )
         assert filtered_result.orphans == result.orphans
         assert filtered_result.self_loop_constraints == result.self_loop_constraints
+
+
+# ---------------------------------------------------------------------------
+# Merge order independence (#174): externalize and merge commute
+# ---------------------------------------------------------------------------
+
+
+def _merge_graph() -> ADG:
+    """One unresolved import (`app.auth`) and one constraint orphan (`app.missing`)."""
+    def module(name: str) -> FQNNode:
+        return FQNNode(fqn=FQN.from_dotted(name), kind=FQNKind.MODULE,
+                       file_path=f"{name.replace('.', '/')}.py", line_start=0, line_end=10)
+
+    return ADG(
+        nodes=[module("app"), module("app.api")],
+        edges=[
+            Edge(source="app.api", target="app.auth", kind="IMPORTS"),
+            Edge(source="app", target="app.api", kind="CONTAINS"),
+        ],
+    )
+
+
+def _merge_edge() -> ConstraintEdge:
+    return ConstraintEdge(
+        subject="app.api.*",            # wildcard base app.api is present: not an orphan
+        predicate=PredicateType.PROHIBITS_DEPENDENCY,
+        object="app.missing.*",         # wildcard base absent: orphan `app.missing`
+        justification="app.api must not reach app.missing",
+        adr_id="ADR-001",
+        adr_path="docs/adr/001.md",
+    )
+
+
+def _membership(adg: ADG) -> list[tuple[str, object, object]]:
+    """Node membership including role, order-independent."""
+    return sorted((str(n.fqn), n.kind, n.role) for n in adg.nodes)
+
+
+class TestMergeOrderIndependence:
+    """Externalize-then-merge == merge-then-externalize (#174).
+
+    build_seed and build_gold_seed used the two orders and nothing enforced that
+    they agreed. Compare membership and the edge multiset, not list equality:
+    with_nodes preserves insertion order by design, so the two orders append the
+    same members in a different sequence at the same cost.
+    """
+
+    def test_the_two_orders_produce_the_same_graph(self):
+        adg = _merge_graph()
+        edges = [_merge_edge()]
+
+        merge_then_externalize = add_external_nodes(merge_constraint_edges(adg, edges))
+        externalize_then_merge = merge_constraint_edges(add_external_nodes(adg), edges)
+
+        assert _membership(merge_then_externalize) == _membership(externalize_then_merge)
+        assert merge_then_externalize.fqn_set == externalize_then_merge.fqn_set
+        assert sorted(merge_then_externalize.edges, key=lambda e: (e.source, e.target, e.kind)) == \
+            sorted(externalize_then_merge.edges, key=lambda e: (e.source, e.target, e.kind))
+        assert sorted(merge_then_externalize.constraint_edges, key=lambda c: (c.adr_id, c.subject, c.object)) == \
+            sorted(externalize_then_merge.constraint_edges, key=lambda c: (c.adr_id, c.subject, c.object))
+
+    def test_both_orphan_sources_land_in_either_order(self):
+        """The unresolved import and the constraint orphan both appear, whichever
+        order runs first — the divergence this collapse exists to prevent. The
+        wildcard pattern itself never becomes a node; its base is tested instead."""
+        for merged in (
+            add_external_nodes(merge_constraint_edges(_merge_graph(), [_merge_edge()])),
+            merge_constraint_edges(add_external_nodes(_merge_graph()), [_merge_edge()]),
+        ):
+            assert {"app.auth", "app.missing"} <= merged.fqn_set
+            assert "app.missing.*" not in merged.fqn_set
+            assert "app.api" in merged.fqn_set

@@ -12,6 +12,7 @@ Resolution logic tested separately in test_resolution.py.
 
 from __future__ import annotations
 
+import dataclasses
 import textwrap
 from pathlib import Path
 
@@ -248,6 +249,20 @@ class TestMatchConstraints:
         matched = match_constraints(adg)
         assert len(matched) == 0
 
+    def test_structurally_equal_constraints_produce_one_match(
+        self, sample_adg: ADG, sample_constraints: list[ConstraintEdge]
+    ) -> None:
+        """#171: identity is the value key, so a resolver dupe within one ADR
+        collapses to one entry instead of two."""
+        from services.cpt.engine import match_constraints
+
+        original = sample_constraints[0]
+        dupe = dataclasses.replace(original, justification="a second resolver pass said the same")
+        adg = ADG(nodes=sample_adg.nodes, edges=sample_adg.edges, constraint_edges=[original, dupe])
+        matched = match_constraints(adg)
+        assert len(matched) == 1
+        assert next(iter(matched.values())).constraint is original  # first wins
+
 
 def test_detect_output_is_hash_seed_independent() -> None:
     """Cross-process determinism can only be checked in two processes (#165): a
@@ -276,6 +291,25 @@ def test_detect_output_is_hash_seed_independent() -> None:
 # ===========================================================================
 # 2. check_structural_predicates: PROHIBITS_* evaluation
 # ===========================================================================
+
+
+class TestBuildAdjacencyDelegate:
+    """`_build_adjacency` survives #173 as a shim over `ADG.out_edges`."""
+
+    def test_delegate_agrees_with_the_index(self) -> None:
+        from services.cpt.engine import _build_adjacency
+
+        edges = [
+            Edge(source="app.api.users", target="app.auth.middleware", kind="IMPORTS"),
+            Edge(source="app.api.users", target="app.models.user", kind="IMPORTS"),
+            Edge(source="app.auth.middleware", target="app.models.user", kind="CALLS"),
+        ]
+        adg = ADG(edges=edges)
+        assert _build_adjacency(edges) == adg.out_edges
+        # a raw set still works — the seam the tests use — but a set has no order,
+        # so only the bucket *contents* are pinned
+        assert {k: set(v) for k, v in _build_adjacency(set(edges)).items()} == \
+            {k: set(v) for k, v in adg.out_edges.items()}
 
 
 class TestCheckStructuralPredicates:
@@ -348,7 +382,7 @@ class TestCheckStructuralPredicates:
         assert "gpiozero" in paths
 
     def test_prohibits_dependency_violated(self) -> None:
-        from services.cpt.engine import MatchedConstraint, check_structural_predicates, _build_adjacency
+        from services.cpt.engine import MatchedConstraint, constraint_key, check_structural_predicates, _build_adjacency
         from services.resolver import MatchStatus
 
         constraint = ConstraintEdge(
@@ -363,7 +397,7 @@ class TestCheckStructuralPredicates:
             Edge(source="app.api.users", target="app.models.user", kind="IMPORTS"),
         })
         matched = {
-            id(constraint): MatchedConstraint(
+            constraint_key(constraint): MatchedConstraint(
                 constraint=constraint,
                 subject_matches=[(FQN.from_dotted("app.api.users"), MatchStatus.WILDCARD)],
                 object_matches=[(FQN.from_dotted("app.models.user"), MatchStatus.WILDCARD)],
@@ -378,7 +412,7 @@ class TestCheckStructuralPredicates:
         module namespace-imports the package itself fires exactly once, at the
         module that genuinely imports the object. Pre-fix this fired at
         pkg.helper too (IMPORTS pkg -> CONTAINS subtree cascade)."""
-        from services.cpt.engine import MatchedConstraint, check_structural_predicates, _build_adjacency
+        from services.cpt.engine import MatchedConstraint, constraint_key, check_structural_predicates, _build_adjacency
         from services.resolver import MatchStatus
 
         constraint = ConstraintEdge(
@@ -396,7 +430,7 @@ class TestCheckStructuralPredicates:
             Edge(source="pkg.gpio_driver", target="gpiozero", kind="IMPORTS"),
         })
         matched = {
-            id(constraint): MatchedConstraint(
+            constraint_key(constraint): MatchedConstraint(
                 constraint=constraint,
                 subject_matches=[
                     (FQN.from_dotted("pkg.helper"), MatchStatus.WILDCARD),
@@ -410,7 +444,7 @@ class TestCheckStructuralPredicates:
         assert str(violations[0].matched_fqn) == "pkg.gpio_driver"
 
     def test_prohibits_dependency_not_violated(self) -> None:
-        from services.cpt.engine import MatchedConstraint, check_structural_predicates, _build_adjacency
+        from services.cpt.engine import MatchedConstraint, constraint_key, check_structural_predicates, _build_adjacency
         from services.resolver import MatchStatus
 
         constraint = ConstraintEdge(
@@ -425,7 +459,7 @@ class TestCheckStructuralPredicates:
             Edge(source="app.api.users", target="app.auth.middleware", kind="IMPORTS"),
         })
         matched = {
-            id(constraint): MatchedConstraint(
+            constraint_key(constraint): MatchedConstraint(
                 constraint=constraint,
                 subject_matches=[(FQN.from_dotted("app.api.users"), MatchStatus.WILDCARD)],
                 object_matches=[(FQN.from_dotted("app.models.user"), MatchStatus.WILDCARD)],
@@ -435,7 +469,7 @@ class TestCheckStructuralPredicates:
         assert len(violations) == 0
 
     def test_prohibits_implementation_violated(self) -> None:
-        from services.cpt.engine import MatchedConstraint, check_structural_predicates, _build_adjacency
+        from services.cpt.engine import MatchedConstraint, constraint_key, check_structural_predicates, _build_adjacency
         from services.resolver import MatchStatus
 
         constraint = ConstraintEdge(
@@ -450,7 +484,7 @@ class TestCheckStructuralPredicates:
             Edge(source="app.api", target="app.auth.middleware", kind="CONTAINS"),
         })
         matched = {
-            id(constraint): MatchedConstraint(
+            constraint_key(constraint): MatchedConstraint(
                 constraint=constraint,
                 subject_matches=[(FQN.from_dotted("app.api"), MatchStatus.WILDCARD)],
                 object_matches=[(FQN.from_dotted("app.auth.middleware"), MatchStatus.EXACT)],
@@ -469,7 +503,7 @@ class TestCheckChangeTriggeredPredicates:
     """REQUIRES_* constraints evaluated per changed_fqn."""
 
     def test_requires_dependency_violated(self) -> None:
-        from services.cpt.engine import MatchedConstraint, check_change_triggered_predicates, _build_adjacency
+        from services.cpt.engine import MatchedConstraint, constraint_key, check_change_triggered_predicates, _build_adjacency
         from services.resolver import MatchStatus
 
         constraint = ConstraintEdge(
@@ -483,7 +517,7 @@ class TestCheckChangeTriggeredPredicates:
         # Empty adjacency: BFS from prefix 'app.api' reaches nothing → violation
         adjacency = _build_adjacency(set())
         matched = {
-            id(constraint): MatchedConstraint(
+            constraint_key(constraint): MatchedConstraint(
                 constraint=constraint,
                 subject_matches=[(FQN.from_dotted("app.api.orders"), MatchStatus.WILDCARD)],
                 object_matches=[(FQN.from_dotted("app.auth.middleware"), MatchStatus.EXACT)],
@@ -497,7 +531,7 @@ class TestCheckChangeTriggeredPredicates:
         assert violations[0].evidence == "app.api.orders has no dependency on any module matching app.auth.middleware"
 
     def test_requires_dependency_not_violated(self) -> None:
-        from services.cpt.engine import MatchedConstraint, check_change_triggered_predicates, _build_adjacency
+        from services.cpt.engine import MatchedConstraint, constraint_key, check_change_triggered_predicates, _build_adjacency
         from services.resolver import MatchStatus
 
         constraint = ConstraintEdge(
@@ -514,7 +548,7 @@ class TestCheckChangeTriggeredPredicates:
             Edge(source="app.api.users", target="app.auth.middleware", kind="IMPORTS"),
         })
         matched = {
-            id(constraint): MatchedConstraint(
+            constraint_key(constraint): MatchedConstraint(
                 constraint=constraint,
                 subject_matches=[(FQN.from_dotted("app.api.users"), MatchStatus.WILDCARD)],
                 object_matches=[(FQN.from_dotted("app.auth.middleware"), MatchStatus.EXACT)],
@@ -525,7 +559,7 @@ class TestCheckChangeTriggeredPredicates:
         assert len(violations) == 0
 
     def test_requires_implementation_violated(self) -> None:
-        from services.cpt.engine import MatchedConstraint, check_change_triggered_predicates, _build_adjacency
+        from services.cpt.engine import MatchedConstraint, constraint_key, check_change_triggered_predicates, _build_adjacency
         from services.resolver import MatchStatus
 
         constraint = ConstraintEdge(
@@ -538,7 +572,7 @@ class TestCheckChangeTriggeredPredicates:
         )
         adjacency = _build_adjacency(set())
         matched = {
-            id(constraint): MatchedConstraint(
+            constraint_key(constraint): MatchedConstraint(
                 constraint=constraint,
                 subject_matches=[(FQN.from_dotted("app.middleware"), MatchStatus.EXACT)],
                 object_matches=[(FQN.from_dotted("app.auth.middleware"), MatchStatus.EXACT)],
@@ -550,7 +584,7 @@ class TestCheckChangeTriggeredPredicates:
         assert violations[0].evidence == "app.middleware does not implement any module matching app.auth.middleware"
 
     def test_requires_wildcard_multiple_objects_semantics(self) -> None:
-        from services.cpt.engine import MatchedConstraint, check_change_triggered_predicates, _build_adjacency
+        from services.cpt.engine import MatchedConstraint, constraint_key, check_change_triggered_predicates, _build_adjacency
         from services.resolver import MatchStatus
 
         constraint = ConstraintEdge(
@@ -565,7 +599,7 @@ class TestCheckChangeTriggeredPredicates:
         # BFS starts from prefix 'app.api'
         adjacency_empty = _build_adjacency(set())
         matched = {
-            id(constraint): MatchedConstraint(
+            constraint_key(constraint): MatchedConstraint(
                 constraint=constraint,
                 subject_matches=[(FQN.from_dotted("app.api.orders"), MatchStatus.WILDCARD)],
                 object_matches=[
@@ -589,7 +623,7 @@ class TestCheckChangeTriggeredPredicates:
         assert len(violations_partial) == 0
 
     def test_requires_implementation_not_violated(self) -> None:
-        from services.cpt.engine import MatchedConstraint, check_change_triggered_predicates, _build_adjacency
+        from services.cpt.engine import MatchedConstraint, constraint_key, check_change_triggered_predicates, _build_adjacency
         from services.resolver import MatchStatus
 
         constraint = ConstraintEdge(
@@ -605,7 +639,7 @@ class TestCheckChangeTriggeredPredicates:
             Edge(source="app.middleware.auth", target="app.auth.middleware", kind="CALLS"),
         })
         matched = {
-            id(constraint): MatchedConstraint(
+            constraint_key(constraint): MatchedConstraint(
                 constraint=constraint,
                 subject_matches=[(FQN.from_dotted("app.middleware"), MatchStatus.EXACT)],
                 object_matches=[(FQN.from_dotted("app.auth.middleware"), MatchStatus.EXACT)],
@@ -616,7 +650,7 @@ class TestCheckChangeTriggeredPredicates:
         assert len(violations) == 0
 
     def test_requires_skips_constraint_if_changed_not_in_subject(self) -> None:
-        from services.cpt.engine import MatchedConstraint, check_change_triggered_predicates, _build_adjacency
+        from services.cpt.engine import MatchedConstraint, constraint_key, check_change_triggered_predicates, _build_adjacency
         from services.resolver import MatchStatus
 
         constraint = ConstraintEdge(
@@ -629,7 +663,7 @@ class TestCheckChangeTriggeredPredicates:
         )
         adjacency = _build_adjacency(set())
         matched = {
-            id(constraint): MatchedConstraint(
+            constraint_key(constraint): MatchedConstraint(
                 constraint=constraint,
                 subject_matches=[(FQN.from_dotted("app.api.users"), MatchStatus.WILDCARD)],
                 object_matches=[(FQN.from_dotted("app.auth.middleware"), MatchStatus.EXACT)],
@@ -943,6 +977,44 @@ class TestDetect:
         assert len(result.orphans) >= 1
         assert any(c.adr_id == "ADR-999" for c in result.orphans)
 
+    def test_orphan_computation_survives_a_copy(
+        self, sample_adg: ADG, sample_constraints: list[ConstraintEdge]
+    ) -> None:
+        """#171 regression: an edge copied by `dataclasses.replace` is a different
+        object, so detect's orphan test (`key not in matched`) reported every
+        copied constraint as an orphan when the key was `id()`. Matching the
+        originals and then querying the copies is the ordering #170's transforms
+        introduce, and the value key makes it a no-op."""
+        from services.cpt.engine import constraint_key, detect, match_constraints
+
+        orphan = ConstraintEdge(
+            subject="app.nonexistent",
+            predicate=PredicateType.PROHIBITS_DEPENDENCY,
+            object="also.nonexistent",
+            justification="test",
+            adr_id="ADR-999",
+            adr_path="docs/adr/999.md",
+        )
+        adg = ADG(
+            nodes=sample_adg.nodes, edges=sample_adg.edges,
+            constraint_edges=[*sample_constraints, orphan],
+        )
+        matched = match_constraints(adg)
+        anchored = sample_constraints[0]
+        assert constraint_key(dataclasses.replace(anchored)) in matched
+        assert constraint_key(dataclasses.replace(orphan)) not in matched
+
+        diff = DiffResult(
+            to_sha="abc123",
+            from_sha="def456",
+            changed_files=[FileChange(path="app/api/users.py", status="modified")],
+            changed_fqns=[_changed_fqn("app.api.users")],
+        )
+        result = detect(diff, adg)
+        orphan_ids = {c.adr_id for c in result.orphans}
+        assert "ADR-999" in orphan_ids
+        assert "ADR-003" not in orphan_ids
+
     def test_detect_skips_tooling_scoped_constraints(
         self, sample_adg: ADG, sample_constraints: list[ConstraintEdge]
     ) -> None:
@@ -1143,6 +1215,24 @@ class TestSelfLoopConstraint:
         assert len(result.self_loop_constraints) == 1
         assert result.self_loop_constraints[0].adr_id == "ADR-010"
 
+    def test_the_two_guards_are_complementary_not_redundant(self) -> None:
+        """Construction is guarded by ConstraintEdge.__post_init__; a self-loop
+        that arrives some other way (mutation, store deserialization) is guarded
+        by detect's filter. Neither layer alone covers both cases."""
+        with pytest.raises(ValueError, match="subject and object must differ"):
+            ConstraintEdge(
+                subject="app.auth.middleware",
+                predicate=PredicateType.REQUIRES_IMPLEMENTATION,
+                object="app.auth.middleware",
+                justification="Only auth middleware implements auth.",
+                adr_id="ADR-010",
+                adr_path="docs/adr/010.md",
+            )
+        # The graph does not re-validate on the way in, so the mutated edge is
+        # accepted by ADG — detect is what catches it (tests above).
+        mutated = TestSelfLoopConstraint._make_self_loop()
+        assert ADG(constraint_edges=[mutated]).constraint_edges == (mutated,)
+
     def test_detect_mixed_self_loop_and_normal(self, sample_adg: ADG) -> None:
         from services.cpt.engine import detect
 
@@ -1223,7 +1313,7 @@ class TestDevToolFiltering:
 
     def test_prohibits_dependency_ignores_dev_tool_path(self) -> None:
         """A module importing pytest should NOT trigger PROHIBITS_DEPENDENCY."""
-        from services.cpt.engine import MatchedConstraint, check_structural_predicates, _build_adjacency
+        from services.cpt.engine import MatchedConstraint, constraint_key, check_structural_predicates, _build_adjacency
         from services.resolver import MatchStatus
 
         constraint = ConstraintEdge(
@@ -1242,7 +1332,7 @@ class TestDevToolFiltering:
             "pytest": DependencyRole.DEV_TOOL,
         }
         matched = {
-            id(constraint): MatchedConstraint(
+            constraint_key(constraint): MatchedConstraint(
                 constraint=constraint,
                 subject_matches=[(FQN.from_dotted("app.api.users"), MatchStatus.WILDCARD)],
                 object_matches=[(FQN.from_dotted("pytest"), MatchStatus.EXACT)],
@@ -1253,7 +1343,7 @@ class TestDevToolFiltering:
 
     def test_prohibits_dependency_flags_unknown_external(self) -> None:
         """A module importing flask SHOULD trigger PROHIBITS_DEPENDENCY."""
-        from services.cpt.engine import MatchedConstraint, check_structural_predicates, _build_adjacency
+        from services.cpt.engine import MatchedConstraint, constraint_key, check_structural_predicates, _build_adjacency
         from services.resolver import MatchStatus
 
         constraint = ConstraintEdge(
@@ -1272,7 +1362,7 @@ class TestDevToolFiltering:
             "flask": DependencyRole.UNKNOWN,
         }
         matched = {
-            id(constraint): MatchedConstraint(
+            constraint_key(constraint): MatchedConstraint(
                 constraint=constraint,
                 subject_matches=[(FQN.from_dotted("app.api.users"), MatchStatus.WILDCARD)],
                 object_matches=[(FQN.from_dotted("flask"), MatchStatus.EXACT)],
@@ -1283,7 +1373,7 @@ class TestDevToolFiltering:
 
     def test_prohibits_dependency_suppresses_dev_tool_object(self) -> None:
         """PROHIBITS_DEPENDENCY with DEV_TOOL object is suppressed entirely."""
-        from services.cpt.engine import MatchedConstraint, check_structural_predicates, _build_adjacency
+        from services.cpt.engine import MatchedConstraint, constraint_key, check_structural_predicates, _build_adjacency
         from services.resolver import MatchStatus
 
         constraint = ConstraintEdge(
@@ -1302,7 +1392,7 @@ class TestDevToolFiltering:
             "pytest": DependencyRole.DEV_TOOL,
         }
         matched = {
-            id(constraint): MatchedConstraint(
+            constraint_key(constraint): MatchedConstraint(
                 constraint=constraint,
                 subject_matches=[(FQN.from_dotted("app.api.users"), MatchStatus.WILDCARD)],
                 object_matches=[(FQN.from_dotted("pytest"), MatchStatus.EXACT)],
@@ -1313,7 +1403,7 @@ class TestDevToolFiltering:
 
     def test_requires_dependency_suppresses_dev_tool_object(self) -> None:
         """REQUIRES_DEPENDENCY targeting a DEV_TOOL produces no violation."""
-        from services.cpt.engine import MatchedConstraint, check_change_triggered_predicates, _build_adjacency
+        from services.cpt.engine import MatchedConstraint, constraint_key, check_change_triggered_predicates, _build_adjacency
         from services.resolver import MatchStatus
 
         constraint = ConstraintEdge(
@@ -1333,7 +1423,7 @@ class TestDevToolFiltering:
             "pytest": DependencyRole.DEV_TOOL,
         }
         matched = {
-            id(constraint): MatchedConstraint(
+            constraint_key(constraint): MatchedConstraint(
                 constraint=constraint,
                 subject_matches=[(FQN.from_dotted("app.api"), MatchStatus.WILDCARD)],
                 object_matches=[(FQN.from_dotted("pytest"), MatchStatus.EXACT)],
@@ -1350,7 +1440,7 @@ class TestDevToolFiltering:
 
     def test_requires_dependency_flags_unknown_object(self) -> None:
         """REQUIRES_DEPENDENCY targeting an UNKNOWN (application) object still produces violation."""
-        from services.cpt.engine import MatchedConstraint, check_change_triggered_predicates, _build_adjacency
+        from services.cpt.engine import MatchedConstraint, constraint_key, check_change_triggered_predicates, _build_adjacency
         from services.resolver import MatchStatus
 
         constraint = ConstraintEdge(
@@ -1370,7 +1460,7 @@ class TestDevToolFiltering:
             "django": DependencyRole.UNKNOWN,
         }
         matched = {
-            id(constraint): MatchedConstraint(
+            constraint_key(constraint): MatchedConstraint(
                 constraint=constraint,
                 subject_matches=[(FQN.from_dotted("app.api"), MatchStatus.WILDCARD)],
                 object_matches=[(FQN.from_dotted("django"), MatchStatus.EXACT)],
@@ -1484,7 +1574,7 @@ class TestRequiresImplementationInherits:
 
     @staticmethod
     def _matched() -> dict:
-        from services.cpt.engine import MatchedConstraint
+        from services.cpt.engine import MatchedConstraint, constraint_key
         from services.resolver import MatchStatus
 
         constraint = ConstraintEdge(
@@ -1496,7 +1586,7 @@ class TestRequiresImplementationInherits:
             adr_path="docs/adr/auth1.md",
         )
         return {
-            id(constraint): MatchedConstraint(
+            constraint_key(constraint): MatchedConstraint(
                 constraint=constraint,
                 subject_matches=[(FQN.from_dotted("app.api.orders"), MatchStatus.WILDCARD)],
                 object_matches=[(FQN.from_dotted("app.auth.AuthMiddleware"), MatchStatus.EXACT)],
@@ -1532,7 +1622,7 @@ class TestRequiresImplementationInherits:
         assert len(violations) == 1
 
     def test_prohibits_implementation_flags_inherits(self) -> None:
-        from services.cpt.engine import MatchedConstraint, check_structural_predicates, _build_adjacency
+        from services.cpt.engine import MatchedConstraint, constraint_key, check_structural_predicates, _build_adjacency
         from services.resolver import MatchStatus
 
         constraint = ConstraintEdge(
@@ -1547,7 +1637,7 @@ class TestRequiresImplementationInherits:
             Edge(source="app.api", target="app.auth.middleware", kind="INHERITS"),
         })
         matched = {
-            id(constraint): MatchedConstraint(
+            constraint_key(constraint): MatchedConstraint(
                 constraint=constraint,
                 subject_matches=[(FQN.from_dotted("app.api"), MatchStatus.WILDCARD)],
                 object_matches=[(FQN.from_dotted("app.auth.middleware"), MatchStatus.EXACT)],
@@ -1656,12 +1746,14 @@ class TestModuleScopeSeeding:
         """A method re-anchors through its class ancestor to the enclosing module."""
         from services.cpt.engine import detect
 
-        adg = self._module_scope_adg()
-        adg.nodes.append(FQNNode(fqn=FQN.from_dotted("app.routes.users.Gate"), kind=FQNKind.CLASS, file_path="app/routes/users.py", line_start=12, line_end=20, start_byte=0, end_byte=0))
-        adg.nodes.append(FQNNode(fqn=FQN.from_dotted("app.routes.users.Gate.open"), kind=FQNKind.METHOD, file_path="app/routes/users.py", line_start=14, line_end=18, start_byte=0, end_byte=0))
-        adg.edges.append(Edge(source="app.routes.users", target="app.routes.users.Gate", kind="CONTAINS"))
-        adg.edges.append(Edge(source="app.routes.users.Gate", target="app.routes.users.Gate.open", kind="CONTAINS"))
-        constraints = [
+        adg = self._module_scope_adg().with_nodes(
+            FQNNode(fqn=FQN.from_dotted("app.routes.users.Gate"), kind=FQNKind.CLASS, file_path="app/routes/users.py", line_start=12, line_end=20, start_byte=0, end_byte=0),
+            FQNNode(fqn=FQN.from_dotted("app.routes.users.Gate.open"), kind=FQNKind.METHOD, file_path="app/routes/users.py", line_start=14, line_end=18, start_byte=0, end_byte=0),
+        ).with_edges(
+            Edge(source="app.routes.users", target="app.routes.users.Gate", kind="CONTAINS"),
+            Edge(source="app.routes.users.Gate", target="app.routes.users.Gate.open", kind="CONTAINS"),
+        )
+        adg = adg.with_constraints(
             ConstraintEdge(
                 subject="app.routes.users.*",
                 predicate=PredicateType.PROHIBITS_DEPENDENCY,
@@ -1670,8 +1762,7 @@ class TestModuleScopeSeeding:
                 adr_id="ADR-001",
                 adr_path="docs/adr/001.md",
             ),
-        ]
-        adg = ADG(nodes=adg.nodes, edges=adg.edges, constraint_edges=constraints)
+        )
         diff = DiffResult(
             to_sha="abc123",
             from_sha="def456",
@@ -1687,10 +1778,11 @@ class TestModuleScopeSeeding:
     def _class_scope_adg() -> ADG:
         """app.routes.users imports the model and the service at module level;
         Gate (class) has no own edges."""
-        adg = TestModuleScopeSeeding._module_scope_adg()
-        adg.nodes.append(FQNNode(fqn=FQN.from_dotted("app.routes.users.Gate"), kind=FQNKind.CLASS, file_path="app/routes/users.py", line_start=12, line_end=20, start_byte=0, end_byte=0))
-        adg.edges.append(Edge(source="app.routes.users", target="app.routes.users.Gate", kind="CONTAINS"))
-        return adg
+        return TestModuleScopeSeeding._module_scope_adg().with_nodes(
+            FQNNode(fqn=FQN.from_dotted("app.routes.users.Gate"), kind=FQNKind.CLASS, file_path="app/routes/users.py", line_start=12, line_end=20, start_byte=0, end_byte=0),
+        ).with_edges(
+            Edge(source="app.routes.users", target="app.routes.users.Gate", kind="CONTAINS"),
+        )
 
     def test_class_scope_requires_satisfied_by_enclosing_module_import(self) -> None:
         """Issue 124 (option a, uniform seeding): a class scope inherits its

@@ -10,15 +10,15 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from services.adg.merge import merge_constraint_edges
 from services.adg.treesitter import parse_repo
 from services.cpt.dismissal import Dismissal, filter_dismissed
 from services.cpt.engine import CPTResult, Violation, detect as cpt_detect
-from services.cpt.diff_processor import process_diff
+from services.cpt.diff_processor import augmented, process_diff
 from services.cpt.git_adapter import GitAdapter
 from services.graph.connector import GraphStore
-from services.models import ADG, ChangedFQN, Diff, ConstraintEdge, DiffResult, FileChange, FQNKind, FQNNode
-from services.fqn import FQN
-from services.pipeline import adg_with_specificity, augment_immutable
+from services.models import ADG, ChangedFQN, Diff, ConstraintEdge, DiffResult, FileChange
+from services.pipeline import adg_with_specificity
 
 log = logging.getLogger(__name__)
 
@@ -37,42 +37,15 @@ class UpdateResult:
 
 
 def merge_preserved_constraints(adg: ADG, constraint_edges: list[ConstraintEdge], project_root: Path | None = None) -> ADG:
-    """Merge preserved constraint edges into a fresh ADG.
+    """One-line delegate: preserved constraints merge exactly like fresh ones.
 
-    Creates EXTERNAL nodes for any constraint endpoint FQN not present in
-    the ADG. Returns a new ADG with constraint_edges attached.
-
-    project_root is accepted for API compatibility but not used here;
-    this function replaces the LLM-based merge_constraint_edges step with
-    a direct merge of already-resolved constraint edges.
+    Wraps resolved ConstraintEdges (the LLM-based merge step is skipped) in the
+    same chain `build_seed` uses, so the wipe-then-restore path and the seed path
+    cannot drift apart (#174). Wildcard endpoints resolve to their base namespace
+    there, and roles are classified there too — this path used to leave them
+    INTERNAL, which was the bug.
     """
-    existing_fqns = {str(n.fqn) for n in adg.nodes}
-    new_nodes: list[FQNNode] = []
-    seen: set[str] = set()
-
-    for ce in constraint_edges:
-        for raw_fqn in (ce.subject, ce.object):
-            # Wildcard patterns (users.views.*) are not concrete FQNs;
-            # resolve to the base namespace and check that instead.
-            fqn_str = raw_fqn.removesuffix(".*")
-            if not fqn_str or fqn_str in existing_fqns or fqn_str in seen:
-                continue
-            new_nodes.append(FQNNode(
-                fqn=FQN.from_dotted(fqn_str),
-                kind=FQNKind.EXTERNAL,
-                file_path="",
-                line_start=-1,
-                line_end=-1,
-                start_byte=0,
-                end_byte=0,
-            ))
-            seen.add(fqn_str)
-
-    return ADG(
-        nodes=adg.nodes + new_nodes,
-        edges=list(adg.edges),
-        constraint_edges=list(constraint_edges),
-    )
+    return merge_constraint_edges(adg, constraint_edges, project_root)
 
 
 def commit_update(
@@ -127,7 +100,7 @@ def commit_update(
     # 9. Get commit diff + process
     diff = GitAdapter().get_diff(repo_path, to_sha=to_sha)
     diff_result = process_diff(diff)
-    merged = augment_immutable(merged, diff)
+    merged = augmented(merged, diff)
 
     # 10. CPT detect
     cpt_result = cpt_detect(diff_result, merged)
