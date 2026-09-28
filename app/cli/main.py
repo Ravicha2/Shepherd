@@ -541,11 +541,18 @@ def violation_dismiss(
     short_id: str = typer.Argument(..., help="Short ID (5 hex chars) of the violation to dismiss"),
     repo: str = typer.Option(..., "--repo", "-r", help="Repository ID from repos.yaml"),
     commit: str | None = typer.Option(None, "--commit", "-c", help="Commit SHA (default: HEAD)"),
+    changed_scopes: list[str] = typer.Option(
+        None, "--changed-scopes",
+        help="Treat every node under each prefix as the changed set, ignoring the git "
+             "diff; pass an empty prefix for a case whose changed set is empty (#163). "
+             "Must match the scopes `violation list` used, or its short_id is unfindable "
+             "here (the dismissal identity is unaffected either way).",
+    ),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ) -> None:
     """Dismiss a violation by its short ID. Violations are ephemeral; must match current detection results."""
     console.print(f"[bold]Detecting[/] violations in [cyan]{repo}[/] (commit: {commit or 'HEAD'})")
-    dr = _run_detection(repo, commit)
+    dr = _run_detection(repo, commit, changed_scopes=changed_scopes)
 
     match = None
     for v in dr.cpt_result.violations:

@@ -18,8 +18,10 @@ from typer.testing import CliRunner
 import cli.main as main
 from cli.config import RepoConfig
 from cli.main import app, scoped_changes
+from services.cpt.dismissal import violation_short_id
 from services.fqn import FQN
 from services.models import ADG, DiffResult, FQNKind, FQNNode
+from tests.cli.test_violation_cli import _make_detection_result
 
 ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
 runner = CliRunner()
@@ -155,6 +157,35 @@ class TestChangedScopesOnTheCli:
 
         assert result.exit_code == 0, result.output
         assert not mock_adapter.return_value.get_diff.called
+
+    @patch("cli.main.GraphStore")
+    @patch.object(main, "_get_repo")
+    def test_violation_dismiss_accepts_the_flag(
+        self, mock_get_repo, mock_store_cls, tmp_path
+    ) -> None:
+        """The short_id `list --changed-scopes` prints must be dismissable.
+
+        `dismiss` re-detects to honour its "must match current detection
+        results" contract; without the flag it reads the git diff instead and
+        reports the short_id as unknown (#176).
+        """
+        repo_cfg, store = _stub_repo(tmp_path, _adg("app.service.UserService"))
+        mock_get_repo.return_value = repo_cfg
+        mock_store_cls.return_value = store
+
+        dr = _make_detection_result()
+        short_id = violation_short_id(dr.cpt_result.violations[0])
+
+        with patch.object(main, "_run_detection", return_value=dr) as run_detection:
+            result = runner.invoke(
+                app,
+                ["violation", "dismiss", short_id, "--repo", "test-repo",
+                 "--changed-scopes", "app.service"],
+            )
+
+        assert run_detection.call_args.kwargs["changed_scopes"] == ["app.service"]
+        assert result.exit_code == 0, result.output
+        assert store.store_dismissal.called
 
     @patch("cli.main.GraphStore")
     @patch.object(main, "GitAdapter")
