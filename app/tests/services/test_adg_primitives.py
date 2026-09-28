@@ -28,6 +28,7 @@ from services.models import (
     FQNNode,
     PredicateType,
 )
+from services.pipeline import adg_with_specificity
 
 
 def _module(name: str) -> FQNNode:
@@ -176,11 +177,29 @@ class TestPrimitives:
 
 
 # ===========================================================================
-# Losslessness: every field of every edge survives every transform
+# Losslessness: every field of every edge survives every transform (#159)
 # ===========================================================================
 
 
 class TestLossless:
+    def test_specificity_transform_preserves_every_other_field(self) -> None:
+        adg = _graph()
+        result = adg_with_specificity(adg)
+        assert len(result.constraint_edges) == len(adg.constraint_edges)
+        for before, after in zip(adg.constraint_edges, result.constraint_edges):
+            assert _signature(after, frozenset({"specificity"})) == _signature(before, frozenset({"specificity"}))
+            assert after.specificity > 0.0
+        assert result.nodes == adg.nodes
+        assert result.edges == adg.edges
+
+    def test_tooling_scope_survives_the_specificity_transform(self) -> None:
+        """The #159 regression, as a test rather than a docstring: the old
+        hand-written field-by-field rebuild dropped `scope` and reverted every
+        edge to RUNTIME."""
+        result = adg_with_specificity(_graph())
+        scopes = [e.scope for e in result.constraint_edges]
+        assert scopes == [ConstraintScope.RUNTIME, ConstraintScope.TOOLING]
+
     def test_external_node_transform_preserves_existing_members(self) -> None:
         adg = _graph()
         result = add_external_nodes(adg)

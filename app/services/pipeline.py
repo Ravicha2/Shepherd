@@ -12,7 +12,7 @@ Usage (tests, pure data):
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from services.adg.merge import add_external_nodes, merge_constraint_edges
@@ -46,25 +46,12 @@ def adg_with_specificity(adg: ADG) -> ADG:
     ConstraintEdges start with specificity=0.0 from the unified resolver;
     this computes pattern depth + exact bonus for each edge.
 
-    `scope` is carried through: rebuilding the dataclass would otherwise default
-    every edge back to RUNTIME and undo the resolver's per-edge verdict (#159).
+    Lossless by construction: `dataclasses.replace` copies every field, so
+    `scope` survives. The hand-written field-by-field rebuild this replaced
+    forgot it and silently reverted every edge to RUNTIME (#159).
     """
-    new_edges: list[ConstraintEdge] = []
-    for edge in adg.constraint_edges:
-        new_edges.append(ConstraintEdge(
-            subject=edge.subject,
-            predicate=edge.predicate,
-            object=edge.object,
-            justification=edge.justification,
-            adr_id=edge.adr_id,
-            adr_path=edge.adr_path,
-            specificity=pattern_specificity(edge.subject),
-            scope=edge.scope,
-        ))
-    return ADG(
-        nodes=list(adg.nodes),
-        edges=list(adg.edges),
-        constraint_edges=new_edges,
+    return adg.map_constraints(
+        lambda edge: replace(edge, specificity=pattern_specificity(edge.subject))
     )
 
 
