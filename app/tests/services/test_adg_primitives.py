@@ -112,6 +112,99 @@ class TestFrozen:
 
 
 # ===========================================================================
+# Derived indexes (#173): each agrees with the linear scan it replaces
+# ===========================================================================
+
+
+def _duplicate_fqn_graph() -> ADG:
+    """Two nodes sharing one FQN — the HA case (88,508 nodes, 88,405 FQNs)."""
+    return ADG(
+        nodes=[
+            _module("app"),
+            FQNNode(fqn=FQN.from_dotted("app.dup"), kind=FQNKind.MODULE,
+                    file_path="app/dup/__init__.py", line_start=1, line_end=1, start_byte=0, end_byte=0),
+            FQNNode(fqn=FQN.from_dotted("app.dup"), kind=FQNKind.CLASS,
+                    file_path="app/dup.py", line_start=1, line_end=9, start_byte=0, end_byte=40),
+        ],
+        edges=[
+            Edge(source="app", target="app.dup", kind="CONTAINS"),
+            Edge(source="app.dup", target="os", kind="IMPORTS"),
+            Edge(source="app.dup", target="pkg.Base", kind="INHERITS"),
+        ],
+    )
+
+
+class TestIndexes:
+    def test_fqns_is_sorted_and_deduped(self) -> None:
+        assert _duplicate_fqn_graph().fqns == (FQN.from_dotted("app"), FQN.from_dotted("app.dup"))
+
+    def test_fqns_matches_the_linear_sort(self) -> None:
+        adg = _graph()
+        assert adg.fqns == tuple(sorted({node.fqn for node in adg.nodes}, key=str))
+
+    def test_fqn_set_matches_the_linear_scan(self) -> None:
+        adg = _graph()
+        assert adg.fqn_set == frozenset(str(node.fqn) for node in adg.nodes)
+        assert isinstance(adg.fqn_set, frozenset)
+
+    def test_node_of_matches_the_linear_scan(self) -> None:
+        assert _graph().node_of == {str(node.fqn): node for node in _graph().nodes}
+
+    def test_node_of_last_wins_on_a_duplicate_fqn(self) -> None:
+        """The dict comprehension it replaces was last-wins; keep that, not first."""
+        adg = _duplicate_fqn_graph()
+        assert adg.node_of["app.dup"] is adg.nodes[-1]
+
+    def test_role_of_matches_the_linear_scan(self) -> None:
+        adg = ADG(nodes=[_module("app"), FQNNode.external("requests", role=DependencyRole.DEV_TOOL)])
+        assert adg.role_of == {str(node.fqn): node.role for node in adg.nodes}
+        assert adg.role_of["requests"] is DependencyRole.DEV_TOOL
+
+    def test_out_edges_matches_the_linear_scan(self) -> None:
+        adg = _duplicate_fqn_graph()
+        expected: dict[str, list[Edge]] = {}
+        for edge in adg.edges:
+            expected.setdefault(edge.source, []).append(edge)
+        assert {k: list(v) for k, v in adg.out_edges.items()} == expected
+
+    def test_out_edges_omits_sources_with_no_out_edges(self) -> None:
+        assert "app.repo" not in _graph().out_edges
+
+    def test_edges_from_matches_the_linear_filter(self) -> None:
+        adg = _duplicate_fqn_graph()
+        assert adg.edges_from("app.dup") == tuple(adg.edges[1:])
+        assert adg.edges_from("app.dup", "INHERITS") == (Edge(source="app.dup", target="pkg.Base", kind="INHERITS"),)
+        assert adg.edges_from("app.dup", "IMPORTS", "INHERITS") == tuple(adg.edges[1:])
+        assert adg.edges_from("app.dup", "CALLS") == ()
+        assert adg.edges_from("nonexistent") == ()
+
+    def test_indexes_are_read_only(self) -> None:
+        """A memoised index that a caller can mutate is the invalidation bug the
+        frozen-value design exists to avoid."""
+        adg = _graph()
+        with pytest.raises(TypeError):
+            adg.node_of["app"] = _module("app")  # type: ignore[index]
+        with pytest.raises(TypeError):
+            adg.out_edges["app"] = ()  # type: ignore[index]
+
+    def test_memoisation_does_not_leak_across_a_transform(self) -> None:
+        """A transform returns a NEW value: the parent's index is not inherited,
+        and the child's index is not stale."""
+        parent = _graph()
+        other = FQN.from_dotted("app.other")
+        assert other not in parent.fqns  # warm the parent's index
+        child = parent.with_nodes(_module("app.other")).with_edges(
+            Edge(source="app.other", target="os", kind="IMPORTS")
+        )
+        assert child.fqns != parent.fqns
+        assert other in child.fqns
+        assert other not in parent.fqns
+        assert child.out_edges["app.other"] == (Edge(source="app.other", target="os", kind="IMPORTS"),)
+        assert "app.other" not in parent.out_edges
+        assert child.node_of is not parent.node_of
+
+
+# ===========================================================================
 # Primitives
 # ===========================================================================
 

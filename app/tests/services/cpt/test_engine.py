@@ -293,6 +293,25 @@ def test_detect_output_is_hash_seed_independent() -> None:
 # ===========================================================================
 
 
+class TestBuildAdjacencyDelegate:
+    """`_build_adjacency` survives #173 as a shim over `ADG.out_edges`."""
+
+    def test_delegate_agrees_with_the_index(self) -> None:
+        from services.cpt.engine import _build_adjacency
+
+        edges = [
+            Edge(source="app.api.users", target="app.auth.middleware", kind="IMPORTS"),
+            Edge(source="app.api.users", target="app.models.user", kind="IMPORTS"),
+            Edge(source="app.auth.middleware", target="app.models.user", kind="CALLS"),
+        ]
+        adg = ADG(edges=edges)
+        assert _build_adjacency(edges) == adg.out_edges
+        # a raw set still works — the seam the tests use — but a set has no order,
+        # so only the bucket *contents* are pinned
+        assert {k: set(v) for k, v in _build_adjacency(set(edges)).items()} == \
+            {k: set(v) for k, v in adg.out_edges.items()}
+
+
 class TestCheckStructuralPredicates:
     """PROHIBITS_* constraints evaluated without changed_fqn."""
 

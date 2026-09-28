@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+from collections import defaultdict
+from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from enum import Enum
+from functools import cached_property
+from types import MappingProxyType
 
 from services.fqn import FQN
 
@@ -123,6 +127,58 @@ class ADG:
         object.__setattr__(self, "nodes", _FrozenSeq(self.nodes))
         object.__setattr__(self, "edges", _FrozenSeq(self.edges))
         object.__setattr__(self, "constraint_edges", _FrozenSeq(self.constraint_edges))
+
+    # -- derived indexes: built once, memoised, never stale (#173) -----------
+    # Nothing mutates an ADG after construction — every transform returns a NEW
+    # graph — so a fresh value has a fresh index and no invalidation protocol
+    # exists to get wrong. The mappings are read-only proxies for the same
+    # reason: `adg.node_of[f] = ...` would corrupt a memoised index silently.
+    #
+    # Only the asks with several hot call sites are here. by_file,
+    # module_scope, children_of, edges_of_kind, nodes_of_kind, has and node()
+    # are deferred until a second consumer shows up; each is a one-line
+    # cached_property at no invalidation cost.
+
+    @cached_property
+    def fqns(self) -> tuple[FQN, ...]:
+        """Every node FQN, deduped and sorted by `str` — #165's process-
+        independent order, which used to be a `sorted(set(...), key=str)`
+        comment re-stated at every consumer. Duplicate FQNs are real: the HA
+        full graph carries 88,508 nodes over 88,405 distinct FQNs."""
+        return tuple(sorted({node.fqn for node in self.nodes}, key=str))
+
+    @cached_property
+    def fqn_set(self) -> frozenset[str]:
+        """The FQN universe as `str`, for membership tests."""
+        return frozenset(str(node.fqn) for node in self.nodes)
+
+    @cached_property
+    def node_of(self) -> Mapping[str, FQNNode]:
+        """fqn -> node. Last wins on a duplicate FQN, exactly as the dict
+        comprehension it replaces did."""
+        return MappingProxyType({str(node.fqn): node for node in self.nodes})
+
+    @cached_property
+    def role_of(self) -> Mapping[str, DependencyRole]:
+        """fqn -> role. `detect` filters DEV_TOOL targets through this, so a
+        missing role would change reachability, not just a label."""
+        return MappingProxyType({str(node.fqn): node.role for node in self.nodes})
+
+    @cached_property
+    def out_edges(self) -> Mapping[str, tuple[Edge, ...]]:
+        """Adjacency: source fqn -> its out-edges, in graph order."""
+        buckets: dict[str, list[Edge]] = defaultdict(list)
+        for edge in self.edges:
+            buckets[edge.source].append(edge)
+        return MappingProxyType({source: tuple(edges) for source, edges in buckets.items()})
+
+    def edges_from(self, fqn: str, *kinds: str) -> tuple[Edge, ...]:
+        """Out-edges of *fqn*, optionally restricted to *kinds*: one bucket
+        read instead of a scan of every edge in the graph."""
+        edges = self.out_edges.get(fqn, ())
+        if not kinds:
+            return edges
+        return tuple(edge for edge in edges if edge.kind in kinds)
 
     # -- lossless transforms: each returns a NEW ADG, never mutates ---------
 

@@ -22,19 +22,25 @@ def _capped(entries: list[dict], cap: int, prefix: str) -> dict:
 
 
 def list_children(fqn: str, adg: ADG, cap: int = NEIGHBORHOOD_CAP) -> dict:
-    """Return direct children of `fqn` via CONTAINS edges, capped."""
-    child_targets = {e.target for e in adg.edges if e.source == fqn and e.kind == "CONTAINS"}
-    entries = [
-        {"fqn": str(node.fqn), "kind": node.kind.value}
-        for node in adg.nodes
-        if str(node.fqn) in child_targets
-    ]
+    """Return direct children of `fqn` via CONTAINS edges, capped.
+
+    One bucket read plus one `node_of` probe per child (#173), in edge order —
+    the old shape scanned every node and every edge to answer the same thing.
+    """
+    seen: set[str] = set()
+    entries: list[dict] = []
+    for edge in adg.edges_from(fqn, "CONTAINS"):
+        node = adg.node_of.get(edge.target)
+        if node is None or edge.target in seen:
+            continue
+        seen.add(edge.target)
+        entries.append({"fqn": edge.target, "kind": node.kind.value})
     return _capped(entries, cap, fqn)
 
 
 def list_imports(fqn: str, adg: ADG) -> list[str]:
     """Return target FQNs that `fqn` imports (IMPORTS edges)."""
-    return [e.target for e in adg.edges if e.source == fqn and e.kind == "IMPORTS"]
+    return [e.target for e in adg.edges_from(fqn, "IMPORTS")]
 
 
 def list_dependencies(fqn: str, adg: ADG, cap: int = NEIGHBORHOOD_CAP) -> dict:
@@ -46,15 +52,14 @@ def list_dependencies(fqn: str, adg: ADG, cap: int = NEIGHBORHOOD_CAP) -> dict:
     """
     entries = [
         {"fqn": e.target, "edge": e.kind}
-        for e in adg.edges
-        if e.source == fqn and e.kind in ("IMPORTS", "INHERITS")
+        for e in adg.edges_from(fqn, "IMPORTS", "INHERITS")
     ]
     return _capped(entries, cap, fqn)
 
 
 def list_inherits(fqn: str, adg: ADG) -> list[str]:
     """Return target FQNs that `fqn` inherits from (INHERITS edges)."""
-    return [e.target for e in adg.edges if e.source == fqn and e.kind == "INHERITS"]
+    return [e.target for e in adg.edges_from(fqn, "INHERITS")]
 
 
 # -- node_search (#143) --------------------------------------------------------
@@ -72,8 +77,11 @@ def _node_search_candidates(adg: ADG) -> list[tuple[str, str]]:
     """(fqn, kind) candidates: ADG nodes verbatim + IMPORTS edge targets
     labeled `external_import` when no node backs them (dedup, node wins)."""
     candidates: list[tuple[str, str]] = [(str(n.fqn), n.kind.value) for n in adg.nodes]
-    node_fqns = {f for f, _ in candidates}
-    seen = set(node_fqns)
+    # the node universe comes from the index rather than from re-deriving it out
+    # of the candidate list; `seen` stays mutable for the add-then-test below.
+    # ponytail: the IMPORTS sweep is still O(E) — it is `edges_of_kind`, which
+    # #173 defers until a second consumer asks for it.
+    seen = set(adg.fqn_set)
     candidates += [
         (e.target, "external_import")
         for e in adg.edges
