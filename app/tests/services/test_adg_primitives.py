@@ -219,6 +219,16 @@ class TestPrimitives:
     def test_replace_recoerces_lists(self) -> None:
         assert isinstance(_graph().replace(nodes=[_module("app.other")]).nodes, tuple)
 
+    def test_replace_shares_untouched_sequences(self) -> None:
+        """An unchanged field arrives already frozen, so __post_init__ shares it
+        with the source instead of re-wrapping: a one-field transform stays O(1)
+        in the other two (the HA graph's 345k-element sequences). This is what
+        engine.detect's `replace(constraint_edges=...)` comment relies on."""
+        adg = _graph()
+        child = adg.replace(constraint_edges=adg.constraint_edges)
+        assert child.nodes is adg.nodes
+        assert child.edges is adg.edges
+
     def test_original_is_never_touched(self) -> None:
         adg = _graph()
         before = _signature(adg)
@@ -351,6 +361,16 @@ class TestExternalSentinel:
             "custom_linter": DependencyRole.DEV_TOOL,  # config-declared dev extra
             "requests": DependencyRole.UNKNOWN,      # unknown package
         }
+
+    def test_delegate_covers_constraint_endpoints_not_just_imports(self) -> None:
+        """`add_external_nodes` stopped being imports-only in #174: it delegates
+        to the unified externalizer, which reads constraint-edge endpoints too.
+        A hand-built graph therefore gains an EXTERNAL node for an endpoint it
+        never imported — grounding a previously-orphan constraint. Deliberate;
+        pinned so the widening cannot regress unnoticed."""
+        adg = ADG(nodes=[_module("app")], constraint_edges=[_constraint("app", "app.repo")])
+        externals = {str(n.fqn) for n in add_external_nodes(adg).nodes if n.kind is FQNKind.EXTERNAL}
+        assert externals == {"app.repo"}
 
     def test_every_placeholder_path_produces_the_sentinel_exactly(self, tmp_path) -> None:
         """The five spellings used to disagree; they are now one constructor."""

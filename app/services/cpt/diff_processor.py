@@ -168,11 +168,13 @@ def _maybe_emit_module_fqn(
     )
 
 
-def augment_adg(adg: ADG, diff: Diff) -> tuple[list[FQNNode], list[Edge]]:
-    """Collect the nodes and edges a diff adds to the ADG. Nothing is mutated.
+def _collect_augmentations(adg: ADG, diff: Diff) -> tuple[list[FQNNode], list[Edge]]:
+    """Collect the nodes and edges that `augmented` must merge in. Nothing is mutated.
 
     Without this, BFS from added FQNs can't expand because those nodes
-    don't exist in the base ADG. Returns (nodes, edges) for `augmented`.
+    don't exist in the base ADG. Private: it returns (nodes, edges) for the
+    graph-building `augmented`, and the near-identical name invited callers to
+    treat the pair as a graph.
     """
     from tree_sitter import Parser
     from services.adg.treesitter import PY_LANGUAGE, walk_imports, walk_calls, walk_inherits, build_import_aliases, parse_file
@@ -268,5 +270,5 @@ def augment_adg(adg: ADG, diff: Diff) -> tuple[list[FQNNode], list[Edge]]:
 
 def augmented(adg: ADG, diff: Diff) -> ADG:
     """Return a NEW ADG with the diff's files merged in; the input is untouched."""
-    nodes, edges = augment_adg(adg, diff)
+    nodes, edges = _collect_augmentations(adg, diff)
     return adg.with_nodes(*nodes).with_edges(*edges)

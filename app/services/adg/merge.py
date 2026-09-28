@@ -162,7 +162,16 @@ def with_external_nodes(adg: ADG, project_root: Path | None = None) -> ADG:
 
 
 def add_external_nodes(adg: ADG, project_root: Path | None = None) -> ADG:
-    """One-line delegate to the externalizer, kept for existing callers."""
+    """One-line delegate to the externalizer, kept for existing callers.
+
+    NOT imports-only, despite the name. Since #174 this reads constraint-edge
+    endpoints as well as IMPORTS targets, so a hand-built graph can gain an
+    EXTERNAL node for an endpoint it never had — grounding a constraint that
+    used to be an orphan. That widening is the point of the one-externalizer
+    decision; `run_prepared` is the production caller, and in the CLI path
+    `build_seed` already externalized those endpoints, so it is a no-op there.
+    Pinned by test_delegate_covers_constraint_endpoints_not_just_imports.
+    """
     return with_external_nodes(adg, project_root)
 
 

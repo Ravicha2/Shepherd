@@ -115,6 +115,12 @@ class ADG:
     that hang off ADG are `functools.cached_property`, which needs an instance
     ``__dict__`` to memoise into — slots would silently turn every index into a
     recompute-per-access, or raise outright.
+
+    Also not hashable: `frozen=True, eq=True` generates a `__hash__`, but the
+    members it would hash are plain (mutable, unhashable) dataclasses —
+    FQNNode and ConstraintEdge — so `hash(adg)` raises naming one of them, not
+    ADG. Nothing hashes an ADG today; if a `set[ADG]` or a `cache` ever needs
+    one, freeze the member types rather than this class.
     """
 
     nodes: tuple[FQNNode, ...] = ()
@@ -123,10 +129,16 @@ class ADG:
 
     def __post_init__(self) -> None:
         # Accepts the existing ADG(nodes=[...], edges=[...]) list-kwarg call
-        # sites, then makes `adg.nodes.append(...)` a loud TypeError.
-        object.__setattr__(self, "nodes", _FrozenSeq(self.nodes))
-        object.__setattr__(self, "edges", _FrozenSeq(self.edges))
-        object.__setattr__(self, "constraint_edges", _FrozenSeq(self.constraint_edges))
+        # sites, then makes `adg.nodes.append(...)` a loud TypeError. An
+        # already-frozen sequence arrives this way from `dataclasses.replace`
+        # (which funnels every field through __init__), so the isinstance guard
+        # SHARES it with the source graph instead of re-wrapping: a transform
+        # touching one field stays O(1) in the other two, which matters on the
+        # HA graph's 345k-element sequences.
+        for name in ("nodes", "edges", "constraint_edges"):
+            seq = getattr(self, name)
+            if not isinstance(seq, _FrozenSeq):
+                object.__setattr__(self, name, _FrozenSeq(seq))
 
     # -- derived indexes: built once, memoised, never stale (#173) -----------
     # Nothing mutates an ADG after construction — every transform returns a NEW
@@ -185,8 +197,12 @@ class ADG:
     def replace(self, **fields) -> ADG:
         """Copy with named fields replaced.
 
-        __post_init__ re-runs, so a transform cannot smuggle an invalid
-        ConstraintEdge past its validation.
+        `dataclasses.replace` re-runs `__post_init__`, which re-coerces the
+        sequences to `_FrozenSeq` — it does not *validate*. A ConstraintEdge is
+        only re-checked where it is rebuilt, i.e. through `map_constraints`;
+        `with_constraints` carries existing objects through untouched, so a
+        mutated self-loop can still enter here (the two engine-side guards are
+        what catch that).
         """
         return replace(self, **fields)
 
