@@ -163,15 +163,30 @@ class GraphStore:
         Uses MERGE so exact-match subjects/objects (e.g. ``app.auth.middleware``)
         find their real code node, while wildcards/orphans (e.g. ``app.api.*``)
         get a temp EXTERNAL node with sentinel values.
+
+        MERGE ... ON CREATE SET stays: a plain store_node would overwrite a
+        real node. The sentinel's field values are read off FQNNode.external so
+        this write cannot drift from the in-memory constructor.
+
+        The sentinel's file_path is "" — an EXTERNAL node has no file, and a
+        real node's own file_path is only ever set by store_node.
         """
+        sentinel = FQNNode.external(fqn_str)
         with self._session() as session:
             result = session.run(
                 "MERGE (n:FQNNode {fqn: $fqn}) "
-                "ON CREATE SET n.kind = 'external', n.file_path = '', "
-                "n.line_start = -1, n.line_end = -1, "
-                "n.start_byte = 0, n.end_byte = 0, n.role = 'unknown' "
+                "ON CREATE SET n.kind = $kind, n.file_path = $file_path, "
+                "n.line_start = $line_start, n.line_end = $line_end, "
+                "n.start_byte = $start_byte, n.end_byte = $end_byte, n.role = $role "
                 "RETURN n.kind AS kind",
                 fqn=fqn_str,
+                kind=sentinel.kind.value,
+                file_path=sentinel.file_path,
+                line_start=sentinel.line_start,
+                line_end=sentinel.line_end,
+                start_byte=sentinel.start_byte,
+                end_byte=sentinel.end_byte,
+                role=sentinel.role.value,
             )
             record = result.single()
             if record and record["kind"] == "external":

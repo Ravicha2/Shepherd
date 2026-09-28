@@ -9,12 +9,10 @@ import logging
 import re
 from pathlib import Path
 
-from services.fqn import FQN
 from services.models import (
     ADG,
     ConstraintEdge,
     DependencyRole,
-    FQNKind,
     FQNNode,
 )
 
@@ -142,18 +140,11 @@ def add_external_nodes(adg: ADG, project_root: Path | None = None) -> ADG:
     else:
         log.debug("add_external_nodes: no unresolved imports")
     external_nodes = [
-        FQNNode(
-            fqn=FQN.from_dotted(fqn),
-            kind=FQNKind.EXTERNAL,
-            file_path="",
-            line_start=-1,
-            line_end=-1,
-            role=_classify_external_role(fqn, extra_dev_packages),
-        )
+        FQNNode.external(fqn, role=_classify_external_role(fqn, extra_dev_packages))
         for fqn in external_fqns
     ]
 
-    return ADG(nodes=adg.nodes + external_nodes, edges=adg.edges, constraint_edges=adg.constraint_edges)
+    return adg.with_nodes(*external_nodes)
 
 
 def merge_constraint_edges(adg: ADG, constraint_edges: list[ConstraintEdge], project_root: Path | None = None) -> ADG:
@@ -181,21 +172,10 @@ def merge_constraint_edges(adg: ADG, constraint_edges: list[ConstraintEdge], pro
         if base and base not in known_fqns
     )
     external_nodes = [
-        FQNNode(
-            fqn=FQN.from_dotted(fqn),
-            kind=FQNKind.EXTERNAL,
-            file_path="",
-            line_start=-1,
-            line_end=-1,
-            role=_classify_external_role(fqn, extra_dev_packages),
-        )
+        FQNNode.external(fqn, role=_classify_external_role(fqn, extra_dev_packages))
         for fqn in orphan_fqns
     ]
     if external_nodes:
         log.info("merge_constraint_edges: adding %d EXTERNAL nodes for orphans: %s", len(external_nodes), orphan_fqns)
 
-    return ADG(
-        nodes=adg.nodes + external_nodes,
-        edges=adg.edges,
-        constraint_edges=adg.constraint_edges + constraint_edges,
-    )
+    return adg.with_nodes(*external_nodes).with_constraints(*constraint_edges)

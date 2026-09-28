@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 
 from services.fqn import FQN
@@ -50,6 +50,27 @@ class FQNNode:
     end_byte: int = 0
     role: DependencyRole = DependencyRole.INTERNAL
 
+    @classmethod
+    def external(cls, fqn: str, role: DependencyRole = DependencyRole.UNKNOWN) -> FQNNode:
+        """The ONE synthetic-EXTERNAL constructor: sentinel spans, no file.
+
+        Every placeholder site used to hand-write these fields, and they had
+        drifted apart (role silently defaulting to INTERNAL, byte spans left
+        off). `role` is load-bearing, not cosmetic: engine.detect filters
+        DEV_TOOL nodes out of reachability, so a mis-defaulted placeholder
+        changes the answer for the same external package.
+        """
+        return cls(
+            fqn=FQN.from_dotted(fqn),
+            kind=FQNKind.EXTERNAL,
+            file_path="",
+            line_start=-1,
+            line_end=-1,
+            start_byte=0,
+            end_byte=0,
+            role=role,
+        )
+
 
 @dataclass(frozen=True)
 class Edge:
@@ -58,11 +79,86 @@ class Edge:
     kind: str  # "CALLS" | "INHERITS" | "CONTAINS" | "IMPORTS"
 
 
-@dataclass
+class _FrozenSeq(tuple):
+    """A tuple that names the mistake instead of just lacking the method.
+
+    __post_init__ wraps ADG's three sequences in this, so the migration's
+    characteristic slip — `adg.nodes.append(...)` — says which transform to
+    reach for instead of a bare "'tuple' object has no attribute 'append'".
+    """
+
+    def append(self, *args) -> None:
+        raise TypeError("ADG is frozen: build a new graph with with_nodes / with_edges / with_constraints")
+
+
+def _extend(existing, extra, key) -> tuple:
+    """*existing* plus the members of *extra* whose key is unseen (first wins)."""
+    seen = {key(item) for item in existing}
+    added = []
+    for item in extra:
+        k = key(item)
+        if k not in seen:
+            added.append(item)
+            seen.add(k)
+    return tuple(existing) + tuple(added)
+
+
+@dataclass(frozen=True)
 class ADG:
-    nodes: list[FQNNode] = field(default_factory=list)
-    edges: list[Edge] = field(default_factory=list)
-    constraint_edges: list[ConstraintEdge] = field(default_factory=list)
+    """The architectural dependency graph, as a frozen value.
+
+    Do NOT add `slots=True` (FQN has it; this must not). The derived indexes
+    that hang off ADG are `functools.cached_property`, which needs an instance
+    ``__dict__`` to memoise into — slots would silently turn every index into a
+    recompute-per-access, or raise outright.
+    """
+
+    nodes: tuple[FQNNode, ...] = ()
+    edges: tuple[Edge, ...] = ()
+    constraint_edges: tuple[ConstraintEdge, ...] = ()
+
+    def __post_init__(self) -> None:
+        # Accepts the existing ADG(nodes=[...], edges=[...]) list-kwarg call
+        # sites, then makes `adg.nodes.append(...)` a loud TypeError.
+        object.__setattr__(self, "nodes", _FrozenSeq(self.nodes))
+        object.__setattr__(self, "edges", _FrozenSeq(self.edges))
+        object.__setattr__(self, "constraint_edges", _FrozenSeq(self.constraint_edges))
+
+    # -- lossless transforms: each returns a NEW ADG, never mutates ---------
+
+    def replace(self, **fields) -> ADG:
+        """Copy with named fields replaced.
+
+        __post_init__ re-runs, so a transform cannot smuggle an invalid
+        ConstraintEdge past its validation.
+        """
+        return replace(self, **fields)
+
+    def map_constraints(self, fn) -> ADG:
+        """Apply *fn* to every ConstraintEdge, returning a new ADG."""
+        return self.replace(constraint_edges=tuple(fn(edge) for edge in self.constraint_edges))
+
+    def with_nodes(self, *extra: FQNNode) -> ADG:
+        """Copy with *extra nodes, deduped by fqn.
+
+        First wins, so a real node already in the graph beats a stale EXTERNAL
+        placeholder offered later.
+        """
+        return self.replace(nodes=_extend(self.nodes, extra, lambda n: n.fqn))
+
+    def with_edges(self, *extra: Edge) -> ADG:
+        """Copy with *extra edges, deduped by (source, target, kind)."""
+        return self.replace(edges=_extend(self.edges, extra, lambda e: (e.source, e.target, e.kind)))
+
+    def with_constraints(self, *extra: ConstraintEdge) -> ADG:
+        """Copy with *extra constraints, deduped first-wins on the value key
+        (adr_id, predicate, subject, object) — the same key the engine's
+        matched map uses (#171), so uniqueness holds by construction."""
+        return self.replace(constraint_edges=_extend(
+            self.constraint_edges,
+            extra,
+            lambda c: (c.adr_id, c.predicate, c.subject, c.object),
+        ))
 
 
 @dataclass
@@ -116,6 +212,15 @@ class PredicateType(Enum):
 
 @dataclass
 class ConstraintEdge:
+    """Deliberately NOT frozen, unlike ADG/Edge/FQN.
+
+    An edge that comes back from the store never went through __post_init__
+    here, so a self-loop can exist in memory after construction; making this
+    frozen would leave no way to build one. The self-loop regression test
+    (test_engine.py TestSelfLoopConstraint) mutates one after construction for
+    exactly that reason.
+    """
+
     subject: str
     predicate: PredicateType
     object: str

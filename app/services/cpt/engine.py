@@ -447,7 +447,14 @@ def detect(diff_result: DiffResult, adg: ADG) -> CPTResult:
         if constraint.scope is not ConstraintScope.TOOLING
     ]
 
-    # filter self-loop constraints (subject == object), surface as informational
+    # filter self-loop constraints (subject == object), surface as informational.
+    #
+    # Complementary to ConstraintEdge.__post_init__'s guard, not redundant with
+    # it. That one rejects construction; this one catches self-loops formed
+    # AFTER construction, which is where real ones come from: the unified
+    # resolver wildcards both sides of `X.* requires X` into `X.* -> X.*`
+    # (#135, tamr ADR-0007), and an edge loaded back from the store never ran
+    # __post_init__ at all. Keep both.
     self_loop_constraints: list[ConstraintEdge] = [
         constraint for constraint in enforced_edges if constraint.subject == constraint.object
     ]

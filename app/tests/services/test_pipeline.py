@@ -3,7 +3,7 @@
 Boundary tests for:
     pattern_specificity: constraint pattern depth + exact/wildcard bonus
     adg_with_specificity: patching ConstraintEdge.specificity after merge
-    augment_immutable: wrapping in-place augment_adg without mutating the input
+    augmented: merging a diff in without mutating the input
     ADGPipeline.run_prepared: pure-data pipeline without git/filesystem/LLM
 """
 
@@ -31,9 +31,9 @@ from services.pipeline import (
     ADGPipeline,
     PipelineInputs,
     adg_with_specificity,
-    augment_immutable,
     pattern_specificity,
 )
+from services.cpt.diff_processor import augmented
 from services.cpt.dismissal import Dismissal
 
 
@@ -156,7 +156,7 @@ class TestAdgWithSpecificity:
 
 
 # ---------------------------------------------------------------------------
-# augment_immutable
+# augmented
 # ---------------------------------------------------------------------------
 
 
@@ -180,7 +180,7 @@ class TestAugmentImmutable:
             from_contents={},
         )
 
-        result = augment_immutable(adg, diff)
+        result = augmented(adg, diff)
 
         # Input ADG should not be modified
         assert len(adg.nodes) == original_node_count
@@ -197,7 +197,7 @@ class TestAugmentImmutable:
             from_contents={},
         )
 
-        result = augment_immutable(adg, diff)
+        result = augmented(adg, diff)
 
         assert result is not adg
 
@@ -257,8 +257,7 @@ class TestADGPipelineRunPrepared:
         )
 
         def fires(scope: ConstraintScope) -> list[str]:
-            adg = _make_adg()
-            adg.constraint_edges = [
+            adg = _make_adg().replace(constraint_edges=[
                 ConstraintEdge(
                     subject="app.*",
                     predicate=PredicateType.PROHIBITS_DEPENDENCY,
@@ -268,7 +267,7 @@ class TestADGPipelineRunPrepared:
                     adr_path="docs/adr/010-tooling.md",
                     scope=scope,
                 ),
-            ]
+            ])
             result = ADGPipeline().run_prepared(PipelineInputs(adg=adg, diff_result=diff_result))
             return [v.constraint.adr_id for v in result.violations]
 

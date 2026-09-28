@@ -89,10 +89,9 @@ class TestAddExternalNodes:
     """Unmatched import targets become EXTERNAL nodes."""
 
     def test_adds_external_for_stdlib(self, sample_adg: ADG) -> None:
-        edges_with_import = sample_adg.edges + [
+        adg = sample_adg.with_edges(
             Edge(source="app.services.user", target="logging", kind="IMPORTS"),
-        ]
-        adg = ADG(nodes=sample_adg.nodes, edges=edges_with_import)
+        )
         result = add_external_nodes(adg)
         external_nodes = [n for n in result.nodes if n.kind == FQNKind.EXTERNAL]
         assert len(external_nodes) == 1
@@ -318,7 +317,7 @@ class TestADGConstraintEdges:
     def test_adg_has_constraint_edges_field(self) -> None:
         adg = ADG(nodes=[], edges=[])
         assert hasattr(adg, "constraint_edges")
-        assert adg.constraint_edges == []
+        assert adg.constraint_edges == ()  # coerced from list by __post_init__
 
     def test_adg_with_constraint_edges(self) -> None:
         edges = [
@@ -344,7 +343,7 @@ class TestADGConstraintEdges:
 
     def test_adg_default_constraint_edges_empty(self) -> None:
         adg = ADG(nodes=[], edges=[])
-        assert adg.constraint_edges == []
+        assert adg.constraint_edges == ()  # coerced from list by __post_init__
 
 
 # ===========================================================================

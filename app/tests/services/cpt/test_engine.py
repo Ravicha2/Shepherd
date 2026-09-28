@@ -1196,6 +1196,24 @@ class TestSelfLoopConstraint:
         assert len(result.self_loop_constraints) == 1
         assert result.self_loop_constraints[0].adr_id == "ADR-010"
 
+    def test_the_two_guards_are_complementary_not_redundant(self) -> None:
+        """Construction is guarded by ConstraintEdge.__post_init__; a self-loop
+        that arrives some other way (mutation, store deserialization) is guarded
+        by detect's filter. Neither layer alone covers both cases."""
+        with pytest.raises(ValueError, match="subject and object must differ"):
+            ConstraintEdge(
+                subject="app.auth.middleware",
+                predicate=PredicateType.REQUIRES_IMPLEMENTATION,
+                object="app.auth.middleware",
+                justification="Only auth middleware implements auth.",
+                adr_id="ADR-010",
+                adr_path="docs/adr/010.md",
+            )
+        # The graph does not re-validate on the way in, so the mutated edge is
+        # accepted by ADG — detect is what catches it (tests above).
+        mutated = TestSelfLoopConstraint._make_self_loop()
+        assert ADG(constraint_edges=[mutated]).constraint_edges == (mutated,)
+
     def test_detect_mixed_self_loop_and_normal(self, sample_adg: ADG) -> None:
         from services.cpt.engine import detect
 
@@ -1709,12 +1727,14 @@ class TestModuleScopeSeeding:
         """A method re-anchors through its class ancestor to the enclosing module."""
         from services.cpt.engine import detect
 
-        adg = self._module_scope_adg()
-        adg.nodes.append(FQNNode(fqn=FQN.from_dotted("app.routes.users.Gate"), kind=FQNKind.CLASS, file_path="app/routes/users.py", line_start=12, line_end=20, start_byte=0, end_byte=0))
-        adg.nodes.append(FQNNode(fqn=FQN.from_dotted("app.routes.users.Gate.open"), kind=FQNKind.METHOD, file_path="app/routes/users.py", line_start=14, line_end=18, start_byte=0, end_byte=0))
-        adg.edges.append(Edge(source="app.routes.users", target="app.routes.users.Gate", kind="CONTAINS"))
-        adg.edges.append(Edge(source="app.routes.users.Gate", target="app.routes.users.Gate.open", kind="CONTAINS"))
-        constraints = [
+        adg = self._module_scope_adg().with_nodes(
+            FQNNode(fqn=FQN.from_dotted("app.routes.users.Gate"), kind=FQNKind.CLASS, file_path="app/routes/users.py", line_start=12, line_end=20, start_byte=0, end_byte=0),
+            FQNNode(fqn=FQN.from_dotted("app.routes.users.Gate.open"), kind=FQNKind.METHOD, file_path="app/routes/users.py", line_start=14, line_end=18, start_byte=0, end_byte=0),
+        ).with_edges(
+            Edge(source="app.routes.users", target="app.routes.users.Gate", kind="CONTAINS"),
+            Edge(source="app.routes.users.Gate", target="app.routes.users.Gate.open", kind="CONTAINS"),
+        )
+        adg = adg.with_constraints(
             ConstraintEdge(
                 subject="app.routes.users.*",
                 predicate=PredicateType.PROHIBITS_DEPENDENCY,
@@ -1723,8 +1743,7 @@ class TestModuleScopeSeeding:
                 adr_id="ADR-001",
                 adr_path="docs/adr/001.md",
             ),
-        ]
-        adg = ADG(nodes=adg.nodes, edges=adg.edges, constraint_edges=constraints)
+        )
         diff = DiffResult(
             to_sha="abc123",
             from_sha="def456",
@@ -1740,10 +1759,11 @@ class TestModuleScopeSeeding:
     def _class_scope_adg() -> ADG:
         """app.routes.users imports the model and the service at module level;
         Gate (class) has no own edges."""
-        adg = TestModuleScopeSeeding._module_scope_adg()
-        adg.nodes.append(FQNNode(fqn=FQN.from_dotted("app.routes.users.Gate"), kind=FQNKind.CLASS, file_path="app/routes/users.py", line_start=12, line_end=20, start_byte=0, end_byte=0))
-        adg.edges.append(Edge(source="app.routes.users", target="app.routes.users.Gate", kind="CONTAINS"))
-        return adg
+        return TestModuleScopeSeeding._module_scope_adg().with_nodes(
+            FQNNode(fqn=FQN.from_dotted("app.routes.users.Gate"), kind=FQNKind.CLASS, file_path="app/routes/users.py", line_start=12, line_end=20, start_byte=0, end_byte=0),
+        ).with_edges(
+            Edge(source="app.routes.users", target="app.routes.users.Gate", kind="CONTAINS"),
+        )
 
     def test_class_scope_requires_satisfied_by_enclosing_module_import(self) -> None:
         """Issue 124 (option a, uniform seeding): a class scope inherits its

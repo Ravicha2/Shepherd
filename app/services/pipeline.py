@@ -17,7 +17,7 @@ from pathlib import Path
 
 from services.adg.merge import add_external_nodes, merge_constraint_edges
 from services.cpt.dismissal import Dismissal, filter_dismissed
-from services.cpt.diff_processor import augment_adg
+from services.cpt.diff_processor import augmented
 from services.cpt.engine import detect as cpt_detect
 from services.models import ADG, ConstraintEdge, Diff, DiffResult
 from services.resolver import MatchStatus
@@ -69,24 +69,6 @@ def adg_with_specificity(adg: ADG) -> ADG:
 
 
 # ---------------------------------------------------------------------------
-# Mutation normalization
-# ---------------------------------------------------------------------------
-
-def augment_immutable(adg: ADG, diff: Diff) -> ADG:
-    """Wrap the in-place augment_adg so it returns a fresh ADG.
-
-    Callers never see their input ADG mutated.
-    """
-    clone = ADG(
-        nodes=list(adg.nodes),
-        edges=list(adg.edges),
-        constraint_edges=list(adg.constraint_edges),
-    )
-    augment_adg(clone, diff)
-    return clone
-
-
-# ---------------------------------------------------------------------------
 # Pure-data test input
 # ---------------------------------------------------------------------------
 
@@ -117,7 +99,7 @@ class ADGPipeline:
         merged = adg_with_specificity(merged)
 
         if inputs.diff is not None:
-            merged = augment_immutable(merged, inputs.diff)
+            merged = augmented(merged, inputs.diff)
 
         return cpt_detect(inputs.diff_result, merged)
 
