@@ -203,7 +203,18 @@ def _path_excused(path: list[Edge], object_str: str, requires: list[ConstraintEd
     return True
 
 
-def match_constraints(adg: ADG) -> dict[int, MatchedConstraint]:
+def constraint_key(constraint: ConstraintEdge) -> tuple[str, PredicateType, str, str]:
+    """Value identity for a constraint: (adr_id, predicate, subject, object).
+
+    `id()` was the old key and is not copy-safe: a `dataclasses.replace`d edge is
+    structurally identical but a different object, so matching silently lost it.
+    adr_id is a file stem (unique per ADR), so the only collision is resolver
+    dupes within one ADR — dedup on this same key in `with_constraints` makes it
+    unique by construction."""
+    return (constraint.adr_id, constraint.predicate, constraint.subject, constraint.object)
+
+
+def match_constraints(adg: ADG) -> dict[tuple, MatchedConstraint]:
     """
     match all constraint with all nodes O(c x n) 
     TODO: do we need to check all constraints? optimize?
@@ -215,7 +226,7 @@ def match_constraints(adg: ADG) -> dict[int, MatchedConstraint]:
     # constraint loop: it is constraint-independent, so one sort, not c sorts.
     all_fqns = sorted({node.fqn for node in adg.nodes}, key=str)
 
-    matched: dict[int, MatchedConstraint] = {}
+    matched: dict[tuple, MatchedConstraint] = {}
     for constraint in adg.constraint_edges:
         subject_matches: list[tuple[FQN, MatchStatus]] = []
         object_matches: list[tuple[FQN, MatchStatus]] = []
@@ -228,16 +239,18 @@ def match_constraints(adg: ADG) -> dict[int, MatchedConstraint]:
                 object_matches.append((fqn, obj_status))
         # Skip constraints where either bucket is empty (orphan)
         if subject_matches and object_matches:
-            matched[id(constraint)] = MatchedConstraint(
+            # first wins on a value-key collision; equal keys yield equal matches,
+            # so only which edge object is stored can differ
+            matched.setdefault(constraint_key(constraint), MatchedConstraint(
                 constraint=constraint,
                 subject_matches=subject_matches,
                 object_matches=object_matches,
-            )
+            ))
     return matched
 
 
 def check_structural_predicates(
-    matched_constraints: dict[int, MatchedConstraint],
+    matched_constraints: dict[tuple, MatchedConstraint],
     adjacency: dict[str, list[Edge]],
     node_roles: dict[str, DependencyRole] | None = None,
     module_scope: dict[str, str] | None = None,
@@ -330,7 +343,7 @@ def check_structural_predicates(
 
 
 def check_change_triggered_predicates(
-    matched_constraints: dict[int, MatchedConstraint],
+    matched_constraints: dict[tuple, MatchedConstraint],
     adjacency: dict[str, list[Edge]],
     changed_fqns: list[ChangedFQN],
     node_roles: dict[str, DependencyRole] | None = None,
@@ -485,7 +498,7 @@ def detect(diff_result: DiffResult, adg: ADG) -> CPTResult:
 
     orphans: list[ConstraintEdge] = []
     for constraint in enforced_edges:
-        if id(constraint) not in matched:
+        if constraint_key(constraint) not in matched:
             orphans.append(constraint)
 
     return CPTResult(violations=violations, orphans=orphans, self_loop_constraints=self_loop_constraints)
