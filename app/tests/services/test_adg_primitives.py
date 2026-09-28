@@ -374,9 +374,10 @@ class TestExternalSentinel:
 
     def test_preserved_constraints_path_moves_orphans_internal_to_unknown(self) -> None:
         """This path never classified, so its orphans used to arrive as INTERNAL.
-        UNKNOWN is the correct direction — pin it."""
+        UNKNOWN is the correct direction — pin it. Since #174 it shares the seed
+        chain, so it externalizes unresolved imports as well as orphan endpoints."""
         merged = merge_preserved_constraints(_graph(), [_constraint("app", "some_unclassified_pkg")])
-        orphan = [n for n in merged.nodes if n.kind is FQNKind.EXTERNAL]
+        orphan = [n for n in merged.nodes if n.kind is FQNKind.EXTERNAL and str(n.fqn) == "some_unclassified_pkg"]
         assert len(orphan) == 1
         assert orphan[0].role is DependencyRole.UNKNOWN
         assert orphan[0].role is not DependencyRole.INTERNAL

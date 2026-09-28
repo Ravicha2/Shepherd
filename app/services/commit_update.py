@@ -10,13 +10,14 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from services.adg.merge import merge_constraint_edges
 from services.adg.treesitter import parse_repo
 from services.cpt.dismissal import Dismissal, filter_dismissed
 from services.cpt.engine import CPTResult, Violation, detect as cpt_detect
 from services.cpt.diff_processor import augmented, process_diff
 from services.cpt.git_adapter import GitAdapter
 from services.graph.connector import GraphStore
-from services.models import ADG, ChangedFQN, Diff, ConstraintEdge, DiffResult, FileChange, FQNNode
+from services.models import ADG, ChangedFQN, Diff, ConstraintEdge, DiffResult, FileChange
 from services.pipeline import adg_with_specificity
 
 log = logging.getLogger(__name__)
@@ -36,27 +37,15 @@ class UpdateResult:
 
 
 def merge_preserved_constraints(adg: ADG, constraint_edges: list[ConstraintEdge], project_root: Path | None = None) -> ADG:
-    """Merge preserved constraint edges into a fresh ADG.
+    """One-line delegate: preserved constraints merge exactly like fresh ones.
 
-    Creates EXTERNAL nodes for any constraint endpoint FQN not present in
-    the ADG. Returns a new ADG with constraint_edges attached.
-
-    project_root is accepted for API compatibility but not used here;
-    this function replaces the LLM-based merge_constraint_edges step with
-    a direct merge of already-resolved constraint edges.
+    Wraps resolved ConstraintEdges (the LLM-based merge step is skipped) in the
+    same chain `build_seed` uses, so the wipe-then-restore path and the seed path
+    cannot drift apart (#174). Wildcard endpoints resolve to their base namespace
+    there, and roles are classified there too — this path used to leave them
+    INTERNAL, which was the bug.
     """
-    # Wildcard patterns (users.views.*) are not concrete FQNs; resolve to the
-    # base namespace. with_nodes drops the ones already in the graph and the
-    # duplicates. Note the role: this path never classified, so these used to
-    # land as INTERNAL; FQNNode.external defaults them to UNKNOWN.
-    endpoints = [
-        raw_fqn.removesuffix(".*")
-        for ce in constraint_edges
-        for raw_fqn in (ce.subject, ce.object)
-    ]
-    new_nodes = [FQNNode.external(fqn_str) for fqn_str in endpoints if fqn_str]
-
-    return adg.with_nodes(*new_nodes).with_constraints(*constraint_edges)
+    return merge_constraint_edges(adg, constraint_edges, project_root)
 
 
 def commit_update(

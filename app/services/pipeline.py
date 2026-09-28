@@ -123,39 +123,34 @@ class ADGPipeline:
 
         adr_path = Path(adr_dir)
         adr_files = sorted(adr_path.glob("*.md"))
-        if not adr_files:
-            log.warning("build_seed: no ADR files found in %s", adr_path)
-            merged = add_external_nodes(adg, project_root=project_root)
-            return adg_with_specificity(merged)
-
-        if project_root is None:
-            # ADR 017 decision 5: loud failure, no silent degradation of retrieval.
-            raise ValueError("project_root is required to build the search backend")
-
-        log.info("build_seed: resolving %d ADR files from %s", len(adr_files), adr_path)
-        search_backend = build_search_backend(Path(project_root), adg)
 
         all_edges: list[ConstraintEdge] = []
-        for adr_file in adr_files:
-            adr_text = adr_file.read_text(encoding="utf-8")
-            adr_id = adr_file.stem
-            edges = resolve_adr_constraints(adr_text, adr_id, str(adr_file), adg, config, search_backend)
-            log.info("build_seed: %s produced %d constraint edges", adr_id, len(edges))
-            all_edges.extend(edges)
+        if not adr_files:
+            log.warning("build_seed: no ADR files found in %s", adr_path)
+        else:
+            if project_root is None:
+                # ADR 017 decision 5: loud failure, no silent degradation of retrieval.
+                raise ValueError("project_root is required to build the search backend")
 
-        merged = merge_constraint_edges(adg, all_edges, project_root=project_root)
-        merged = add_external_nodes(merged, project_root=project_root)
-        return adg_with_specificity(merged)
+            log.info("build_seed: resolving %d ADR files from %s", len(adr_files), adr_path)
+            search_backend = build_search_backend(Path(project_root), adg)
+            for adr_file in adr_files:
+                adr_text = adr_file.read_text(encoding="utf-8")
+                adr_id = adr_file.stem
+                edges = resolve_adr_constraints(adr_text, adr_id, str(adr_file), adg, config, search_backend)
+                log.info("build_seed: %s produced %d constraint edges", adr_id, len(edges))
+                all_edges.extend(edges)
+
+        return adg_with_specificity(merge_constraint_edges(adg, all_edges, project_root=project_root))
 
     @staticmethod
     def build_gold_seed(adg: ADG, gold_file: Path, project_root: Path | None = None) -> ADG:
         """Merge the benchmark gold constraints into the ADG, skipping the resolver.
 
-        Same merge as build_seed, fed from benchmark/gold/<repo>_gold.json
+        The same chain as build_seed, fed from benchmark/gold/<repo>_gold.json
         instead of the resolver. For `cpt seed build --gold` (#167).
         """
         from services.adg.gold import load_gold_edges
 
         edges = load_gold_edges(gold_file)
-        merged = merge_constraint_edges(add_external_nodes(adg, project_root=project_root), edges, project_root=project_root)
-        return adg_with_specificity(merged)
+        return adg_with_specificity(merge_constraint_edges(adg, edges, project_root=project_root))

@@ -10,9 +10,10 @@ from pathlib import Path
 
 import pytest
 
+from services.adg.merge import merge_constraint_edges
 from services.commit_update import UpdateResult, commit_update, merge_preserved_constraints
 from services.fqn import FQN
-from services.models import ADG, ConstraintEdge, Edge, FQNKind, FQNNode, PredicateType
+from services.models import ADG, ConstraintEdge, DependencyRole, Edge, FQNKind, FQNNode, PredicateType
 
 
 # ---------------------------------------------------------------------------
@@ -160,6 +161,23 @@ class TestMergePreservedConstraints:
         merged = merge_preserved_constraints(adg, [])
         assert len(merged.nodes) == len(adg.nodes)
         assert len(merged.constraint_edges) == 0
+
+
+class TestMergePreservedIsTheSeedChain:
+    """#174: the preserved-constraint path is the seed merge chain, not a copy."""
+
+    def test_same_graph_as_the_seed_merge(self) -> None:
+        adg = _structural_adg()
+        edges = [_make_constraint_edge("app.api.*", "logging")]
+        assert merge_preserved_constraints(adg, edges) == merge_constraint_edges(adg, edges)
+
+    def test_roles_are_classified_like_the_seed_path(self) -> None:
+        """This path never classified (#172 left it UNKNOWN); sharing the chain
+        means a dev-tool endpoint is now DEV_TOOL here too."""
+        merged = merge_preserved_constraints(_structural_adg(), [_make_constraint_edge("app.api.*", "pytest")])
+        external = [n for n in merged.nodes if n.kind is FQNKind.EXTERNAL]
+        assert [str(n.fqn) for n in external] == ["pytest"]
+        assert external[0].role is DependencyRole.DEV_TOOL
 
 
 # ===========================================================================
