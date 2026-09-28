@@ -42,12 +42,6 @@ class MatchedConstraint:
     object_matches: list[tuple[FQN, MatchStatus]]
 
 
-def _build_adjacency(edges: Iterable[Edge]) -> Adjacency:
-    """ADG owns the bucketing (#173); this stays a free function because ~60
-    test sites hand it a raw edge iterable rather than a graph."""
-    return ADG(edges=tuple(edges)).out_edges
-
-
 def _enclosing_module_map(adg: ADG) -> dict[str, str]:
     """function/method/class FQN -> enclosing module FQN (nearest MODULE ancestor).
     Any nested scope inherits its enclosing module's module-level edges (issue 115

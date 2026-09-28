@@ -1,9 +1,9 @@
 """ADG query tools for agent tool-call consumption.
 
 Thin wrappers over the in-memory ADG. Each function returns structured data
-suitable for LLM tool-call responses (ADR 017: bounded, typed tools; dive and
-list_modules are deleted; list_dependencies replaced by node_search per
-#143). No Neo4j dependency.
+suitable for LLM tool-call responses (ADR 017: bounded, typed tools; dive,
+list_modules, list_imports, list_inherits and list_dependencies are deleted —
+node_search replaced them per #143/#176). No Neo4j dependency.
 """
 
 from __future__ import annotations
@@ -36,30 +36,6 @@ def list_children(fqn: str, adg: ADG, cap: int = NEIGHBORHOOD_CAP) -> dict:
         seen.add(edge.target)
         entries.append({"fqn": edge.target, "kind": node.kind.value})
     return _capped(entries, cap, fqn)
-
-
-def list_imports(fqn: str, adg: ADG) -> list[str]:
-    """Return target FQNs that `fqn` imports (IMPORTS edges)."""
-    return [e.target for e in adg.edges_from(fqn, "IMPORTS")]
-
-
-def list_dependencies(fqn: str, adg: ADG, cap: int = NEIGHBORHOOD_CAP) -> dict:
-    """Return what `fqn` uses: IMPORTS + INHERITS edges out, labeled with edge kind.
-
-    Removed from the LLM tool surface per #143 (kept as a library function for
-    ad-hoc analysis; the ablation harness still references the name pattern).
-    CALLS excluded (matches dive semantics).
-    """
-    entries = [
-        {"fqn": e.target, "edge": e.kind}
-        for e in adg.edges_from(fqn, "IMPORTS", "INHERITS")
-    ]
-    return _capped(entries, cap, fqn)
-
-
-def list_inherits(fqn: str, adg: ADG) -> list[str]:
-    """Return target FQNs that `fqn` inherits from (INHERITS edges)."""
-    return [e.target for e in adg.edges_from(fqn, "INHERITS")]
 
 
 # -- node_search (#143) --------------------------------------------------------
@@ -169,8 +145,4 @@ if __name__ == "__main__":
     adg = ADG(nodes=nodes, edges=edges)
     assert list_children("app", adg) == {"entries": [{"fqn": "app.mod", "kind": "module"}], "truncated": False}
     assert list_children("app.mod", adg) == {"entries": [{"fqn": "app.mod.Foo", "kind": "class"}], "truncated": False}
-    assert list_imports("app.mod", adg) == ["os"]
-    assert list_inherits("app.mod.Foo", adg) == ["bar.Baz"]
-    assert list_dependencies("app.mod", adg) == {"entries": [{"fqn": "os", "edge": "IMPORTS"}], "truncated": False}
-    assert list_dependencies("app.mod.Foo", adg) == {"entries": [{"fqn": "bar.Baz", "edge": "INHERITS"}], "truncated": False}
     print("OK")

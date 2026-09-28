@@ -593,7 +593,7 @@ def _external_packages(adg: ADG) -> set[str]:
     }
 
 
-def _validate_edge(edge: ConstraintEdge, adg: ADG, external_packages: set[str]) -> bool:
+def _validate_edge(edge: ConstraintEdge, adg: ADG) -> bool:
     """Return True if edge passes root-namespace-aware validation.
 
     Subject: internal pattern (first segment in roots) must match an ADG node;
@@ -608,7 +608,6 @@ def _validate_edge(edge: ConstraintEdge, adg: ADG, external_packages: set[str]) 
     """
     all_fqns = {str(n.fqn) for n in adg.nodes}
     roots = _root_segments(adg)
-    _ = external_packages  # ponytail: kept for API stability; strict-list check removed (transitive deps)
 
     # Subject
     subj_first = edge.subject.split(".")[0].rstrip(".*")
@@ -758,7 +757,7 @@ def resolve_adr_constraints(
                 edges = _materialize_edges(
                     _parse_edges(msg.content, adr_id, adr_path, none_verdict_edges), adg
                 )
-                valid_edges = [e for e in edges if _validate_edge(e, adg, external_packages)]
+                valid_edges = [e for e in edges if _validate_edge(e, adg)]
                 if len(valid_edges) < len(edges):
                     dropped = [e for e in edges if e not in valid_edges]
                     log.warning("unified_resolver: dropped %d edges with nonexistent FQNs for %s", len(dropped), adr_id)
@@ -806,7 +805,7 @@ def resolve_adr_constraints(
             edges = _materialize_edges(
                 _parse_edges(content, adr_id, adr_path, none_verdict_edges), adg
             )
-            valid_edges = [e for e in edges if _validate_edge(e, adg, external_packages)]
+            valid_edges = [e for e in edges if _validate_edge(e, adg)]
             if len(valid_edges) < len(edges):
                 dropped = [e for e in edges if e not in valid_edges]
                 log.warning("unified_resolver: dropped %d edges with nonexistent FQNs for %s", len(dropped), adr_id)
@@ -888,29 +887,27 @@ if __name__ == "__main__":
     assert _external_packages(adg) == set()
     print("_external_packages OK")
 
-    ext_pkgs = {"elasticsearch"}  # simulated imports list
-
-    # _validate_edge: requires_* external object in list passes
+    # _validate_edge: requires_* external object passes (no strict-list check)
     ext_obj_edge = ConstraintEdge(subject="app.api.*", predicate=PredicateType.REQUIRES_DEPENDENCY, object="elasticsearch", justification="ext", adr_id="ADR-1", adr_path="docs/adr/1.md")
-    assert _validate_edge(ext_obj_edge, adg, ext_pkgs) is True
-    print("_validate_edge requires_* external object in list OK")
+    assert _validate_edge(ext_obj_edge, adg) is True
+    print("_validate_edge requires_* external object OK")
 
-    # _validate_edge: requires_* external object NOT in list passes (transitive deps, e.g. postgresql via django.db)
+    # _validate_edge: requires_* external object not imported passes (transitive deps, e.g. postgresql via django.db)
     req_transitive_edge = ConstraintEdge(subject="app.api.*", predicate=PredicateType.REQUIRES_DEPENDENCY, object="postgresql", justification="transitive", adr_id="ADR-1", adr_path="docs/adr/1.md")
-    assert _validate_edge(req_transitive_edge, adg, ext_pkgs) is True
-    print("_validate_edge requires_* external object not in list (transitive) OK")
+    assert _validate_edge(req_transitive_edge, adg) is True
+    print("_validate_edge requires_* external object (transitive) OK")
 
-    # _validate_edge: prohibits_* external object NOT in list passes (linter checks absence)
+    # _validate_edge: prohibits_* external object passes (linter checks absence)
     pro_absent_edge = ConstraintEdge(subject="app.api.*", predicate=PredicateType.PROHIBITS_DEPENDENCY, object="rest_framework", justification="absent", adr_id="ADR-1", adr_path="docs/adr/1.md")
-    assert _validate_edge(pro_absent_edge, adg, ext_pkgs) is True
-    print("_validate_edge prohibits_* external object not in list OK")
+    assert _validate_edge(pro_absent_edge, adg) is True
+    print("_validate_edge prohibits_* external object OK")
 
     halluc_obj_edge = ConstraintEdge(subject="app.api.*", predicate=PredicateType.REQUIRES_DEPENDENCY, object="app.hallucinated.*", justification="halluc", adr_id="ADR-1", adr_path="docs/adr/1.md")
-    assert _validate_edge(halluc_obj_edge, adg, ext_pkgs) is False
+    assert _validate_edge(halluc_obj_edge, adg) is False
     print("_validate_edge hallucinated internal object dropped OK")
 
     valid_internal_edge = ConstraintEdge(subject="app.api.*", predicate=PredicateType.PROHIBITS_DEPENDENCY, object="app.db.*", justification="valid", adr_id="ADR-1", adr_path="docs/adr/1.md")
-    assert _validate_edge(valid_internal_edge, adg, ext_pkgs) is True
+    assert _validate_edge(valid_internal_edge, adg) is True
     print("_validate_edge valid internal OK")
 
     print("All self-checks passed")

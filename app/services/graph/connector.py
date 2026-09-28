@@ -114,22 +114,6 @@ class GraphStore:
                 role=node.role.value,
             )
 
-    def load_node(self, fqn: FQN) -> FQNNode | None:
-        with self._session() as session:
-            result = session.run("MATCH (n:FQNNode {fqn: $fqn}) RETURN n", fqn=str(fqn))
-            record = result.single()
-            if record is None:
-                return None
-            return self._row_to_fqn_node(record)
-
-    def find_nodes_by_file(self, file_path: str) -> list[FQNNode]:
-        with self._session() as session:
-            result = session.run(
-                "MATCH (n:FQNNode) WHERE n.file_path = $file_path RETURN n",
-                file_path=file_path,
-            )
-            return [self._row_to_fqn_node(record) for record in result]
-
     # --- Edge CRUD ---
 
     def store_edge(self, edge: Edge) -> None:
@@ -142,18 +126,6 @@ class GraphStore:
                 f"CREATE (src)-[:{rel_type}]->(tgt)",
                 source=edge.source, target=edge.target,
             )
-
-    def load_edges_from(self, fqn: FQN) -> list[Edge]:
-        with self._session() as session:
-            result = session.run(
-                "MATCH (src:FQNNode {fqn: $fqn})-[r]->(tgt:FQNNode) "
-                "RETURN type(r) AS kind, tgt.fqn AS target",
-                fqn=str(fqn),
-            )
-            return [
-                Edge(source=str(fqn), target=r["target"], kind=r["kind"])
-                for r in result
-            ]
 
     # --- Constraint edge CRUD ---
 
@@ -268,17 +240,6 @@ class GraphStore:
             )
             return [self._row_to_constraint_edge(record) for record in result]
 
-    def delete_constraints_by_adr(self, adr_id: str) -> None:
-        with self._session() as session:
-            session.run(
-                "MATCH (src:FQNNode)-[r]->(tgt:FQNNode) "
-                "WHERE type(r) IN $predicate_types AND r.adr_id = $adr_id "
-                "DELETE r",
-                adr_id=adr_id,
-                predicate_types=PREDICATE_VALUES,
-            )
-        log.info("delete_constraints_by_adr: deleted constraints for adr_id=%s", adr_id)
-
     # --- Dismissal CRUD ---
 
     def store_dismissal(self, dismissal: Dismissal) -> None:
@@ -325,27 +286,6 @@ class GraphStore:
                 "d.adr_id AS adr_id, d.dismissed_at AS dismissed_at"
             )
             return [self._row_to_dismissal(r) for r in result]
-
-    def delete_dismissals_by_adr(self, adr_id: str) -> int:
-        """Delete all dismissals for a given adr_id. Returns count deleted."""
-        with self._session() as session:
-            result = session.run(
-                "MATCH (d:Dismissal {adr_id: $adr_id}) DELETE d RETURN count(d) AS deleted",
-                adr_id=adr_id,
-            )
-            record = result.single()
-            deleted = record["deleted"] if record else 0
-        log.info("delete_dismissals_by_adr: deleted %d dismissals for adr_id=%s", deleted, adr_id)
-        return deleted
-
-    def delete_all_dismissals(self) -> int:
-        """Delete all Dismissal nodes. Used for seed rebuild."""
-        with self._session() as session:
-            result = session.run("MATCH (d:Dismissal) DELETE d RETURN count(d) AS deleted")
-            record = result.single()
-            deleted = record["deleted"] if record else 0
-        log.info("delete_all_dismissals: deleted %d dismissals", deleted)
-        return deleted
 
     # --- Full ADG ---
 

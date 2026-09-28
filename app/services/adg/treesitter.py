@@ -315,7 +315,7 @@ def parse_file(source: bytes, module_fqn: FQN, rel_path: str) -> tuple[list[FQNN
     tree = parser.parse(source)
 
     # fail fast
-    if _has_error(tree.root_node):
+    if tree.root_node.has_error:
         raise SyntaxError(f"Syntax error in {rel_path}")
 
     nodes: list[FQNNode] = []
@@ -325,10 +325,6 @@ def parse_file(source: bytes, module_fqn: FQN, rel_path: str) -> tuple[list[FQNN
 
     return nodes, edges
 
-def _has_error(node) -> bool:
-    """Check if the AST has any errors."""
-    return node.has_error
-
 
 def _is_test_file(path: Path, repo_root: Path) -> bool:
     """Skip test files: paths under a tests/ dir, or files named test_*.py / *_test.py."""
@@ -337,7 +333,6 @@ def _is_test_file(path: Path, repo_root: Path) -> bool:
         return True
     name = path.name
     return name.startswith("test_") or name.endswith("_test.py")
-
 
 
 def parse_repo(repo_path: Path) -> ADG:

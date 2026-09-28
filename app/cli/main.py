@@ -466,16 +466,6 @@ def update(
         console.print(o_table)
 
 
-@app.command()
-def report(
-    repo: str = typer.Option(..., "--repo", "-r", help="Repository ID from repos.yaml"),
-) -> None:
-    """View stored violation reports for a repository."""
-    _get_repo(repo)
-    console.print(f"[bold]Fetching[/] reports for [cyan]{repo}[/]")
-    console.print("[dim]Not implemented yet.[/]")
-
-
 @violation_app.command("list")
 def violation_list(
     repo: str = typer.Option(..., "--repo", "-r", help="Repository ID from repos.yaml"),
@@ -757,16 +747,6 @@ def _check_gold_seed(repo: str, repo_path: Path, merged, read_back: list) -> tup
     (record_dir / name).write_text(json.dumps(record, indent=2) + "\n")
     console.print(f"  Recorded in benchmark/reports/gold_seeds/{name}")
     return missing, extra
-
-
-@seed_app.command("restore")
-def seed_restore(
-    repo: str = typer.Option(..., "--repo", "-r", help="Repository ID from repos.yaml"),
-) -> None:
-    """Restore an ADG seed snapshot into Neo4j."""
-    _get_repo(repo)
-    console.print(f"[bold]Restoring[/] seed for [cyan]{repo}[/]")
-    console.print("[dim]Not implemented yet.[/]")
 
 
 @seed_app.command("list")

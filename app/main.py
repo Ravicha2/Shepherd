@@ -22,14 +22,6 @@ def _get_langextract_config() -> LangExtractConfig:
     return _langextract_config
 
 
-def get_db():
-    driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
-    try:
-        yield driver
-    finally:
-        driver.close()
-
-
 @app.get("/health")
 def health():
     return {"status": "ok"}
