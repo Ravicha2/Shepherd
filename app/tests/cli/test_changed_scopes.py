@@ -18,8 +18,10 @@ from typer.testing import CliRunner
 import cli.main as main
 from cli.config import RepoConfig
 from cli.main import app, scoped_changes
+from services.cpt.dismissal import violation_short_id
 from services.fqn import FQN
 from services.models import ADG, DiffResult, FQNKind, FQNNode
+from tests.cli.test_violation_cli import _make_detection_result
 
 ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
 runner = CliRunner()
@@ -51,6 +53,14 @@ def _stub_repo(tmp_path, adg: ADG):
     store.load_adg.return_value = adg
     store.load_dismissals.return_value = []
     return RepoConfig(id="test-repo", url=str(repo_path), adr_dir="docs/adr"), store
+
+
+def _wire(mock_get_repo, mock_store_cls, tmp_path, *dotted_names) -> MagicMock:
+    """Point the patched `_get_repo` / `GraphStore` at a stub graph."""
+    repo_cfg, store = _stub_repo(tmp_path, _adg(*dotted_names))
+    mock_get_repo.return_value = repo_cfg
+    mock_store_cls.return_value = store
+    return store
 
 
 class TestScopedChanges:
@@ -124,9 +134,7 @@ class TestChangedScopesOnTheCli:
     def test_detect_reports_the_synthetic_set_and_reads_no_diff(
         self, mock_get_repo, mock_adapter, mock_store_cls, tmp_path
     ) -> None:
-        repo_cfg, store = _stub_repo(tmp_path, _adg("app.service.UserService", "app.repo.UserRepo"))
-        mock_get_repo.return_value = repo_cfg
-        mock_store_cls.return_value = store
+        _wire(mock_get_repo, mock_store_cls, tmp_path, "app.service.UserService", "app.repo.UserRepo")
 
         result = runner.invoke(
             app, ["detect", "--repo", "test-repo", "--changed-scopes", "app.service", "--json"]
@@ -145,9 +153,7 @@ class TestChangedScopesOnTheCli:
         self, mock_get_repo, mock_adapter, mock_store_cls, tmp_path
     ) -> None:
         """`violation list` is the command the two-arm harness calls."""
-        repo_cfg, store = _stub_repo(tmp_path, _adg("app.service.UserService"))
-        mock_get_repo.return_value = repo_cfg
-        mock_store_cls.return_value = store
+        _wire(mock_get_repo, mock_store_cls, tmp_path, "app.service.UserService")
 
         result = runner.invoke(
             app, ["violation", "list", "--repo", "test-repo", "--changed-scopes", "app.service"]
@@ -167,9 +173,7 @@ class TestChangedScopesOnTheCli:
         The empty set must suppress the git diff: without the flag a 0-unit
         historical case would be detected against whatever that commit touched.
         """
-        repo_cfg, store = _stub_repo(tmp_path, _adg("app.service.UserService"))
-        mock_get_repo.return_value = repo_cfg
-        mock_store_cls.return_value = store
+        _wire(mock_get_repo, mock_store_cls, tmp_path, "app.service.UserService")
 
         result = runner.invoke(
             app, ["violation", "list", "--repo", "test-repo", "--changed-scopes", ""]
@@ -182,9 +186,7 @@ class TestChangedScopesOnTheCli:
     @patch.object(main, "_get_repo")
     def test_without_the_flag_the_diff_path_still_runs(self, mock_get_repo, mock_store_cls, tmp_path) -> None:
         """The flag is opt-in: a plain run still asks git for the commit's diff."""
-        repo_cfg, store = _stub_repo(tmp_path, _adg("app.service.UserService"))
-        mock_get_repo.return_value = repo_cfg
-        mock_store_cls.return_value = store
+        _wire(mock_get_repo, mock_store_cls, tmp_path, "app.service.UserService")
 
         with patch.object(main.GitAdapter, "get_diff", side_effect=ValueError("no such sha")) as get_diff:
             result = runner.invoke(app, ["detect", "--repo", "test-repo", "--commit", "deadbeef"])
@@ -192,3 +194,34 @@ class TestChangedScopesOnTheCli:
         assert result.exit_code == 1
         assert get_diff.called
         assert "Git error" in plain(result.output)
+
+
+class TestChangedScopesOnViolationDismiss:
+    """The flag reaches `violation dismiss`, which re-detects before matching."""
+
+    @patch("cli.main.GraphStore")
+    @patch.object(main, "_get_repo")
+    def test_violation_dismiss_accepts_the_flag(
+        self, mock_get_repo, mock_store_cls, tmp_path
+    ) -> None:
+        """The short_id `list --changed-scopes` prints must be dismissable.
+
+        `dismiss` re-detects to honour its "must match current detection
+        results" contract; without the flag it reads the git diff instead and
+        reports the short_id as unknown (#176).
+        """
+        store = _wire(mock_get_repo, mock_store_cls, tmp_path, "app.service.UserService")
+
+        dr = _make_detection_result()
+        short_id = violation_short_id(dr.cpt_result.violations[0])
+
+        with patch.object(main, "_run_detection", return_value=dr) as run_detection:
+            result = runner.invoke(
+                app,
+                ["violation", "dismiss", short_id, "--repo", "test-repo",
+                 "--changed-scopes", "app.service"],
+            )
+
+        assert run_detection.call_args.kwargs["changed_scopes"] == ["app.service"]
+        assert result.exit_code == 0, result.output
+        assert store.store_dismissal.called

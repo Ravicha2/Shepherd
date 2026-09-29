@@ -29,7 +29,7 @@ def main() -> None:
     print(f"match_constraints_seconds: {time.perf_counter() - t:.2f}", flush=True)
 
     # filter bite: candidates vs subject matches, per constraint
-    adjacency = engine._build_adjacency(seed.edges)
+    adjacency = seed.out_edges
     universe = {str(n.fqn) for n in seed.nodes}
     for mc in matched.values():
         kinds = {"CONTAINS", "IMPORTS", "CALLS", "INHERITS"}

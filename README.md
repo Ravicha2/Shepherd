@@ -97,7 +97,7 @@ cpt update --repo flask --commit abc1234
 
 ## Repository Configuration
 
-Repositories are defined in `repos/repos.yaml`. Each entry specifies the repo path, ADR directory, Neo4j memory settings, and ports:
+Repositories are defined in `repos/repos.yaml`. Each entry specifies the repo path and ADR directory:
 
 ```yaml
 repos:
@@ -105,13 +105,6 @@ repos:
     url: ./my-project
     size: small
     adr_dir: docs/adr
-    ports:
-      http: 7475
-      bolt: 7688
-    neo4j_memory:
-      heap_initial: 256m
-      heap_max: 2048m
-      pagecache: 512m
 ```
 
 ## Environment Variables

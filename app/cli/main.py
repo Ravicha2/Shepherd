@@ -466,16 +466,6 @@ def update(
         console.print(o_table)
 
 
-@app.command()
-def report(
-    repo: str = typer.Option(..., "--repo", "-r", help="Repository ID from repos.yaml"),
-) -> None:
-    """View stored violation reports for a repository."""
-    _get_repo(repo)
-    console.print(f"[bold]Fetching[/] reports for [cyan]{repo}[/]")
-    console.print("[dim]Not implemented yet.[/]")
-
-
 @violation_app.command("list")
 def violation_list(
     repo: str = typer.Option(..., "--repo", "-r", help="Repository ID from repos.yaml"),
@@ -551,11 +541,18 @@ def violation_dismiss(
     short_id: str = typer.Argument(..., help="Short ID (5 hex chars) of the violation to dismiss"),
     repo: str = typer.Option(..., "--repo", "-r", help="Repository ID from repos.yaml"),
     commit: str | None = typer.Option(None, "--commit", "-c", help="Commit SHA (default: HEAD)"),
+    changed_scopes: list[str] = typer.Option(
+        None, "--changed-scopes",
+        help="Treat every node under each prefix as the changed set, ignoring the git "
+             "diff; pass an empty prefix for a case whose changed set is empty (#163). "
+             "Must match the scopes `violation list` used, or its short_id is unfindable "
+             "here (the dismissal identity is unaffected either way).",
+    ),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ) -> None:
     """Dismiss a violation by its short ID. Violations are ephemeral; must match current detection results."""
     console.print(f"[bold]Detecting[/] violations in [cyan]{repo}[/] (commit: {commit or 'HEAD'})")
-    dr = _run_detection(repo, commit)
+    dr = _run_detection(repo, commit, changed_scopes=changed_scopes)
 
     match = None
     for v in dr.cpt_result.violations:
@@ -757,16 +754,6 @@ def _check_gold_seed(repo: str, repo_path: Path, merged, read_back: list) -> tup
     (record_dir / name).write_text(json.dumps(record, indent=2) + "\n")
     console.print(f"  Recorded in benchmark/reports/gold_seeds/{name}")
     return missing, extra
-
-
-@seed_app.command("restore")
-def seed_restore(
-    repo: str = typer.Option(..., "--repo", "-r", help="Repository ID from repos.yaml"),
-) -> None:
-    """Restore an ADG seed snapshot into Neo4j."""
-    _get_repo(repo)
-    console.print(f"[bold]Restoring[/] seed for [cyan]{repo}[/]")
-    console.print("[dim]Not implemented yet.[/]")
 
 
 @seed_app.command("list")

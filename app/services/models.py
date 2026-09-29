@@ -26,12 +26,6 @@ class DependencyRole(Enum):
     UNKNOWN = "unknown"
 
 
-class ADRStatus(Enum):
-    ACCEPTED = "accepted"
-    SUPERSEDED = "superseded"
-    REJECTED = "rejected"
-
-
 class ConstraintScope(Enum):
     """#136 decision (a): runtime constraints govern the import graph;
     tooling/CI constraints (linters, formatters, type checkers, doc tooling,
@@ -231,12 +225,6 @@ class ADG:
             extra,
             lambda c: (c.adr_id, c.predicate, c.subject, c.object),
         ))
-
-
-@dataclass
-class MDSResult:
-    hubs: list[str] = field(default_factory=list)
-    dominance_counts: dict[str, int] = field(default_factory=dict)
 
 
 # Diff Processor data models

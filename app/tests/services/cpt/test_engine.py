@@ -15,6 +15,7 @@ from __future__ import annotations
 import dataclasses
 import textwrap
 from pathlib import Path
+from typing import Iterable, Mapping
 
 import pytest
 
@@ -32,6 +33,13 @@ from services.models import (
     FQNNode,
     PredicateType,
 )
+
+
+def _adjacency(edges: Iterable[Edge]) -> Mapping[str, tuple[Edge, ...]]:
+    """Test fixture: bucket a raw edge iterable the way the engine does.
+    (Was `services.cpt.engine._build_adjacency` until #176 — the production
+    shim existed only for these call sites.)"""
+    return ADG(edges=tuple(edges)).out_edges
 
 
 # ===========================================================================
@@ -293,33 +301,14 @@ def test_detect_output_is_hash_seed_independent() -> None:
 # ===========================================================================
 
 
-class TestBuildAdjacencyDelegate:
-    """`_build_adjacency` survives #173 as a shim over `ADG.out_edges`."""
-
-    def test_delegate_agrees_with_the_index(self) -> None:
-        from services.cpt.engine import _build_adjacency
-
-        edges = [
-            Edge(source="app.api.users", target="app.auth.middleware", kind="IMPORTS"),
-            Edge(source="app.api.users", target="app.models.user", kind="IMPORTS"),
-            Edge(source="app.auth.middleware", target="app.models.user", kind="CALLS"),
-        ]
-        adg = ADG(edges=edges)
-        assert _build_adjacency(edges) == adg.out_edges
-        # a raw set still works — the seam the tests use — but a set has no order,
-        # so only the bucket *contents* are pinned
-        assert {k: set(v) for k, v in _build_adjacency(set(edges)).items()} == \
-            {k: set(v) for k, v in adg.out_edges.items()}
-
-
 class TestCheckStructuralPredicates:
     """PROHIBITS_* constraints evaluated without changed_fqn."""
 
     def test_reachable_paths(self) -> None:
-        from services.cpt.engine import _reachable_paths, _build_adjacency
+        from services.cpt.engine import _reachable_paths
         from services.models import Edge
 
-        adjacency = _build_adjacency({
+        adjacency = _adjacency({
             Edge(source="app.api.users", target="app.auth.middleware", kind="IMPORTS"),
             Edge(source="app.auth.middleware", target="app.models.user", kind="IMPORTS"),
         })
@@ -336,10 +325,10 @@ class TestCheckStructuralPredicates:
         fallback) is a dependency on the package's interface, not on every
         module inside it: CONTAINS must not expand once a dependency edge
         has been traversed."""
-        from services.cpt.engine import _reachable_paths, _build_adjacency
+        from services.cpt.engine import _reachable_paths
         from services.models import Edge
 
-        adjacency = _build_adjacency({
+        adjacency = _adjacency({
             Edge(source="pkg", target="pkg.helper", kind="CONTAINS"),
             Edge(source="pkg", target="pkg.gpio_driver", kind="CONTAINS"),
             Edge(source="importer", target="pkg", kind="IMPORTS"),
@@ -353,10 +342,10 @@ class TestCheckStructuralPredicates:
         """issue 150 preserved: pure descent from the subject's own scope
         (package node CONTAINS child, child IMPORTS object) still reaches the
         object: load-bearing for package-level requires satisfaction."""
-        from services.cpt.engine import _reachable_paths, _build_adjacency
+        from services.cpt.engine import _reachable_paths
         from services.models import Edge
 
-        adjacency = _build_adjacency({
+        adjacency = _adjacency({
             Edge(source="pkg", target="pkg.gpio_driver", kind="CONTAINS"),
             Edge(source="pkg.gpio_driver", target="gpiozero", kind="IMPORTS"),
         })
@@ -370,10 +359,10 @@ class TestCheckStructuralPredicates:
     def test_reachable_paths_transitive_dependency_chain_still_traverses(self) -> None:
         """issue 150 preserved: module -> module -> module dependency chains
         (the #138 door_status -> pin_tools -> gpiozero shape)."""
-        from services.cpt.engine import _reachable_paths, _build_adjacency
+        from services.cpt.engine import _reachable_paths
         from services.models import Edge
 
-        adjacency = _build_adjacency({
+        adjacency = _adjacency({
             Edge(source="door_status", target="pin_tools", kind="IMPORTS"),
             Edge(source="pin_tools", target="gpiozero", kind="IMPORTS"),
         })
@@ -382,7 +371,7 @@ class TestCheckStructuralPredicates:
         assert "gpiozero" in paths
 
     def test_prohibits_dependency_violated(self) -> None:
-        from services.cpt.engine import MatchedConstraint, constraint_key, check_structural_predicates, _build_adjacency
+        from services.cpt.engine import MatchedConstraint, constraint_key, check_structural_predicates
         from services.resolver import MatchStatus
 
         constraint = ConstraintEdge(
@@ -393,7 +382,7 @@ class TestCheckStructuralPredicates:
             adr_id="ADR-003",
             adr_path="docs/adr/003.md",
         )
-        adjacency = _build_adjacency({
+        adjacency = _adjacency({
             Edge(source="app.api.users", target="app.models.user", kind="IMPORTS"),
         })
         matched = {
@@ -412,7 +401,7 @@ class TestCheckStructuralPredicates:
         module namespace-imports the package itself fires exactly once, at the
         module that genuinely imports the object. Pre-fix this fired at
         pkg.helper too (IMPORTS pkg -> CONTAINS subtree cascade)."""
-        from services.cpt.engine import MatchedConstraint, constraint_key, check_structural_predicates, _build_adjacency
+        from services.cpt.engine import MatchedConstraint, constraint_key, check_structural_predicates
         from services.resolver import MatchStatus
 
         constraint = ConstraintEdge(
@@ -423,7 +412,7 @@ class TestCheckStructuralPredicates:
             adr_id="ADR-019",
             adr_path="docs/adr/019.md",
         )
-        adjacency = _build_adjacency({
+        adjacency = _adjacency({
             Edge(source="pkg", target="pkg.helper", kind="CONTAINS"),
             Edge(source="pkg", target="pkg.gpio_driver", kind="CONTAINS"),
             Edge(source="pkg.helper", target="pkg", kind="IMPORTS"),
@@ -444,7 +433,7 @@ class TestCheckStructuralPredicates:
         assert str(violations[0].matched_fqn) == "pkg.gpio_driver"
 
     def test_prohibits_dependency_not_violated(self) -> None:
-        from services.cpt.engine import MatchedConstraint, constraint_key, check_structural_predicates, _build_adjacency
+        from services.cpt.engine import MatchedConstraint, constraint_key, check_structural_predicates
         from services.resolver import MatchStatus
 
         constraint = ConstraintEdge(
@@ -455,7 +444,7 @@ class TestCheckStructuralPredicates:
             adr_id="ADR-003",
             adr_path="docs/adr/003.md",
         )
-        adjacency = _build_adjacency({
+        adjacency = _adjacency({
             Edge(source="app.api.users", target="app.auth.middleware", kind="IMPORTS"),
         })
         matched = {
@@ -469,7 +458,7 @@ class TestCheckStructuralPredicates:
         assert len(violations) == 0
 
     def test_prohibits_implementation_violated(self) -> None:
-        from services.cpt.engine import MatchedConstraint, constraint_key, check_structural_predicates, _build_adjacency
+        from services.cpt.engine import MatchedConstraint, constraint_key, check_structural_predicates
         from services.resolver import MatchStatus
 
         constraint = ConstraintEdge(
@@ -480,7 +469,7 @@ class TestCheckStructuralPredicates:
             adr_id="ADR-005",
             adr_path="docs/adr/005.md",
         )
-        adjacency = _build_adjacency({
+        adjacency = _adjacency({
             Edge(source="app.api", target="app.auth.middleware", kind="CONTAINS"),
         })
         matched = {
@@ -503,7 +492,7 @@ class TestCheckChangeTriggeredPredicates:
     """REQUIRES_* constraints evaluated per changed_fqn."""
 
     def test_requires_dependency_violated(self) -> None:
-        from services.cpt.engine import MatchedConstraint, constraint_key, check_change_triggered_predicates, _build_adjacency
+        from services.cpt.engine import MatchedConstraint, constraint_key, check_change_triggered_predicates
         from services.resolver import MatchStatus
 
         constraint = ConstraintEdge(
@@ -515,7 +504,7 @@ class TestCheckChangeTriggeredPredicates:
             adr_path="docs/adr/004.md",
         )
         # Empty adjacency: BFS from prefix 'app.api' reaches nothing → violation
-        adjacency = _build_adjacency(set())
+        adjacency = _adjacency(set())
         matched = {
             constraint_key(constraint): MatchedConstraint(
                 constraint=constraint,
@@ -531,7 +520,7 @@ class TestCheckChangeTriggeredPredicates:
         assert violations[0].evidence == "app.api.orders has no dependency on any module matching app.auth.middleware"
 
     def test_requires_dependency_not_violated(self) -> None:
-        from services.cpt.engine import MatchedConstraint, constraint_key, check_change_triggered_predicates, _build_adjacency
+        from services.cpt.engine import MatchedConstraint, constraint_key, check_change_triggered_predicates
         from services.resolver import MatchStatus
 
         constraint = ConstraintEdge(
@@ -543,7 +532,7 @@ class TestCheckChangeTriggeredPredicates:
             adr_path="docs/adr/004.md",
         )
         # BFS from prefix 'app.api' needs CONTAINS edge to reach child modules
-        adjacency = _build_adjacency({
+        adjacency = _adjacency({
             Edge(source="app.api", target="app.api.users", kind="CONTAINS"),
             Edge(source="app.api.users", target="app.auth.middleware", kind="IMPORTS"),
         })
@@ -559,7 +548,7 @@ class TestCheckChangeTriggeredPredicates:
         assert len(violations) == 0
 
     def test_requires_implementation_violated(self) -> None:
-        from services.cpt.engine import MatchedConstraint, constraint_key, check_change_triggered_predicates, _build_adjacency
+        from services.cpt.engine import MatchedConstraint, constraint_key, check_change_triggered_predicates
         from services.resolver import MatchStatus
 
         constraint = ConstraintEdge(
@@ -570,7 +559,7 @@ class TestCheckChangeTriggeredPredicates:
             adr_id="ADR-005",
             adr_path="docs/adr/005.md",
         )
-        adjacency = _build_adjacency(set())
+        adjacency = _adjacency(set())
         matched = {
             constraint_key(constraint): MatchedConstraint(
                 constraint=constraint,
@@ -584,7 +573,7 @@ class TestCheckChangeTriggeredPredicates:
         assert violations[0].evidence == "app.middleware does not implement any module matching app.auth.middleware"
 
     def test_requires_wildcard_multiple_objects_semantics(self) -> None:
-        from services.cpt.engine import MatchedConstraint, constraint_key, check_change_triggered_predicates, _build_adjacency
+        from services.cpt.engine import MatchedConstraint, constraint_key, check_change_triggered_predicates
         from services.resolver import MatchStatus
 
         constraint = ConstraintEdge(
@@ -597,7 +586,7 @@ class TestCheckChangeTriggeredPredicates:
         )
         # Case 1: Zero objects reachable -> exactly 1 violation emitted
         # BFS starts from prefix 'app.api'
-        adjacency_empty = _build_adjacency(set())
+        adjacency_empty = _adjacency(set())
         matched = {
             constraint_key(constraint): MatchedConstraint(
                 constraint=constraint,
@@ -615,7 +604,7 @@ class TestCheckChangeTriggeredPredicates:
 
         # Case 2: One object reachable via prefix -> 0 violations emitted
         # Need CONTAINS edge from prefix to child so BFS can reach the IMPORTS target
-        adjacency_partial = _build_adjacency({
+        adjacency_partial = _adjacency({
             Edge(source="app.api", target="app.api.orders", kind="CONTAINS"),
             Edge(source="app.api.orders", target="app.auth.a", kind="IMPORTS"),
         })
@@ -623,7 +612,7 @@ class TestCheckChangeTriggeredPredicates:
         assert len(violations_partial) == 0
 
     def test_requires_implementation_not_violated(self) -> None:
-        from services.cpt.engine import MatchedConstraint, constraint_key, check_change_triggered_predicates, _build_adjacency
+        from services.cpt.engine import MatchedConstraint, constraint_key, check_change_triggered_predicates
         from services.resolver import MatchStatus
 
         constraint = ConstraintEdge(
@@ -634,7 +623,7 @@ class TestCheckChangeTriggeredPredicates:
             adr_id="ADR-005",
             adr_path="docs/adr/005.md",
         )
-        adjacency = _build_adjacency({
+        adjacency = _adjacency({
             Edge(source="app.middleware", target="app.middleware.auth", kind="CONTAINS"),
             Edge(source="app.middleware.auth", target="app.auth.middleware", kind="CALLS"),
         })
@@ -650,7 +639,7 @@ class TestCheckChangeTriggeredPredicates:
         assert len(violations) == 0
 
     def test_requires_skips_constraint_if_changed_not_in_subject(self) -> None:
-        from services.cpt.engine import MatchedConstraint, constraint_key, check_change_triggered_predicates, _build_adjacency
+        from services.cpt.engine import MatchedConstraint, constraint_key, check_change_triggered_predicates
         from services.resolver import MatchStatus
 
         constraint = ConstraintEdge(
@@ -661,7 +650,7 @@ class TestCheckChangeTriggeredPredicates:
             adr_id="ADR-004",
             adr_path="docs/adr/004.md",
         )
-        adjacency = _build_adjacency(set())
+        adjacency = _adjacency(set())
         matched = {
             constraint_key(constraint): MatchedConstraint(
                 constraint=constraint,
@@ -1277,9 +1266,9 @@ class TestDevToolFiltering:
     """DEV_TOOL nodes are excluded from reachability traversal."""
 
     def test_reachable_paths_skips_dev_tool(self) -> None:
-        from services.cpt.engine import _reachable_paths, _build_adjacency
+        from services.cpt.engine import _reachable_paths
 
-        adjacency = _build_adjacency({
+        adjacency = _adjacency({
             Edge(source="app.api", target="pytest", kind="IMPORTS"),
             Edge(source="pytest", target="pytest.fixture", kind="CONTAINS"),
         })
@@ -1296,9 +1285,9 @@ class TestDevToolFiltering:
         assert "pytest.fixture" not in paths
 
     def test_reachable_paths_includes_unknown_external(self) -> None:
-        from services.cpt.engine import _reachable_paths, _build_adjacency
+        from services.cpt.engine import _reachable_paths
 
-        adjacency = _build_adjacency({
+        adjacency = _adjacency({
             Edge(source="app.api", target="flask", kind="IMPORTS"),
         })
         node_roles = {
@@ -1313,7 +1302,7 @@ class TestDevToolFiltering:
 
     def test_prohibits_dependency_ignores_dev_tool_path(self) -> None:
         """A module importing pytest should NOT trigger PROHIBITS_DEPENDENCY."""
-        from services.cpt.engine import MatchedConstraint, constraint_key, check_structural_predicates, _build_adjacency
+        from services.cpt.engine import MatchedConstraint, constraint_key, check_structural_predicates
         from services.resolver import MatchStatus
 
         constraint = ConstraintEdge(
@@ -1324,7 +1313,7 @@ class TestDevToolFiltering:
             adr_id="ADR-DT1",
             adr_path="docs/adr/dt1.md",
         )
-        adjacency = _build_adjacency({
+        adjacency = _adjacency({
             Edge(source="app.api.users", target="pytest", kind="IMPORTS"),
         })
         node_roles = {
@@ -1343,7 +1332,7 @@ class TestDevToolFiltering:
 
     def test_prohibits_dependency_flags_unknown_external(self) -> None:
         """A module importing flask SHOULD trigger PROHIBITS_DEPENDENCY."""
-        from services.cpt.engine import MatchedConstraint, constraint_key, check_structural_predicates, _build_adjacency
+        from services.cpt.engine import MatchedConstraint, constraint_key, check_structural_predicates
         from services.resolver import MatchStatus
 
         constraint = ConstraintEdge(
@@ -1354,7 +1343,7 @@ class TestDevToolFiltering:
             adr_id="ADR-DT2",
             adr_path="docs/adr/dt2.md",
         )
-        adjacency = _build_adjacency({
+        adjacency = _adjacency({
             Edge(source="app.api.users", target="flask", kind="IMPORTS"),
         })
         node_roles = {
@@ -1373,7 +1362,7 @@ class TestDevToolFiltering:
 
     def test_prohibits_dependency_suppresses_dev_tool_object(self) -> None:
         """PROHIBITS_DEPENDENCY with DEV_TOOL object is suppressed entirely."""
-        from services.cpt.engine import MatchedConstraint, constraint_key, check_structural_predicates, _build_adjacency
+        from services.cpt.engine import MatchedConstraint, constraint_key, check_structural_predicates
         from services.resolver import MatchStatus
 
         constraint = ConstraintEdge(
@@ -1384,7 +1373,7 @@ class TestDevToolFiltering:
             adr_id="ADR-DT3",
             adr_path="docs/adr/dt3.md",
         )
-        adjacency = _build_adjacency({
+        adjacency = _adjacency({
             Edge(source="app.api.users", target="pytest", kind="IMPORTS"),
         })
         node_roles = {
@@ -1403,7 +1392,7 @@ class TestDevToolFiltering:
 
     def test_requires_dependency_suppresses_dev_tool_object(self) -> None:
         """REQUIRES_DEPENDENCY targeting a DEV_TOOL produces no violation."""
-        from services.cpt.engine import MatchedConstraint, constraint_key, check_change_triggered_predicates, _build_adjacency
+        from services.cpt.engine import MatchedConstraint, constraint_key, check_change_triggered_predicates
         from services.resolver import MatchStatus
 
         constraint = ConstraintEdge(
@@ -1414,7 +1403,7 @@ class TestDevToolFiltering:
             adr_id="ADR-DT4",
             adr_path="docs/adr/dt4.md",
         )
-        adjacency = _build_adjacency({
+        adjacency = _adjacency({
             Edge(source="app", target="app.api", kind="CONTAINS"),
         })
         node_roles = {
@@ -1440,7 +1429,7 @@ class TestDevToolFiltering:
 
     def test_requires_dependency_flags_unknown_object(self) -> None:
         """REQUIRES_DEPENDENCY targeting an UNKNOWN (application) object still produces violation."""
-        from services.cpt.engine import MatchedConstraint, constraint_key, check_change_triggered_predicates, _build_adjacency
+        from services.cpt.engine import MatchedConstraint, constraint_key, check_change_triggered_predicates
         from services.resolver import MatchStatus
 
         constraint = ConstraintEdge(
@@ -1451,7 +1440,7 @@ class TestDevToolFiltering:
             adr_id="ADR-DT5",
             adr_path="docs/adr/dt5.md",
         )
-        adjacency = _build_adjacency({
+        adjacency = _adjacency({
             Edge(source="app", target="app.api", kind="CONTAINS"),
         })
         node_roles = {
@@ -1519,9 +1508,9 @@ class TestPathBasedProhibits:
         }
 
     def test_via_connector_only_not_violating(self) -> None:
-        from services.cpt.engine import check_structural_predicates, _build_adjacency
+        from services.cpt.engine import check_structural_predicates
 
-        adjacency = _build_adjacency({
+        adjacency = _adjacency({
             Edge(source="app.services.OrderService", target="app.db_connector.Conn", kind="CALLS"),
             Edge(source="app.db_connector.Conn", target="src.db", kind="CALLS"),
         })
@@ -1529,9 +1518,9 @@ class TestPathBasedProhibits:
         assert len(violations) == 0
 
     def test_direct_path_violates_and_evidence_names_path(self) -> None:
-        from services.cpt.engine import check_structural_predicates, _build_adjacency
+        from services.cpt.engine import check_structural_predicates
 
-        adjacency = _build_adjacency({
+        adjacency = _adjacency({
             Edge(source="app.services.OrderService", target="src.db", kind="CALLS"),
         })
         violations = check_structural_predicates(self._prohibit_and_require_matched(), adjacency)
@@ -1541,9 +1530,9 @@ class TestPathBasedProhibits:
         )
 
     def test_mixed_paths_violate_and_evidence_names_direct_path(self) -> None:
-        from services.cpt.engine import check_structural_predicates, _build_adjacency
+        from services.cpt.engine import check_structural_predicates
 
-        adjacency = _build_adjacency({
+        adjacency = _adjacency({
             Edge(source="app.services.OrderService", target="src.db", kind="CALLS"),
             Edge(source="app.services.OrderService", target="app.db_connector.Conn", kind="CALLS"),
             Edge(source="app.db_connector.Conn", target="src.db", kind="CALLS"),
@@ -1555,9 +1544,9 @@ class TestPathBasedProhibits:
         )
 
     def test_via_non_allowed_intermediary_still_violates(self) -> None:
-        from services.cpt.engine import check_structural_predicates, _build_adjacency
+        from services.cpt.engine import check_structural_predicates
 
-        adjacency = _build_adjacency({
+        adjacency = _adjacency({
             Edge(source="app.services.OrderService", target="app.random.Thing", kind="CALLS"),
             Edge(source="app.random.Thing", target="src.db", kind="CALLS"),
         })
@@ -1594,9 +1583,9 @@ class TestRequiresImplementationInherits:
         }
 
     def test_inherits_satisfies(self) -> None:
-        from services.cpt.engine import check_change_triggered_predicates, _build_adjacency
+        from services.cpt.engine import check_change_triggered_predicates
 
-        adjacency = _build_adjacency({
+        adjacency = _adjacency({
             Edge(source="app.api.orders", target="app.auth.AuthMiddleware", kind="INHERITS"),
         })
         changed = [_changed_fqn("app.api.orders")]
@@ -1604,9 +1593,9 @@ class TestRequiresImplementationInherits:
         assert len(violations) == 0
 
     def test_calls_still_satisfies(self) -> None:
-        from services.cpt.engine import check_change_triggered_predicates, _build_adjacency
+        from services.cpt.engine import check_change_triggered_predicates
 
-        adjacency = _build_adjacency({
+        adjacency = _adjacency({
             Edge(source="app.api.orders", target="app.auth.AuthMiddleware", kind="CALLS"),
         })
         changed = [_changed_fqn("app.api.orders")]
@@ -1614,15 +1603,15 @@ class TestRequiresImplementationInherits:
         assert len(violations) == 0
 
     def test_no_edge_still_violates(self) -> None:
-        from services.cpt.engine import check_change_triggered_predicates, _build_adjacency
+        from services.cpt.engine import check_change_triggered_predicates
 
-        adjacency = _build_adjacency({})
+        adjacency = _adjacency({})
         changed = [_changed_fqn("app.api.orders")]
         violations = check_change_triggered_predicates(self._matched(), adjacency, changed)
         assert len(violations) == 1
 
     def test_prohibits_implementation_flags_inherits(self) -> None:
-        from services.cpt.engine import MatchedConstraint, constraint_key, check_structural_predicates, _build_adjacency
+        from services.cpt.engine import MatchedConstraint, constraint_key, check_structural_predicates
         from services.resolver import MatchStatus
 
         constraint = ConstraintEdge(
@@ -1633,7 +1622,7 @@ class TestRequiresImplementationInherits:
             adr_id="ADR-005",
             adr_path="docs/adr/005.md",
         )
-        adjacency = _build_adjacency({
+        adjacency = _adjacency({
             Edge(source="app.api", target="app.auth.middleware", kind="INHERITS"),
         })
         matched = {
@@ -2003,7 +1992,7 @@ def _reverse_filter_matched() -> tuple:
         ADG(nodes=adg.nodes, edges=adg.edges, constraint_edges=_reverse_filter_constraints())
     )
     assert matched, "fixture must produce matched constraints"
-    return adg, matched, engine._build_adjacency(adg.edges), engine._enclosing_module_map(adg)
+    return adg, matched, adg.out_edges, engine._enclosing_module_map(adg)
 
 
 def test_reverse_filter_is_a_no_op_on_structural_violations(monkeypatch) -> None:

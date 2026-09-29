@@ -7,7 +7,7 @@ from services.fqn import FQN
 from services.models import ADG, ChangedFQN, ConstraintEdge, ConstraintScope, DependencyRole, DiffResult, Edge, FQNKind, PredicateType
 from services.cpt.resolution import Violation, resolve, suppress_outweighed_prohibits, suppress_outweighed_requires
 from services.resolver import MatchStatus, fqn_matches_pattern
-from collections.abc import Iterable, Mapping
+from collections.abc import Mapping
 from collections import deque, defaultdict
 
 Adjacency = Mapping[str, tuple[Edge, ...]]
@@ -40,12 +40,6 @@ class MatchedConstraint:
     constraint: ConstraintEdge
     subject_matches: list[tuple[FQN, MatchStatus]]
     object_matches: list[tuple[FQN, MatchStatus]]
-
-
-def _build_adjacency(edges: Iterable[Edge]) -> Adjacency:
-    """ADG owns the bucketing (#173); this stays a free function because ~60
-    test sites hand it a raw edge iterable rather than a graph."""
-    return ADG(edges=tuple(edges)).out_edges
 
 
 def _enclosing_module_map(adg: ADG) -> dict[str, str]:

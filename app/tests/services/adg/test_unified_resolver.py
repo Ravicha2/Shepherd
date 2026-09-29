@@ -755,7 +755,7 @@ class TestValidateEdge:
             adr_id="ADR-001",
             adr_path="docs/adr/001.md",
         )
-        assert _validate_edge(edge, sample_adg, set()) is True
+        assert _validate_edge(edge, sample_adg) is True
 
     def test_valid_class_patterns_pass(self, sample_adg: ADG) -> None:
         edge = ConstraintEdge(
@@ -766,7 +766,7 @@ class TestValidateEdge:
             adr_id="ADR-002",
             adr_path="docs/adr/002.md",
         )
-        assert _validate_edge(edge, sample_adg, set()) is True
+        assert _validate_edge(edge, sample_adg) is True
 
     def test_hallucinated_subject_fails(self, sample_adg: ADG) -> None:
         edge = ConstraintEdge(
@@ -777,7 +777,7 @@ class TestValidateEdge:
             adr_id="ADR-001",
             adr_path="docs/adr/001.md",
         )
-        assert _validate_edge(edge, sample_adg, set()) is False
+        assert _validate_edge(edge, sample_adg) is False
 
     def test_hallucinated_object_fails(self, sample_adg: ADG) -> None:
         edge = ConstraintEdge(
@@ -788,7 +788,7 @@ class TestValidateEdge:
             adr_id="ADR-001",
             adr_path="docs/adr/001.md",
         )
-        assert _validate_edge(edge, sample_adg, set()) is False
+        assert _validate_edge(edge, sample_adg) is False
 
     def test_both_hallucinated_fails(self, sample_adg: ADG) -> None:
         edge = ConstraintEdge(
@@ -799,9 +799,9 @@ class TestValidateEdge:
             adr_id="ADR-001",
             adr_path="docs/adr/001.md",
         )
-        assert _validate_edge(edge, sample_adg, set()) is False
+        assert _validate_edge(edge, sample_adg) is False
 
-    def test_requires_external_object_in_list_passes(self, sample_adg: ADG) -> None:
+    def test_requires_external_object_imported_passes(self, sample_adg: ADG) -> None:
         # ponytail: requires_* external object passes (LLM grounded by External packages prompt section)
         edge = ConstraintEdge(
             subject="app.api.*",
@@ -811,11 +811,11 @@ class TestValidateEdge:
             adr_id="ADR-001",
             adr_path="docs/adr/001.md",
         )
-        assert _validate_edge(edge, sample_adg, {"elasticsearch"}) is True
+        assert _validate_edge(edge, sample_adg) is True
 
-    def test_requires_external_object_not_in_list_passes(self, sample_adg: ADG) -> None:
+    def test_requires_external_object_not_imported_passes(self, sample_adg: ADG) -> None:
         # ponytail: loosened strict rule — transitive deps (postgresql via django.db) not in IMPORTS still pass;
-        # LLM is grounded by the External packages section, not by the validator
+        # the LLM is grounded by the External packages section, not by the validator
         edge = ConstraintEdge(
             subject="app.api.*",
             predicate=PredicateType.REQUIRES_DEPENDENCY,
@@ -824,9 +824,9 @@ class TestValidateEdge:
             adr_id="ADR-001",
             adr_path="docs/adr/001.md",
         )
-        assert _validate_edge(edge, sample_adg, set()) is True
+        assert _validate_edge(edge, sample_adg) is True
 
-    def test_prohibits_external_object_not_in_list_passes(self, sample_adg: ADG) -> None:
+    def test_prohibits_external_object_not_imported_passes(self, sample_adg: ADG) -> None:
         # ponytail: prohibits_* external object may be absent (linter checks absence)
         edge = ConstraintEdge(
             subject="app.api.*",
@@ -836,7 +836,7 @@ class TestValidateEdge:
             adr_id="ADR-001",
             adr_path="docs/adr/001.md",
         )
-        assert _validate_edge(edge, sample_adg, set()) is True
+        assert _validate_edge(edge, sample_adg) is True
 
     def test_external_package_subject_passes(self, sample_adg: ADG) -> None:
         edge = ConstraintEdge(
@@ -847,7 +847,7 @@ class TestValidateEdge:
             adr_id="ADR-001",
             adr_path="docs/adr/001.md",
         )
-        assert _validate_edge(edge, sample_adg, set()) is True
+        assert _validate_edge(edge, sample_adg) is True
 
     def test_hallucinated_internal_object_with_external_subject_fails(self, sample_adg: ADG) -> None:
         # External subject passes, but hallucinated internal object must still drop.
@@ -859,7 +859,7 @@ class TestValidateEdge:
             adr_id="ADR-001",
             adr_path="docs/adr/001.md",
         )
-        assert _validate_edge(edge, sample_adg, set()) is False
+        assert _validate_edge(edge, sample_adg) is False
 
 
 # -- Test: _is_internal -------------------------------------------------------
