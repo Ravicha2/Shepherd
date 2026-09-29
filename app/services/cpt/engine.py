@@ -7,7 +7,7 @@ from services.fqn import FQN
 from services.models import ADG, ChangedFQN, ConstraintEdge, ConstraintScope, DependencyRole, DiffResult, Edge, FQNKind, PredicateType
 from services.cpt.resolution import Violation, resolve, suppress_outweighed_prohibits, suppress_outweighed_requires
 from services.resolver import MatchStatus, fqn_matches_pattern
-from collections.abc import Iterable, Mapping
+from collections.abc import Mapping
 from collections import deque, defaultdict
 
 Adjacency = Mapping[str, tuple[Edge, ...]]

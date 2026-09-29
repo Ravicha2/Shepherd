@@ -55,6 +55,14 @@ def _stub_repo(tmp_path, adg: ADG):
     return RepoConfig(id="test-repo", url=str(repo_path), adr_dir="docs/adr"), store
 
 
+def _wire(mock_get_repo, mock_store_cls, tmp_path, *dotted_names) -> MagicMock:
+    """Point the patched `_get_repo` / `GraphStore` at a stub graph."""
+    repo_cfg, store = _stub_repo(tmp_path, _adg(*dotted_names))
+    mock_get_repo.return_value = repo_cfg
+    mock_store_cls.return_value = store
+    return store
+
+
 class TestScopedChanges:
     """The pure changed-set builder."""
 
@@ -126,9 +134,7 @@ class TestChangedScopesOnTheCli:
     def test_detect_reports_the_synthetic_set_and_reads_no_diff(
         self, mock_get_repo, mock_adapter, mock_store_cls, tmp_path
     ) -> None:
-        repo_cfg, store = _stub_repo(tmp_path, _adg("app.service.UserService", "app.repo.UserRepo"))
-        mock_get_repo.return_value = repo_cfg
-        mock_store_cls.return_value = store
+        _wire(mock_get_repo, mock_store_cls, tmp_path, "app.service.UserService", "app.repo.UserRepo")
 
         result = runner.invoke(
             app, ["detect", "--repo", "test-repo", "--changed-scopes", "app.service", "--json"]
@@ -147,9 +153,7 @@ class TestChangedScopesOnTheCli:
         self, mock_get_repo, mock_adapter, mock_store_cls, tmp_path
     ) -> None:
         """`violation list` is the command the two-arm harness calls."""
-        repo_cfg, store = _stub_repo(tmp_path, _adg("app.service.UserService"))
-        mock_get_repo.return_value = repo_cfg
-        mock_store_cls.return_value = store
+        _wire(mock_get_repo, mock_store_cls, tmp_path, "app.service.UserService")
 
         result = runner.invoke(
             app, ["violation", "list", "--repo", "test-repo", "--changed-scopes", "app.service"]
@@ -157,6 +161,43 @@ class TestChangedScopesOnTheCli:
 
         assert result.exit_code == 0, result.output
         assert not mock_adapter.return_value.get_diff.called
+
+    @patch("cli.main.GraphStore")
+    @patch.object(main, "GitAdapter")
+    @patch.object(main, "_get_repo")
+    def test_an_empty_prefix_is_still_a_changed_set_decision(
+        self, mock_get_repo, mock_adapter, mock_store_cls, tmp_path
+    ) -> None:
+        """`--changed-scopes ''` is the argv the driver sends for a 0-unit case.
+
+        The empty set must suppress the git diff: without the flag a 0-unit
+        historical case would be detected against whatever that commit touched.
+        """
+        _wire(mock_get_repo, mock_store_cls, tmp_path, "app.service.UserService")
+
+        result = runner.invoke(
+            app, ["violation", "list", "--repo", "test-repo", "--changed-scopes", ""]
+        )
+
+        assert result.exit_code == 0, result.output
+        assert not mock_adapter.return_value.get_diff.called
+
+    @patch("cli.main.GraphStore")
+    @patch.object(main, "_get_repo")
+    def test_without_the_flag_the_diff_path_still_runs(self, mock_get_repo, mock_store_cls, tmp_path) -> None:
+        """The flag is opt-in: a plain run still asks git for the commit's diff."""
+        _wire(mock_get_repo, mock_store_cls, tmp_path, "app.service.UserService")
+
+        with patch.object(main.GitAdapter, "get_diff", side_effect=ValueError("no such sha")) as get_diff:
+            result = runner.invoke(app, ["detect", "--repo", "test-repo", "--commit", "deadbeef"])
+
+        assert result.exit_code == 1
+        assert get_diff.called
+        assert "Git error" in plain(result.output)
+
+
+class TestChangedScopesOnViolationDismiss:
+    """The flag reaches `violation dismiss`, which re-detects before matching."""
 
     @patch("cli.main.GraphStore")
     @patch.object(main, "_get_repo")
@@ -169,9 +210,7 @@ class TestChangedScopesOnTheCli:
         results" contract; without the flag it reads the git diff instead and
         reports the short_id as unknown (#176).
         """
-        repo_cfg, store = _stub_repo(tmp_path, _adg("app.service.UserService"))
-        mock_get_repo.return_value = repo_cfg
-        mock_store_cls.return_value = store
+        store = _wire(mock_get_repo, mock_store_cls, tmp_path, "app.service.UserService")
 
         dr = _make_detection_result()
         short_id = violation_short_id(dr.cpt_result.violations[0])
@@ -186,40 +225,3 @@ class TestChangedScopesOnTheCli:
         assert run_detection.call_args.kwargs["changed_scopes"] == ["app.service"]
         assert result.exit_code == 0, result.output
         assert store.store_dismissal.called
-
-    @patch("cli.main.GraphStore")
-    @patch.object(main, "GitAdapter")
-    @patch.object(main, "_get_repo")
-    def test_an_empty_prefix_is_still_a_changed_set_decision(
-        self, mock_get_repo, mock_adapter, mock_store_cls, tmp_path
-    ) -> None:
-        """`--changed-scopes ''` is the argv the driver sends for a 0-unit case.
-
-        The empty set must suppress the git diff: without the flag a 0-unit
-        historical case would be detected against whatever that commit touched.
-        """
-        repo_cfg, store = _stub_repo(tmp_path, _adg("app.service.UserService"))
-        mock_get_repo.return_value = repo_cfg
-        mock_store_cls.return_value = store
-
-        result = runner.invoke(
-            app, ["violation", "list", "--repo", "test-repo", "--changed-scopes", ""]
-        )
-
-        assert result.exit_code == 0, result.output
-        assert not mock_adapter.return_value.get_diff.called
-
-    @patch("cli.main.GraphStore")
-    @patch.object(main, "_get_repo")
-    def test_without_the_flag_the_diff_path_still_runs(self, mock_get_repo, mock_store_cls, tmp_path) -> None:
-        """The flag is opt-in: a plain run still asks git for the commit's diff."""
-        repo_cfg, store = _stub_repo(tmp_path, _adg("app.service.UserService"))
-        mock_get_repo.return_value = repo_cfg
-        mock_store_cls.return_value = store
-
-        with patch.object(main.GitAdapter, "get_diff", side_effect=ValueError("no such sha")) as get_diff:
-            result = runner.invoke(app, ["detect", "--repo", "test-repo", "--commit", "deadbeef"])
-
-        assert result.exit_code == 1
-        assert get_diff.called
-        assert "Git error" in plain(result.output)
