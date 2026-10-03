@@ -16,6 +16,45 @@ log = logging.getLogger(__name__)
 
 PY_LANGUAGE = Language(tspython.language())
 
+
+def _comment_ranges(node):
+    """Byte ranges of comment descendants, in span order.
+
+    Excised from code hashes so a comment edit is not material change
+    (#181 §8). AST-based, not regex: a comment-like string literal is a
+    string node and survives.
+    """
+    if node.type == "comment":
+        return [(node.start_byte, node.end_byte)]
+    ranges: list[tuple[int, int]] = []
+    for child in node.children:
+        ranges.extend(_comment_ranges(child))
+    return ranges
+
+
+def _span_code_hash(node, name_node=None) -> str:
+    """SHA-256 of a span's code, normalized so only material change shows.
+
+    Comments are excised, the definition's own name is cut (a pure rename
+    keeps the hash, #181 §8 — a rename that also edits the body is
+    renamed-and-edited, and re-surfacing that matches #181 §6's censoring),
+    and whitespace is collapsed (formatting is not material). Identifier
+    and structure changes — imports, calls, bases — still change the hash.
+    """
+    start = node.start_byte
+    cuts = _comment_ranges(node)
+    if name_node is not None:
+        cuts.append((name_node.start_byte, name_node.end_byte))
+    cuts.sort()
+    parts: list[bytes] = []
+    prev = start
+    for cut_start, cut_end in cuts:
+        parts.append(node.text[prev - start:cut_start - start])
+        prev = cut_end
+    parts.append(node.text[prev - start:])
+    return hashlib.sha256(b" ".join(b"".join(parts).split())).hexdigest()
+
+
 def walk_definitions(node, parent_fqn: FQN, parent_kind: str, rel_path: str, nodes: list[FQNNode], edges: list[Edge]):
     """Recursively walk AST to extract class, function, method definitions."""
     if node.type == "class_definition":
@@ -32,7 +71,7 @@ def walk_definitions(node, parent_fqn: FQN, parent_kind: str, rel_path: str, nod
             line_end=node.end_point[0],
             start_byte=node.start_byte,
             end_byte=node.end_byte,
-            code_hash=hashlib.sha256(node.text).hexdigest(),
+            code_hash=_span_code_hash(node, name_node),
         ))
         edges.append(Edge(source=str(parent_fqn), target=str(class_fqn), kind="CONTAINS"))
         for child in node.children:
@@ -53,7 +92,7 @@ def walk_definitions(node, parent_fqn: FQN, parent_kind: str, rel_path: str, nod
             line_end=node.end_point[0],
             start_byte=node.start_byte,
             end_byte=node.end_byte,
-            code_hash=hashlib.sha256(node.text).hexdigest(),
+            code_hash=_span_code_hash(node, name_node),
         ))
         edges.append(Edge(source=str(parent_fqn), target=str(func_fqn), kind="CONTAINS"))
         for child in node.children:
@@ -368,7 +407,7 @@ def parse_repo(repo_path: Path) -> ADG:
             line_end=line_count - 1,
             start_byte=0,
             end_byte=len(source),
-            code_hash=hashlib.sha256(source).hexdigest(),
+            code_hash=_span_code_hash(parser.parse(source).root_node),
         ))
 
     # Pass 2: extract class/function/method definitions + CONTAINS edges

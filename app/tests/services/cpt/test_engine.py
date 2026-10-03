@@ -2120,6 +2120,17 @@ class TestCausalCodeFingerprint:
         changed_hop = self._node_map(**{"app.a.M": "c1", "app.a.M.helper": "c2-edited"})
         assert _causal_code_fingerprint(v, nodes) != _causal_code_fingerprint(v, changed_hop)
 
+    def test_scope_snapshots_are_context_not_fingerprint(self):
+        """#181 §8: the enclosing module's edits are neighbour churn — a
+        scope snapshot (even a node that IS in the graph) must not move the
+        fingerprint."""
+        from services.cpt.engine import _causal_code_fingerprint
+
+        nodes = self._node_map(**{"app.a.M": "c1", "app.a": "c-enclosing"})
+        plain = self._violation()
+        with_snap = self._violation(snaps=[{"scope": "enclosing_module", "fqn": "app.a", "outgoing": []}])
+        assert _causal_code_fingerprint(with_snap, nodes) == _causal_code_fingerprint(plain, nodes)
+
     def test_codeless_anchor_means_no_fingerprint(self):
         """EXTERNAL placeholders / missing nodes: no code state to judge, so
         the violation can never be soundly dismissed."""

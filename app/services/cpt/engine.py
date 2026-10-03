@@ -433,9 +433,12 @@ def _causal_code_fingerprint(violation: Violation, node_by_fqn) -> str | None:
     """SHA-256 over the code of every node the violation's judgement rests on.
 
     The governed module and the reported anchor must both have code in the
-    graph; evidence-route nodes (path hops, scope snapshots) contribute when
-    present. Content hashes only — names and paths never enter — so a rename
-    keeps the fingerprint and a material edit changes it (#186, #181 §8).
+    graph; evidence-route nodes (path hops — the decisive route a prohibits
+    judgement traced) contribute when present. Content hashes only — names
+    and paths never enter — so a rename keeps the fingerprint and a material
+    edit changes it (#186, #181 §8). scope_snapshots are deliberately NOT
+    included: they are reviewer context, and the enclosing module's edits
+    are neighbour churn, which #181 §8 says must not invalidate a dismissal.
     None = an anchor is missing or codeless (EXTERNAL placeholder): the
     violation has no recordable code state and cannot be soundly dismissed.
     """
@@ -447,10 +450,6 @@ def _causal_code_fingerprint(violation: Violation, node_by_fqn) -> str | None:
         hashes.append(node.code_hash)
     for hop in violation.path_hops or ():
         node = node_by_fqn.get(hop["target"])
-        if node is not None and node.code_hash:
-            hashes.append(node.code_hash)
-    for snap in violation.scope_snapshots or ():
-        node = node_by_fqn.get(snap["fqn"])
         if node is not None and node.code_hash:
             hashes.append(node.code_hash)
     return hashlib.sha256("|".join(hashes).encode("utf-8")).hexdigest()
