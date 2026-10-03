@@ -61,6 +61,15 @@ def _constraint_to_dict(c) -> dict:
     }
 
 
+def _exit_error(message: str, json_output: bool) -> None:
+    """Print an error (JSON or plain) and exit 1. Shared CLI error path."""
+    if json_output:
+        console.print_json(json.dumps({"error": message}))
+    else:
+        console.print(f"[red]Error:[/] {message}")
+    raise typer.Exit(code=1)
+
+
 @dataclass
 class DetectionResult:
     cpt_result: "object"  # services.cpt.engine.CPTResult
@@ -562,22 +571,14 @@ def violation_dismiss(
             break
 
     if match is None:
-        if json_output:
-            console.print_json(json.dumps({"error": f"No violation with short_id '{short_id}' found"}))
-            raise typer.Exit(code=1)
-        console.print(f"[red]Error:[/] No violation with short_id '{short_id}' found in current detection results")
-        raise typer.Exit(code=1)
+        _exit_error(f"No violation with short_id '{short_id}' found in current detection results", json_output)
 
     try:
         dismissal = Dismissal.from_violation(match)
     except ValueError as e:
         # #186: no code state to anchor the dismissal to — refuse rather than
         # record a dismissal that can never soundly apply.
-        if json_output:
-            console.print_json(json.dumps({"error": str(e)}))
-            raise typer.Exit(code=1)
-        console.print(f"[red]Error:[/] {e}")
-        raise typer.Exit(code=1)
+        _exit_error(str(e), json_output)
 
     store = GraphStore(
         uri=os.getenv("NEO4J_URI", "bolt://neo4j:7687"),

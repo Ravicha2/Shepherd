@@ -46,16 +46,13 @@ def _make_violation(
 class TestGovernedModule:
     """#181 §4: the dismissal anchor is the module the rule is about."""
 
-    def test_prohibits_governed_is_changed_fqn(self):
-        v = _make_violation(predicate=PredicateType.PROHIBITS_DEPENDENCY)
-        assert str(governed_module(v)) == "app.service.UserService"  # changed_fqn
-
-    def test_requires_governed_is_matched_fqn(self):
-        v = _make_violation(
-            predicate=PredicateType.REQUIRES_DEPENDENCY,
-            matched_fqn="app.service.OrderService",
-        )
-        assert str(governed_module(v)) == "app.service.OrderService"  # matched_fqn
+    @pytest.mark.parametrize("predicate,expect_field", [
+        (PredicateType.PROHIBITS_DEPENDENCY, "changed_fqn"),
+        (PredicateType.REQUIRES_DEPENDENCY, "matched_fqn"),
+    ])
+    def test_governed_module_branch(self, predicate, expect_field):
+        v = _make_violation(predicate=predicate)
+        assert governed_module(v) is getattr(v, expect_field)
 
 
 class TestComputeIdentityKey:
@@ -64,22 +61,17 @@ class TestComputeIdentityKey:
         key2 = compute_identity_key("app.auth", "prohibits_dependency", "app.external.*", "ADR-003", "fp-1")
         assert key1 == key2
 
-    def test_different_predicate(self):
-        key1 = compute_identity_key("app.auth", "prohibits_dependency", "app.external.*", "ADR-003", "fp-1")
-        key2 = compute_identity_key("app.auth", "requires_dependency", "app.external.*", "ADR-003", "fp-1")
-        assert key1 != key2
-
-    def test_different_adr_id(self):
-        key1 = compute_identity_key("app.auth", "prohibits_dependency", "app.external.*", "ADR-003", "fp-1")
-        key2 = compute_identity_key("app.auth", "prohibits_dependency", "app.external.*", "ADR-004", "fp-1")
-        assert key1 != key2
-
-    def test_different_fingerprint(self):
+    @pytest.mark.parametrize("variant", [
+        {"predicate": "requires_dependency"},
+        {"adr_id": "ADR-004"},
         # #186: the code-state component is identity — a material change at
         # the governed module is a different violation for dismissal purposes.
-        key1 = compute_identity_key("app.auth", "prohibits_dependency", "app.external.*", "ADR-003", "fp-1")
-        key2 = compute_identity_key("app.auth", "prohibits_dependency", "app.external.*", "ADR-003", "fp-2")
-        assert key1 != key2
+        {"code_fingerprint": "fp-2"},
+    ])
+    def test_identity_changes_when_a_component_changes(self, variant):
+        base = dict(subject="app.auth", predicate="prohibits_dependency",
+                    object="app.external.*", adr_id="ADR-003", code_fingerprint="fp-1")
+        assert compute_identity_key(**base) != compute_identity_key(**{**base, **variant})
 
     def test_pipe_delimited(self):
         key = compute_identity_key("a", "b", "c", "d", "e")
@@ -181,31 +173,21 @@ class TestFilterDismissed:
         result = filter_dismissed([v], dismissals)
         assert result == []
 
-    def test_keeps_non_matching(self):
-        v1 = _make_violation(adr_id="ADR-001")
-        v2 = _make_violation(adr_id="ADR-002")
-        dismissals = [Dismissal.from_violation(v1)]
-        result = filter_dismissed([v1, v2], dismissals)
-        assert len(result) == 1
-        assert result[0].constraint.adr_id == "ADR-002"
-
-    def test_material_code_change_resurfaces_violation(self):
-        """#186 headline: the same location re-firing after the code at the
-        governed module changed is NOT suppressed by the old dismissal."""
-        before = _make_violation(code_fingerprint="fp-before")
-        after = _make_violation(code_fingerprint="fp-after")
-        dismissals = [Dismissal.from_violation(before)]
-        result = filter_dismissed([after], dismissals)
-        assert result == [after]
-
-    def test_evidence_location_move_still_suppressed(self):
-        """Unrelated churn that moves the evidence location (matched_fqn)
-        keeps the dismissal valid — evidence is provenance, not identity."""
-        dismissed = _make_violation(matched_fqn="app.service.UserService")
-        moved = _make_violation(matched_fqn="app.service.helpers.UserService")
-        dismissals = [Dismissal.from_violation(dismissed)]
-        result = filter_dismissed([moved], dismissals)
-        assert result == []
+    @pytest.mark.parametrize("variant,expect_suppressed", [
+        # #186 headline: material change at the governed module re-surfaces
+        ({"code_fingerprint": "fp-after"}, False),
+        # a different ADR attribution is a different finding
+        ({"adr_id": "ADR-002"}, False),
+        # unrelated churn moving the evidence location keeps the dismissal
+        ({"matched_fqn": "app.service.helpers.U"}, True),
+    ])
+    def test_suppression_tracks_code_state_not_location(self, variant, expect_suppressed):
+        """Only the constraint and the judged code state decide; where the
+        evidence happened to sit does not (#186, #181 §8)."""
+        dismissed = Dismissal.from_violation(_make_violation())
+        v = _make_violation(**variant)
+        result = filter_dismissed([v], [dismissed])
+        assert (result == []) is expect_suppressed
 
     def test_legacy_dismissal_never_suppresses(self):
         """Pre-#186 rows carry no code fingerprint: they cannot be checked

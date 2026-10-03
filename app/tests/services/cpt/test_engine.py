@@ -2065,33 +2065,9 @@ class TestCausalCodeFingerprint:
     detect() attaches it to every violation; it hashes the *content* of the
     causal surface (governed module, reported anchor, evidence route) — names
     and paths never enter, so renames keep it and material edits change it.
+    _causal_code_fingerprint reads only the four causal fields, so these
+    tests feed it a plain namespace instead of a full Violation.
     """
-
-    @staticmethod
-    def _violation(predicate: PredicateType = PredicateType.PROHIBITS_DEPENDENCY,
-                   path_hops: list[dict] | None = None,
-                   scope_snapshots: list[dict] | None = None) -> "Violation":
-        from services.cpt.resolution import Violation
-
-        from services.resolver import MatchStatus
-
-        return Violation(
-            constraint=ConstraintEdge(
-                subject="app.a.*",
-                predicate=predicate,
-                object="app.b.*",
-                justification="test",
-                adr_id="ADR-001",
-                adr_path="docs/adr/001.md",
-            ),
-            changed_fqn=FQN.from_dotted_safe("app.a.M"),
-            matched_fqn=FQN.from_dotted_safe("app.a.M"),
-            match_status=MatchStatus.EXACT,
-            evidence="test",
-            change_type="structural",
-            path_hops=path_hops,
-            scope_snapshots=scope_snapshots,
-        )
 
     @staticmethod
     def _node_map(**codes: str) -> dict:
@@ -2103,12 +2079,18 @@ class TestCausalCodeFingerprint:
             for fqn, code in codes.items()
         }
 
+    @staticmethod
+    def _violation(changed: str = "app.a.M", matched: str = "app.a.M",
+                   hops: list[dict] | None = None, snaps: list[dict] | None = None):
+        from types import SimpleNamespace
+        return SimpleNamespace(changed_fqn=changed, matched_fqn=matched,
+                               path_hops=hops, scope_snapshots=snaps)
+
     def test_anchors_content_is_the_fingerprint(self):
         from services.cpt.engine import _causal_code_fingerprint
 
         v = self._violation()
         nodes = self._node_map(**{"app.a.M": "code-1"})
-        assert _causal_code_fingerprint(v, nodes) is not None
         # same content -> same fingerprint
         assert _causal_code_fingerprint(v, self._node_map(**{"app.a.M": "code-1"})) \
             == _causal_code_fingerprint(v, nodes)
@@ -2117,27 +2099,23 @@ class TestCausalCodeFingerprint:
             != _causal_code_fingerprint(v, nodes)
 
     def test_rename_keeps_fingerprint(self):
-        """#181 §8: a rename must not invalidate a dismissal by accident —
-        content hashes carry no names, so a moved module with unchanged code
-        fingerprints identically."""
+        """#181 §8: a rename never invalidates by accident — the fingerprint
+        hashes content, so identical code under a new name fingerprints the
+        same. The anchors are re-resolved per sample; the node map carries
+        the same content hash under the new name."""
         from services.cpt.engine import _causal_code_fingerprint
 
-        v = self._violation()
-        before = self._node_map(**{"app.a.M": "code-1"})
-        after = self._node_map(**{"app.b_renamed.M": "code-1"})
-        # the violation's anchors moved with the module (names re-resolve
-        # per sample); only the map keys differ
-        v_moved = dataclasses.replace(v)  # same content judgement
-        fp_before = _causal_code_fingerprint(v, before)
-        # anchors not found in the renamed map -> None, i.e. undismissable,
-        # never a silent wrong match
-        assert _causal_code_fingerprint(v_moved, after) is None
+        before = self._violation()
+        after = self._violation(changed="app.b_renamed.M", matched="app.b_renamed.M")
+        fp_before = _causal_code_fingerprint(before, self._node_map(**{"app.a.M": "code-1"}))
+        fp_after = _causal_code_fingerprint(after, self._node_map(**{"app.b_renamed.M": "code-1"}))
         assert fp_before is not None
+        assert fp_after == fp_before
 
     def test_evidence_route_content_changes_fingerprint(self):
         from services.cpt.engine import _causal_code_fingerprint
 
-        v = self._violation(path_hops=[{"kind": "CALLS", "target": "app.a.M.helper"}])
+        v = self._violation(hops=[{"kind": "CALLS", "target": "app.a.M.helper"}])
         nodes = self._node_map(**{"app.a.M": "c1", "app.a.M.helper": "c2"})
         changed_hop = self._node_map(**{"app.a.M": "c1", "app.a.M.helper": "c2-edited"})
         assert _causal_code_fingerprint(v, nodes) != _causal_code_fingerprint(v, changed_hop)
