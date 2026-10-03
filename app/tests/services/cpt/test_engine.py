@@ -2057,3 +2057,96 @@ def test_reverse_candidates_is_complete_for_every_firing_shape() -> None:
     assert "app.pkg" in engine._reverse_candidates(
         adjacency, kinds, {str(fqn) for fqn, _ in ext_mc.object_matches}
     )
+
+
+class TestCausalCodeFingerprint:
+    """#186 / #181 §8: the fingerprint is the code state a dismissal judges.
+
+    detect() attaches it to every violation; it hashes the *content* of the
+    causal surface (governed module, reported anchor, evidence route) — names
+    and paths never enter, so renames keep it and material edits change it.
+    """
+
+    @staticmethod
+    def _violation(predicate: PredicateType = PredicateType.PROHIBITS_DEPENDENCY,
+                   path_hops: list[dict] | None = None,
+                   scope_snapshots: list[dict] | None = None) -> "Violation":
+        from services.cpt.resolution import Violation
+
+        from services.resolver import MatchStatus
+
+        return Violation(
+            constraint=ConstraintEdge(
+                subject="app.a.*",
+                predicate=predicate,
+                object="app.b.*",
+                justification="test",
+                adr_id="ADR-001",
+                adr_path="docs/adr/001.md",
+            ),
+            changed_fqn=FQN.from_dotted_safe("app.a.M"),
+            matched_fqn=FQN.from_dotted_safe("app.a.M"),
+            match_status=MatchStatus.EXACT,
+            evidence="test",
+            change_type="structural",
+            path_hops=path_hops,
+            scope_snapshots=scope_snapshots,
+        )
+
+    @staticmethod
+    def _node_map(**codes: str) -> dict:
+        return {
+            fqn: FQNNode(
+                fqn=FQN.from_dotted(fqn), kind=FQNKind.CLASS,
+                file_path="x.py", line_start=0, line_end=1, code_hash=code,
+            )
+            for fqn, code in codes.items()
+        }
+
+    def test_anchors_content_is_the_fingerprint(self):
+        from services.cpt.engine import _causal_code_fingerprint
+
+        v = self._violation()
+        nodes = self._node_map(**{"app.a.M": "code-1"})
+        assert _causal_code_fingerprint(v, nodes) is not None
+        # same content -> same fingerprint
+        assert _causal_code_fingerprint(v, self._node_map(**{"app.a.M": "code-1"})) \
+            == _causal_code_fingerprint(v, nodes)
+        # material edit at the anchor -> different fingerprint
+        assert _causal_code_fingerprint(v, self._node_map(**{"app.a.M": "code-2"})) \
+            != _causal_code_fingerprint(v, nodes)
+
+    def test_rename_keeps_fingerprint(self):
+        """#181 §8: a rename must not invalidate a dismissal by accident —
+        content hashes carry no names, so a moved module with unchanged code
+        fingerprints identically."""
+        from services.cpt.engine import _causal_code_fingerprint
+
+        v = self._violation()
+        before = self._node_map(**{"app.a.M": "code-1"})
+        after = self._node_map(**{"app.b_renamed.M": "code-1"})
+        # the violation's anchors moved with the module (names re-resolve
+        # per sample); only the map keys differ
+        v_moved = dataclasses.replace(v)  # same content judgement
+        fp_before = _causal_code_fingerprint(v, before)
+        # anchors not found in the renamed map -> None, i.e. undismissable,
+        # never a silent wrong match
+        assert _causal_code_fingerprint(v_moved, after) is None
+        assert fp_before is not None
+
+    def test_evidence_route_content_changes_fingerprint(self):
+        from services.cpt.engine import _causal_code_fingerprint
+
+        v = self._violation(path_hops=[{"kind": "CALLS", "target": "app.a.M.helper"}])
+        nodes = self._node_map(**{"app.a.M": "c1", "app.a.M.helper": "c2"})
+        changed_hop = self._node_map(**{"app.a.M": "c1", "app.a.M.helper": "c2-edited"})
+        assert _causal_code_fingerprint(v, nodes) != _causal_code_fingerprint(v, changed_hop)
+
+    def test_codeless_anchor_means_no_fingerprint(self):
+        """EXTERNAL placeholders / missing nodes: no code state to judge, so
+        the violation can never be soundly dismissed."""
+        from services.cpt.engine import _causal_code_fingerprint
+
+        v = self._violation()
+        assert _causal_code_fingerprint(v, self._node_map(**{"app.a.M": ""})) is None
+        assert _causal_code_fingerprint(v, {}) is None

@@ -51,6 +51,7 @@ def _make_violation(
     object: str = "app.repo.*",
     matched_fqn: str = "app.service.UserService",
     adr_id: str = "ADR-001",
+    code_fingerprint: str | None = "fp-001",
 ) -> Violation:
     return Violation(
         constraint=_make_constraint(subject, predicate, object, adr_id),
@@ -59,6 +60,7 @@ def _make_violation(
         match_status=MatchStatus.EXACT,
         evidence="test evidence",
         change_type="structural",
+        code_fingerprint=code_fingerprint,
     )
 
 

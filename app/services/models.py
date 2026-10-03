@@ -47,6 +47,10 @@ class FQNNode:
     start_byte: int = 0
     end_byte: int = 0
     role: DependencyRole = DependencyRole.INTERNAL
+    # SHA-256 of this node's own source span (whole file for MODULE nodes).
+    # Content only — no name, no path — so a rename keeps it and an edit
+    # changes it (#186: dismissal identity's code-state component).
+    code_hash: str = ""
 
     @classmethod
     def external(cls, fqn: str, role: DependencyRole = DependencyRole.UNKNOWN) -> FQNNode:

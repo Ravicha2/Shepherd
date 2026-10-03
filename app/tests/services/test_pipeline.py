@@ -369,9 +369,9 @@ def _make_violations() -> list:
     adg = ADG(
         nodes=[
             FQNNode(fqn=FQN.from_dotted("app.service.UserService"), kind=FQNKind.CLASS,
-                    file_path="app/service.py", line_start=1, line_end=10),
+                    file_path="app/service.py", line_start=1, line_end=10, code_hash="h-service"),
             FQNNode(fqn=FQN.from_dotted("app.repo.UserRepo"), kind=FQNKind.CLASS,
-                    file_path="app/repo.py", line_start=1, line_end=10),
+                    file_path="app/repo.py", line_start=1, line_end=10, code_hash="h-repo"),
         ],
         edges=[
             Edge(source="app.service.UserService", target="app.repo.UserRepo", kind="CALLS"),

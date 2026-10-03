@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import logging
 from dataclasses import dataclass, field
 
@@ -428,6 +429,33 @@ def check_change_triggered_predicates(
     return violations
 
 
+def _causal_code_fingerprint(violation: Violation, node_by_fqn) -> str | None:
+    """SHA-256 over the code of every node the violation's judgement rests on.
+
+    The governed module and the reported anchor must both have code in the
+    graph; evidence-route nodes (path hops, scope snapshots) contribute when
+    present. Content hashes only — names and paths never enter — so a rename
+    keeps the fingerprint and a material edit changes it (#186, #181 §8).
+    None = an anchor is missing or codeless (EXTERNAL placeholder): the
+    violation has no recordable code state and cannot be soundly dismissed.
+    """
+    hashes: list[str] = []
+    for anchor_fqn in (str(violation.changed_fqn), str(violation.matched_fqn)):
+        node = node_by_fqn.get(anchor_fqn)
+        if node is None or not node.code_hash:
+            return None
+        hashes.append(node.code_hash)
+    for hop in violation.path_hops or ():
+        node = node_by_fqn.get(hop["target"])
+        if node is not None and node.code_hash:
+            hashes.append(node.code_hash)
+    for snap in violation.scope_snapshots or ():
+        node = node_by_fqn.get(snap["fqn"])
+        if node is not None and node.code_hash:
+            hashes.append(node.code_hash)
+    return hashlib.sha256("|".join(hashes).encode("utf-8")).hexdigest()
+
+
 def detect(diff_result: DiffResult, adg: ADG) -> CPTResult:
     # Index reads, not four map builds (#173): out_edges / role_of / node_of are
     # memoised on the graph and shared by every check below.
@@ -498,6 +526,7 @@ def detect(diff_result: DiffResult, adg: ADG) -> CPTResult:
         node = node_by_fqn.get(anchor_fqn) or node_by_fqn.get(str(violation.changed_fqn))
         if node:
             violation.location = {"file_path": node.file_path, "line_start": node.line_start, "line_end": node.line_end}
+        violation.code_fingerprint = _causal_code_fingerprint(violation, node_by_fqn)
         for hop in violation.path_hops or ():
             hop_node = node_by_fqn.get(hop["target"])
             if hop_node:

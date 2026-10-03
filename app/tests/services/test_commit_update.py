@@ -228,16 +228,19 @@ class TestCommitUpdate:
         assert result.constraint_edges_preserved >= 1
 
     def test_commit_update_filters_dismissals(self, neo4j_store, flask_repo) -> None:
-        """Dismissals from before the update filter violations after."""
+        """Dismissals recorded before an update filter the same violations after —
+        through a full structural rebuild, on unchanged code (#186, ADR 012)."""
         from services.adg.treesitter import parse_repo
         from services.cpt.dismissal import Dismissal
 
         adg = parse_repo(flask_repo)
+        # HEAD is the unsafe commit: app/routes/users.py imports app/models
+        # directly, so the layered-architecture prohibit fires
         ce = ConstraintEdge(
-            subject="flask.helpers.*",
+            subject="app.routes.*",
             predicate=PredicateType.PROHIBITS_DEPENDENCY,
-            object="logging",
-            justification="No bare logging.",
+            object="app.models.*",
+            justification="Routes must not import models.",
             adr_id="ADR-005",
             adr_path="docs/adr/005.md",
             specificity=2.0,
@@ -249,23 +252,20 @@ class TestCommitUpdate:
         )
         neo4j_store.store_adg(adg_with_constraint)
 
-        dismissal = Dismissal(
-            short_id="abc12",
-            identity_hash="abc12" + "0" * 59,
-            subject="flask.helpers.*",
-            predicate="prohibits_dependency",
-            object="logging",
-            matched_fqn="flask.helpers",
-            adr_id="ADR-005",
-        )
-        neo4j_store.store_dismissal(dismissal)
+        # Detect once, dismiss what fired — dismissals carry the code
+        # fingerprint of the state being judged
+        first = commit_update(neo4j_store, flask_repo, to_sha=None)
+        assert first.violations, "Test setup: need violations to dismiss"
+        for violation in first.violations:
+            assert violation.code_fingerprint is not None
+            neo4j_store.store_dismissal(Dismissal.from_violation(violation))
 
+        # Same code, full rebuild: the dismissal still applies
         result = commit_update(neo4j_store, flask_repo, to_sha=None)
-
-        # Dismissals still exist in Neo4j
         after_dismissals = neo4j_store.load_dismissals()
-        assert len(after_dismissals) >= 1
-        assert result.dismissals_applied >= 0
+        assert len(after_dismissals) == len(first.violations)
+        assert result.dismissals_applied == len(first.violations)
+        assert result.violations == []
 
     def test_commit_update_detects_violations_change(self, neo4j_store, flask_repo) -> None:
         """Seed ADG, run commit_update, verify violations are detected."""

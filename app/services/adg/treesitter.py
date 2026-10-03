@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
 from pathlib import Path
@@ -31,6 +32,7 @@ def walk_definitions(node, parent_fqn: FQN, parent_kind: str, rel_path: str, nod
             line_end=node.end_point[0],
             start_byte=node.start_byte,
             end_byte=node.end_byte,
+            code_hash=hashlib.sha256(node.text).hexdigest(),
         ))
         edges.append(Edge(source=str(parent_fqn), target=str(class_fqn), kind="CONTAINS"))
         for child in node.children:
@@ -51,6 +53,7 @@ def walk_definitions(node, parent_fqn: FQN, parent_kind: str, rel_path: str, nod
             line_end=node.end_point[0],
             start_byte=node.start_byte,
             end_byte=node.end_byte,
+            code_hash=hashlib.sha256(node.text).hexdigest(),
         ))
         edges.append(Edge(source=str(parent_fqn), target=str(func_fqn), kind="CONTAINS"))
         for child in node.children:
@@ -364,7 +367,8 @@ def parse_repo(repo_path: Path) -> ADG:
             line_start=0,
             line_end=line_count - 1,
             start_byte=0,
-            end_byte=len(source)
+            end_byte=len(source),
+            code_hash=hashlib.sha256(source).hexdigest(),
         ))
 
     # Pass 2: extract class/function/method definitions + CONTAINS edges

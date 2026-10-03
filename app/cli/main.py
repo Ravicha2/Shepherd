@@ -42,6 +42,7 @@ def _violation_to_dict(v: Violation) -> dict:
         "object": v.constraint.object,
         "matched_fqn": str(v.matched_fqn),
         "changed_fqn": str(v.changed_fqn),
+        "code_fingerprint": v.code_fingerprint,
         "change_type": v.change_type,
         "match_status": v.match_status.value,
         "evidence": v.evidence,
@@ -567,7 +568,16 @@ def violation_dismiss(
         console.print(f"[red]Error:[/] No violation with short_id '{short_id}' found in current detection results")
         raise typer.Exit(code=1)
 
-    dismissal = Dismissal.from_violation(match)
+    try:
+        dismissal = Dismissal.from_violation(match)
+    except ValueError as e:
+        # #186: no code state to anchor the dismissal to — refuse rather than
+        # record a dismissal that can never soundly apply.
+        if json_output:
+            console.print_json(json.dumps({"error": str(e)}))
+            raise typer.Exit(code=1)
+        console.print(f"[red]Error:[/] {e}")
+        raise typer.Exit(code=1)
 
     store = GraphStore(
         uri=os.getenv("NEO4J_URI", "bolt://neo4j:7687"),
@@ -587,6 +597,8 @@ def violation_dismiss(
             "subject": dismissal.subject,
             "object": dismissal.object,
             "matched_fqn": dismissal.matched_fqn,
+            "governed_fqn": dismissal.governed_fqn,
+            "code_fingerprint": dismissal.code_fingerprint,
             "adr_id": dismissal.adr_id,
             "dismissed_at": dismissal.dismissed_at,
         }

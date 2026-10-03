@@ -76,6 +76,7 @@ class GraphStore:
             line_end=props["line_end"],
             start_byte=props.get("start_byte", 0),
             end_byte=props.get("end_byte", 0),
+            code_hash=props.get("code_hash", ""),
             role=role,
         )
 
@@ -106,12 +107,13 @@ class GraphStore:
                 "n.kind = $kind, n.file_path = $file_path, "
                 "n.line_start = $line_start, n.line_end = $line_end, "
                 "n.start_byte = $start_byte, n.end_byte = $end_byte, "
-                "n.role = $role",
+                "n.role = $role, n.code_hash = $code_hash",
                 fqn=str(node.fqn), kind=node.kind.value,
                 file_path=node.file_path,
                 line_start=node.line_start, line_end=node.line_end,
                 start_byte=node.start_byte, end_byte=node.end_byte,
                 role=node.role.value,
+                code_hash=node.code_hash,
             )
 
     # --- Edge CRUD ---
@@ -250,7 +252,8 @@ class GraphStore:
                 "SET d.short_id = $short_id, "
                 "d.subject = $subject, d.predicate = $predicate, "
                 "d.object = $object, d.matched_fqn = $matched_fqn, "
-                "d.adr_id = $adr_id, d.dismissed_at = $dismissed_at",
+                "d.adr_id = $adr_id, d.code_fingerprint = $code_fingerprint, "
+                "d.governed_fqn = $governed_fqn, d.dismissed_at = $dismissed_at",
                 identity_hash=dismissal.identity_hash,
                 short_id=dismissal.short_id,
                 subject=dismissal.subject,
@@ -258,34 +261,34 @@ class GraphStore:
                 object=dismissal.object,
                 matched_fqn=dismissal.matched_fqn,
                 adr_id=dismissal.adr_id,
+                code_fingerprint=dismissal.code_fingerprint,
+                governed_fqn=dismissal.governed_fqn,
                 dismissed_at=dismissal.dismissed_at,
             )
         log.info("store_dismissal: stored dismissal short_id=%s for adr_id=%s", dismissal.short_id, dismissal.adr_id)
 
     @staticmethod
-    def _row_to_dismissal(record) -> Dismissal:
+    def _row_to_dismissal(props: dict) -> Dismissal:
+        # code_fingerprint/governed_fqn are absent on pre-#186 rows:
+        # .get leaves them None/"" and filter_dismissed never matches those.
         return Dismissal(
-            short_id=record["short_id"],
-            identity_hash=record["identity_hash"],
-            subject=record["subject"],
-            predicate=record["predicate"],
-            object=record["object"],
-            matched_fqn=record["matched_fqn"],
-            adr_id=record["adr_id"],
-            dismissed_at=record["dismissed_at"],
+            short_id=props["short_id"],
+            identity_hash=props["identity_hash"],
+            subject=props["subject"],
+            predicate=props["predicate"],
+            object=props["object"],
+            matched_fqn=props.get("matched_fqn", ""),
+            adr_id=props["adr_id"],
+            code_fingerprint=props.get("code_fingerprint"),
+            governed_fqn=props.get("governed_fqn", ""),
+            dismissed_at=props["dismissed_at"],
         )
 
     def load_dismissals(self) -> list[Dismissal]:
         """Load all Dismissal nodes from Neo4j."""
         with self._session() as session:
-            result = session.run(
-                "MATCH (d:Dismissal) "
-                "RETURN d.short_id AS short_id, d.identity_hash AS identity_hash, "
-                "d.subject AS subject, d.predicate AS predicate, "
-                "d.object AS object, d.matched_fqn AS matched_fqn, "
-                "d.adr_id AS adr_id, d.dismissed_at AS dismissed_at"
-            )
-            return [self._row_to_dismissal(r) for r in result]
+            result = session.run("MATCH (d:Dismissal) RETURN properties(d) AS props")
+            return [self._row_to_dismissal(r["props"]) for r in result]
 
     # --- Full ADG ---
 
