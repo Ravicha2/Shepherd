@@ -42,6 +42,7 @@ def _violation_to_dict(v: Violation) -> dict:
         "object": v.constraint.object,
         "matched_fqn": str(v.matched_fqn),
         "changed_fqn": str(v.changed_fqn),
+        "code_fingerprint": v.code_fingerprint,
         "change_type": v.change_type,
         "match_status": v.match_status.value,
         "evidence": v.evidence,
@@ -58,6 +59,15 @@ def _constraint_to_dict(c) -> dict:
         "subject": c.subject,
         "object": c.object,
     }
+
+
+def _exit_error(message: str, json_output: bool) -> None:
+    """Print an error (JSON or plain) and exit 1. Shared CLI error path."""
+    if json_output:
+        console.print_json(json.dumps({"error": message}))
+    else:
+        console.print(f"[red]Error:[/] {message}")
+    raise typer.Exit(code=1)
 
 
 @dataclass
@@ -561,13 +571,14 @@ def violation_dismiss(
             break
 
     if match is None:
-        if json_output:
-            console.print_json(json.dumps({"error": f"No violation with short_id '{short_id}' found"}))
-            raise typer.Exit(code=1)
-        console.print(f"[red]Error:[/] No violation with short_id '{short_id}' found in current detection results")
-        raise typer.Exit(code=1)
+        _exit_error(f"No violation with short_id '{short_id}' found in current detection results", json_output)
 
-    dismissal = Dismissal.from_violation(match)
+    try:
+        dismissal = Dismissal.from_violation(match)
+    except ValueError as e:
+        # #186: no code state to anchor the dismissal to — refuse rather than
+        # record a dismissal that can never soundly apply.
+        _exit_error(str(e), json_output)
 
     store = GraphStore(
         uri=os.getenv("NEO4J_URI", "bolt://neo4j:7687"),
@@ -587,6 +598,8 @@ def violation_dismiss(
             "subject": dismissal.subject,
             "object": dismissal.object,
             "matched_fqn": dismissal.matched_fqn,
+            "governed_fqn": dismissal.governed_fqn,
+            "code_fingerprint": dismissal.code_fingerprint,
             "adr_id": dismissal.adr_id,
             "dismissed_at": dismissal.dismissed_at,
         }

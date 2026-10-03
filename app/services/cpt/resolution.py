@@ -30,6 +30,23 @@ class Violation:
     location: dict | None = None           # {"file_path", "line_start", "line_end"} of changed_fqn's node
     path_hops: list[dict] | None = None    # prohibits: traversal from subject to object, [{"kind", "target", "file_path"?}]
     scope_snapshots: list[dict] | None = None  # requires: [{"scope", "fqn", "outgoing": [{"kind", "target"}]}]
+    # SHA-256 over the code of every node the violation's judgement rests on:
+    # governed module, reported anchor, evidence route (path hops).
+    # Content-only (no names) so renames keep it, edits change it (#186, #181 §8).
+    # None = an anchor has no code in the graph: the violation cannot be soundly dismissed.
+    code_fingerprint: str | None = None
+
+
+def governed_module(violation: Violation) -> FQN:
+    """The module the rule is about — what a dismissal is anchored to.
+
+    #181 §4: the concrete module the rule's subject matched, which today is
+    changed_fqn for prohibits and matched_fqn for requires. The evidence
+    location (the other field) is provenance only.
+    """
+    if violation.constraint.predicate.value.startswith("prohibits_"):
+        return violation.changed_fqn
+    return violation.matched_fqn
 
 
 def resolve(violations: list[Violation]) -> list[Violation]:

@@ -4,7 +4,7 @@ Date: 2026-07-09
 
 ## Status
 
-Accepted
+Accepted (identity key §2 and the "code changes" cleanup rule in §4 superseded by [ADR 020](./020-dismissal-code-state-identity.md) — a dismissal now carries the code state it judged. Everything else, including the dismissals-only model, stays live.)
 
 ## Context
 
@@ -18,7 +18,7 @@ The design must also integrate with the incremental ADG update (issue #10), wher
 
 CPT is the single source of truth for "what violations exist right now." Dismissals are a filter layer: `cpt violation list` runs detect, subtracts dismissals, and shows the remainder. There is no "open" status in storage.
 
-### 2. Dismissal identity key: (subject, predicate, object, matched_fqn, adr_id)
+### 2. Dismissal identity key: (subject, predicate, object, matched_fqn, adr_id) *(superseded by [ADR 020](./020-dismissal-code-state-identity.md): the key is now (subject, predicate, object, adr_id, code_fingerprint) — matched_fqn is provenance only)*
 
 The 5-tuple identifies a dismissal. Including `adr_id` enables cleanup when an ADR is superseded: deleting constraints for that `adr_id` also deletes dismissals for that `adr_id`. The original 4-tuple (subject, predicate, object, matched_fqn) is the violation identity; `adr_id` is added for dismissals to scope them to the originating ADR.
 

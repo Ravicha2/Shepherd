@@ -609,3 +609,87 @@ class TestSyntaxErrors:
         """A repo with no syntax errors does not raise."""
         adg = parse_repo(sample_repo)
         assert len(adg.nodes) > 0
+
+class TestCodeHashNormalization:
+    """#186 / #181 §8: code_hash is material-change-only, verified by real
+    parse-rename-parse — no mocked node maps. Comments and the definition's
+    own name are excised from the hashed span and whitespace runs collapse,
+    so a pure rename, a comment edit, a blank-line/tab/indent reformat keep
+    the hash; a dependency edit changes it. Boundary, deliberate: edits that
+    insert or remove space *between* tokens (some formatter diffs) still
+    change the hash — a safe-direction re-surface, stated in ADR 20.
+    """
+
+    CLASS_SRC = (
+        "from app.repo import UserRepo\n"
+        "\n"
+        "class UserService:\n"
+        "    def find(self):\n"
+        "        return UserRepo().find()\n"
+    )
+
+    @staticmethod
+    def _class_node(tmp_path: Path, source: str, fqn: str = "mod.UserService") -> FQNNode:
+        (tmp_path / "mod.py").write_text(source)
+        node = _find_node(parse_repo(tmp_path), fqn)
+        assert node is not None
+        return node
+
+    def test_pure_class_rename_keeps_hash(self, tmp_path: Path) -> None:
+        before = self._class_node(tmp_path, self.CLASS_SRC)
+        after = self._class_node(
+            tmp_path,
+            self.CLASS_SRC.replace("class UserService:", "class UserAccountService:"),
+            fqn="mod.UserAccountService",
+        )
+        assert after.code_hash == before.code_hash
+
+    def test_comment_or_reformat_keeps_hash(self, tmp_path: Path) -> None:
+        before = self._class_node(tmp_path, self.CLASS_SRC)
+        reformatted = (
+            "class UserService:\n"
+            "    # why this exists\n"
+            "\n"
+            "\tdef find(self):\n"
+            "        return UserRepo().find()\n"
+            "\n"
+            "\n"
+        )
+        after = self._class_node(tmp_path, reformatted)
+        assert after.code_hash == before.code_hash
+
+    def test_body_dependency_edit_changes_hash(self, tmp_path: Path) -> None:
+        before = self._class_node(tmp_path, self.CLASS_SRC)
+        after = self._class_node(tmp_path, self.CLASS_SRC.replace(
+            "UserRepo().find()", "OtherRepo().find()"
+        ))
+        assert after.code_hash != before.code_hash
+
+    def test_comment_like_string_is_material(self, tmp_path: Path) -> None:
+        """AST-based excision: a '#'-string is a string node, not a comment —
+        changing it is a code edit inside the span and must change the hash."""
+        before = self._class_node(tmp_path, self.CLASS_SRC.replace(
+            "    def find(self):", '    TAG = "# not a comment"\n    def find(self):'
+        ))
+        after = self._class_node(tmp_path, self.CLASS_SRC.replace(
+            "    def find(self):", '    TAG = "# edited"\n    def find(self):'
+        ))
+        assert after.code_hash != before.code_hash
+
+    def test_module_comment_keeps_module_hash(self, tmp_path: Path) -> None:
+        before = self._class_node(tmp_path, self.CLASS_SRC, fqn="mod")
+        after = self._class_node(
+            tmp_path,
+            "# a module-level comment\n" + self.CLASS_SRC + "# trailing comment\n",
+            fqn="mod",
+        )
+        assert after.code_hash == before.code_hash
+
+    def test_import_target_change_changes_module_hash(self, tmp_path: Path) -> None:
+        before = self._class_node(tmp_path, self.CLASS_SRC, fqn="mod")
+        after = self._class_node(
+            tmp_path,
+            self.CLASS_SRC.replace("from app.repo import", "from app.repo2 import"),
+            fqn="mod",
+        )
+        assert after.code_hash != before.code_hash
