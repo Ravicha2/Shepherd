@@ -17,16 +17,18 @@ from services.models import ADG, ConstraintEdge, ConstraintScope, PredicateType
 runner = CliRunner()
 
 
+_BASE = dict(
+    subject="app.tools.*",
+    predicate=PredicateType.PROHIBITS_DEPENDENCY,
+    object="app.models.*",
+    justification="j",
+    adr_id="ADR-009",
+    adr_path="docs/adr/009.md",
+)
+
+
 def _edge(scope: ConstraintScope) -> ConstraintEdge:
-    return ConstraintEdge(
-        subject="app.tools.*",
-        predicate=PredicateType.PROHIBITS_DEPENDENCY,
-        object="app.models.*",
-        justification="j",
-        adr_id="ADR-009",
-        adr_path="docs/adr/009.md",
-        scope=scope,
-    )
+    return ConstraintEdge(**_BASE, scope=scope)
 
 
 def _run(tmp_path, args, build_seed=None):

@@ -19,8 +19,8 @@ from services.resolver import MatchStatus
 runner = CliRunner()
 
 
-def _violation() -> Violation:
-    return Violation(
+def test_detect_json_includes_raw_violations_with_governed_keys() -> None:
+    v = Violation(
         constraint=ConstraintEdge(
             subject="app.api.*",
             predicate=PredicateType.PROHIBITS_DEPENDENCY,
@@ -38,10 +38,6 @@ def _violation() -> Violation:
         fan_in=3,
         governed_file_path="app/api/users.py",
     )
-
-
-def test_detect_json_includes_raw_violations_with_governed_keys() -> None:
-    v = _violation()
     dr = DetectionResult(
         cpt_result=CPTResult(violations=[v], raw_violations=[v], orphans=[], self_loop_constraints=[]),
         diff=MagicMock(to_sha="abc123", from_sha=None),

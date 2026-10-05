@@ -458,6 +458,33 @@ def _causal_code_fingerprint(violation: Violation, node_by_fqn) -> str | None:
     return hashlib.sha256("|".join(hashes).encode("utf-8")).hexdigest()
 
 
+def _fill_violation_provenance(violations, node_by_fqn, importer_index) -> None:
+    """Set location, code_fingerprint, hop paths, fan_in and governed_file_path.
+
+    Runs over the RAW list, not the deduped survivors: the survivors are the same
+    objects, so their provenance is set here too, and every raw entry -- which is
+    what the replay records -- comes out complete (#190).
+    """
+    for violation in violations:
+        # structural prohibits report at the evidence-owning node (issue 126):
+        # changed_fqn is just the wildcard subject's match anchor; the location
+        # must follow the reported FQN. Change-triggered requires keep the
+        # changed node: that is what a reviewer reviews.
+        anchor_fqn = str(violation.matched_fqn) if violation.change_type == "structural" else str(violation.changed_fqn)
+        node = node_by_fqn.get(anchor_fqn) or node_by_fqn.get(str(violation.changed_fqn))
+        if node:
+            violation.location = {"file_path": node.file_path, "line_start": node.line_start, "line_end": node.line_end}
+        violation.code_fingerprint = _causal_code_fingerprint(violation, node_by_fqn)
+        for hop in violation.path_hops or ():
+            hop_node = node_by_fqn.get(hop["target"])
+            if hop_node:
+                hop["file_path"] = hop_node.file_path
+        governed_fqn = str(governed_module(violation))
+        violation.fan_in = len(importer_index.get(governed_fqn, ()))
+        governed_node = node_by_fqn.get(governed_fqn)
+        violation.governed_file_path = governed_node.file_path if governed_node else None
+
+
 def _importer_index(edges) -> dict[str, set[str]]:
     """module fqn -> distinct modules importing it or anything under it (#184).
 
@@ -539,27 +566,7 @@ def detect(diff_result: DiffResult, adg: ADG) -> CPTResult:
 
     node_by_fqn = adg.node_of
     importer_index = _importer_index(adg.edges)
-    # Fill in over the RAW list, not the survivors: the deduped list holds the
-    # same objects, so its output is unchanged, and every raw entry gets the
-    # location/fingerprint/fan-in the replay records (#190).
-    for violation in raw_violations:
-        # structural prohibits report at the evidence-owning node (issue 126):
-        # changed_fqn is just the wildcard subject's match anchor; the location
-        # must follow the reported FQN. Change-triggered requires keep the
-        # changed node: that is what a reviewer reviews.
-        anchor_fqn = str(violation.matched_fqn) if violation.change_type == "structural" else str(violation.changed_fqn)
-        node = node_by_fqn.get(anchor_fqn) or node_by_fqn.get(str(violation.changed_fqn))
-        if node:
-            violation.location = {"file_path": node.file_path, "line_start": node.line_start, "line_end": node.line_end}
-        violation.code_fingerprint = _causal_code_fingerprint(violation, node_by_fqn)
-        for hop in violation.path_hops or ():
-            hop_node = node_by_fqn.get(hop["target"])
-            if hop_node:
-                hop["file_path"] = hop_node.file_path
-        governed_fqn = str(governed_module(violation))
-        violation.fan_in = len(importer_index.get(governed_fqn, ()))
-        governed_node = node_by_fqn.get(governed_fqn)
-        violation.governed_file_path = governed_node.file_path if governed_node else None
+    _fill_violation_provenance(raw_violations, node_by_fqn, importer_index)
 
     orphans: list[ConstraintEdge] = []
     for constraint in enforced_edges:

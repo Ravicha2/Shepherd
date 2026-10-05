@@ -645,31 +645,16 @@ def seed_build(
         console.print(f"[red]Error:[/] Repository path does not exist: {repo_path}")
         raise typer.Exit(code=1)
 
-    if constraints is not None and gold:
-        console.print("[red]Error:[/] --constraints and --gold are mutually exclusive")
-        raise typer.Exit(code=1)
-    if constraints is not None and constraints_out is not None:
-        console.print("[red]Error:[/] --constraints and --constraints-out are mutually exclusive")
-        raise typer.Exit(code=1)
-    if gold and constraints_out is not None:
-        console.print("[red]Error:[/] --constraints-out needs the resolver; --gold skips it")
-        raise typer.Exit(code=1)
+    _validate_seed_options(gold, constraints, constraints_out)
 
     # parse repo into adg
     console.print("[bold]Step 1:[/] Parsing repository structure...")
     adg = parse_repo(repo_path)
     console.print(f"  Found {len(adg.nodes)} nodes, {len(adg.edges)} edges")
 
-    if constraints is not None:
-        # #190: the replay's ADR-set cache. No resolver, no pin check — the
-        # constraint file is version-keyed by the caller, not the census pin.
-        console.print(f"[bold]Step 2:[/] Loading constraints from {constraints.name} (resolver skipped)...")
-        merged = ADGPipeline.build_gold_seed(adg, constraints, project_root=repo_path)
-    else:
-        merged = _merge_constraints(repo_cfg, repo_path, adg, gold, config, allow_off_pin=allow_off_pin)
-        if constraints_out is not None:
-            dump_gold_edges(constraints_out, merged.constraint_edges)
-            console.print(f"  Wrote {len(merged.constraint_edges)} constraint edges to {constraints_out}")
+    merged = _merge_constraints(repo_cfg, repo_path, adg, gold, config,
+                                allow_off_pin=allow_off_pin,
+                                constraints=constraints, constraints_out=constraints_out)
     external_count = sum(1 for n in merged.nodes if n.kind == FQNKind.EXTERNAL)
     console.print(f"  {len(merged.constraint_edges)} constraint edges, {external_count} EXTERNAL nodes")
 
@@ -716,13 +701,38 @@ def seed_build(
     console.print(f"[bold green]Done[/] Seed built for [cyan]{repo}[/]")
 
 
-def _merge_constraints(repo_cfg, repo_path: Path, adg, gold: bool, config, allow_off_pin: bool = False):
-    """Step 2: the gold merge (`--gold`) or the resolver extraction."""
+def _validate_seed_options(gold: bool, constraints: Path | None, constraints_out: Path | None) -> None:
+    """Refuse the seed-build flag combinations that have no meaning together."""
+    if constraints is not None and gold:
+        console.print("[red]Error:[/] --constraints and --gold are mutually exclusive")
+        raise typer.Exit(code=1)
+    if constraints is not None and constraints_out is not None:
+        console.print("[red]Error:[/] --constraints and --constraints-out are mutually exclusive")
+        raise typer.Exit(code=1)
+    if gold and constraints_out is not None:
+        console.print("[red]Error:[/] --constraints-out needs the resolver; --gold skips it")
+        raise typer.Exit(code=1)
+
+
+def _merge_constraints(repo_cfg, repo_path: Path, adg, gold: bool, config,
+                       allow_off_pin: bool = False, constraints: Path | None = None,
+                       constraints_out: Path | None = None):
+    """Step 2: the rule-set load (`--constraints`), the gold merge (`--gold`), or
+    the resolver extraction."""
     pipeline = ADGPipeline()
+    if constraints is not None:
+        # #190: the replay's ADR-set cache. No resolver, no pin check -- the
+        # constraint file is version-keyed by the caller, not the census pin.
+        console.print(f"[bold]Step 2:[/] Loading constraints from {constraints.name} (resolver skipped)...")
+        return pipeline.build_gold_seed(adg, constraints, project_root=repo_path)
     if not gold:
         console.print("[bold]Step 2:[/] Resolving ADR constraints (unified agent)...")
         adr_dir = _resolve_adr_dir(repo_cfg, repo_path)
-        return pipeline.build_seed(adg, adr_dir, project_root=repo_path, config=config.langextract)
+        merged = pipeline.build_seed(adg, adr_dir, project_root=repo_path, config=config.langextract)
+        if constraints_out is not None:
+            dump_gold_edges(constraints_out, merged.constraint_edges)
+            console.print(f"  Wrote {len(merged.constraint_edges)} constraint edges to {constraints_out}")
+        return merged
 
     # census §5: a gold seed off its pin is a different benchmark. A benchmark
     # historical case is exactly that on purpose, so it has to say so (#163).
