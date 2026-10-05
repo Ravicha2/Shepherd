@@ -103,6 +103,7 @@ class ADGPipeline:
             violations=filtered,
             orphans=result.orphans,
             self_loop_constraints=result.self_loop_constraints,
+            raw_violations=result.raw_violations,
         )
 
     @staticmethod

@@ -16,10 +16,10 @@ from rich.table import Table
 
 from cli.config import RepoConfig, load_config
 from services.adg import parse_repo
-from services.adg.gold import GOLD_ADR_PINS, GOLD_PINS, gold_path, gold_triples, triple_differences, triples
+from services.adg.gold import GOLD_ADR_PINS, GOLD_PINS, dump_gold_edges, gold_path, gold_triples, triple_differences, triples
 from services.cpt import GitAdapter, process_diff
 from services.cpt.dismissal import Dismissal, compute_identity_hash, filter_dismissed, violation_identity, violation_short_id
-from services.cpt.resolution import Violation
+from services.cpt.resolution import Violation, governed_module
 from services.graph.connector import GraphStore
 from services.models import ChangedFQN, Diff, DiffResult, FQNKind
 from services.commit_update import UpdateResult, commit_update
@@ -42,6 +42,9 @@ def _violation_to_dict(v: Violation) -> dict:
         "object": v.constraint.object,
         "matched_fqn": str(v.matched_fqn),
         "changed_fqn": str(v.changed_fqn),
+        "governed_fqn": str(governed_module(v)),
+        "fan_in": v.fan_in,
+        "governed_file_path": v.governed_file_path,
         "code_fingerprint": v.code_fingerprint,
         "change_type": v.change_type,
         "match_status": v.match_status.value,
@@ -275,6 +278,9 @@ def detect(
                 for f in dr.diff_result.changed_fqns
             ],
             "violations": [_violation_to_dict(v) for v in dr.cpt_result.violations],
+            # #190: the pre-dedup firings, keyed on the governed module, that the
+            # replay records (survivors are the same objects as in `violations`)
+            "raw_violations": [_violation_to_dict(v) for v in dr.cpt_result.raw_violations],
             "orphans": [_constraint_to_dict(c) for c in dr.cpt_result.orphans],
             "self_loop_constraints": [_constraint_to_dict(c) for c in dr.cpt_result.self_loop_constraints],
         }
@@ -618,6 +624,16 @@ def seed_build(
         False, "--allow-off-pin",
         help="Build a gold seed off the census §5 pin, for a benchmark historical case (#163)",
     ),
+    constraints: Path | None = typer.Option(
+        None, "--constraints",
+        help="Load the rule set from a file (gold JSON shape, with scope) instead of "
+             "running the resolver; the pin check does not apply (#190)",
+    ),
+    constraints_out: Path | None = typer.Option(
+        None, "--constraints-out",
+        help="Write the resolver's rule set to a file (gold JSON shape, with scope) so "
+             "later samples can load it with --constraints (#190)",
+    ),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ) -> None:
     """Build an ADG seed snapshot from scratch."""
@@ -629,12 +645,31 @@ def seed_build(
         console.print(f"[red]Error:[/] Repository path does not exist: {repo_path}")
         raise typer.Exit(code=1)
 
+    if constraints is not None and gold:
+        console.print("[red]Error:[/] --constraints and --gold are mutually exclusive")
+        raise typer.Exit(code=1)
+    if constraints is not None and constraints_out is not None:
+        console.print("[red]Error:[/] --constraints and --constraints-out are mutually exclusive")
+        raise typer.Exit(code=1)
+    if gold and constraints_out is not None:
+        console.print("[red]Error:[/] --constraints-out needs the resolver; --gold skips it")
+        raise typer.Exit(code=1)
+
     # parse repo into adg
     console.print("[bold]Step 1:[/] Parsing repository structure...")
     adg = parse_repo(repo_path)
     console.print(f"  Found {len(adg.nodes)} nodes, {len(adg.edges)} edges")
 
-    merged = _merge_constraints(repo_cfg, repo_path, adg, gold, config, allow_off_pin=allow_off_pin)
+    if constraints is not None:
+        # #190: the replay's ADR-set cache. No resolver, no pin check — the
+        # constraint file is version-keyed by the caller, not the census pin.
+        console.print(f"[bold]Step 2:[/] Loading constraints from {constraints.name} (resolver skipped)...")
+        merged = ADGPipeline.build_gold_seed(adg, constraints, project_root=repo_path)
+    else:
+        merged = _merge_constraints(repo_cfg, repo_path, adg, gold, config, allow_off_pin=allow_off_pin)
+        if constraints_out is not None:
+            dump_gold_edges(constraints_out, merged.constraint_edges)
+            console.print(f"  Wrote {len(merged.constraint_edges)} constraint edges to {constraints_out}")
     external_count = sum(1 for n in merged.nodes if n.kind == FQNKind.EXTERNAL)
     console.print(f"  {len(merged.constraint_edges)} constraint edges, {external_count} EXTERNAL nodes")
 

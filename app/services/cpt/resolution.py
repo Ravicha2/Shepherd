@@ -35,6 +35,11 @@ class Violation:
     # Content-only (no names) so renames keep it, edits change it (#186, #181 §8).
     # None = an anchor has no code in the graph: the violation cannot be soundly dismissed.
     code_fingerprint: str | None = None
+    # #190: the governed module's import fan-in and file, for #184's matched
+    # controls. Recorded, not part of identity. None when the governed module
+    # has no node in the graph.
+    fan_in: int | None = None
+    governed_file_path: str | None = None
 
 
 def governed_module(violation: Violation) -> FQN:

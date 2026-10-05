@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 
 from services.fqn import FQN
 from services.models import ADG, ChangedFQN, ConstraintEdge, ConstraintScope, DependencyRole, DiffResult, Edge, FQNKind, PredicateType
-from services.cpt.resolution import Violation, resolve, suppress_outweighed_prohibits, suppress_outweighed_requires
+from services.cpt.resolution import Violation, governed_module, resolve, suppress_outweighed_prohibits, suppress_outweighed_requires
 from services.resolver import MatchStatus, fqn_matches_pattern
 from collections.abc import Mapping
 from collections import deque, defaultdict
@@ -34,6 +34,9 @@ class CPTResult:
     violations: list[Violation] = field(default_factory=list)
     orphans: list[ConstraintEdge] = field(default_factory=list)
     self_loop_constraints: list[ConstraintEdge] = field(default_factory=list)
+    # #190: the pre-dedup firing list, keyed on the governed module, for the
+    # replay. The survivors in `violations` are the same objects.
+    raw_violations: list[Violation] = field(default_factory=list)
 
 
 @dataclass
@@ -455,6 +458,23 @@ def _causal_code_fingerprint(violation: Violation, node_by_fqn) -> str | None:
     return hashlib.sha256("|".join(hashes).encode("utf-8")).hexdigest()
 
 
+def _importer_index(edges) -> dict[str, set[str]]:
+    """module fqn -> distinct modules importing it or anything under it (#184).
+
+    One pass over the IMPORTS edges: each importer is credited to the target and
+    to every ancestor module, so a lookup for the governed module counts both
+    direct importers and importers of its submodules.
+    """
+    importers: dict[str, set[str]] = defaultdict(set)
+    for edge in edges:
+        if edge.kind != "IMPORTS":
+            continue
+        parts = edge.target.split(".")
+        for i in range(len(parts), 0, -1):
+            importers[".".join(parts[:i])].add(edge.source)
+    return importers
+
+
 def detect(diff_result: DiffResult, adg: ADG) -> CPTResult:
     # Index reads, not four map builds (#173): out_edges / role_of / node_of are
     # memoised on the graph and shared by every check below.
@@ -501,6 +521,8 @@ def detect(diff_result: DiffResult, adg: ADG) -> CPTResult:
     all_violations.extend(check_structural_predicates(matched, adjacency, node_roles=node_roles, module_scope=module_scope))
     all_violations.extend(check_change_triggered_predicates(matched, adjacency, diff_result.changed_fqns, node_roles=node_roles, module_scope=module_scope))
 
+    raw_violations: list[Violation] = list(all_violations)
+
     violations = resolve(all_violations)
 
     active_requires: list[ConstraintEdge] = []
@@ -516,7 +538,11 @@ def detect(diff_result: DiffResult, adg: ADG) -> CPTResult:
     violations = suppress_outweighed_requires(violations, active_prohibits)
 
     node_by_fqn = adg.node_of
-    for violation in violations:
+    importer_index = _importer_index(adg.edges)
+    # Fill in over the RAW list, not the survivors: the deduped list holds the
+    # same objects, so its output is unchanged, and every raw entry gets the
+    # location/fingerprint/fan-in the replay records (#190).
+    for violation in raw_violations:
         # structural prohibits report at the evidence-owning node (issue 126):
         # changed_fqn is just the wildcard subject's match anchor; the location
         # must follow the reported FQN. Change-triggered requires keep the
@@ -530,13 +556,22 @@ def detect(diff_result: DiffResult, adg: ADG) -> CPTResult:
             hop_node = node_by_fqn.get(hop["target"])
             if hop_node:
                 hop["file_path"] = hop_node.file_path
+        governed_fqn = str(governed_module(violation))
+        violation.fan_in = len(importer_index.get(governed_fqn, ()))
+        governed_node = node_by_fqn.get(governed_fqn)
+        violation.governed_file_path = governed_node.file_path if governed_node else None
 
     orphans: list[ConstraintEdge] = []
     for constraint in enforced_edges:
         if constraint_key(constraint) not in matched:
             orphans.append(constraint)
 
-    return CPTResult(violations=violations, orphans=orphans, self_loop_constraints=self_loop_constraints)
+    return CPTResult(
+        violations=violations,
+        orphans=orphans,
+        self_loop_constraints=self_loop_constraints,
+        raw_violations=raw_violations,
+    )
 
 
 if __name__ == "__main__":
