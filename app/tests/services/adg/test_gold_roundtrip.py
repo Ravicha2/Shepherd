@@ -10,16 +10,16 @@ from services.adg.gold import dump_gold_edges, load_gold_edges
 from services.models import ConstraintEdge, ConstraintScope, PredicateType
 
 
+_BASE = dict(
+    predicate=PredicateType.PROHIBITS_DEPENDENCY,
+    object="app.models.*",
+    justification="j",
+    adr_path="docs/adr/001.md",
+)
+
+
 def _edge(adr_id: str, scope: ConstraintScope, subject: str = "app.api.*") -> ConstraintEdge:
-    return ConstraintEdge(
-        subject=subject,
-        predicate=PredicateType.PROHIBITS_DEPENDENCY,
-        object="app.models.*",
-        justification="j",
-        adr_id=adr_id,
-        adr_path=f"docs/adr/{adr_id}.md",
-        scope=scope,
-    )
+    return ConstraintEdge(**_BASE, subject=subject, adr_id=adr_id, scope=scope)
 
 
 def test_roundtrip_preserves_scope(tmp_path) -> None:
