@@ -16,10 +16,10 @@ from rich.table import Table
 
 from cli.config import RepoConfig, load_config
 from services.adg import parse_repo
-from services.adg.gold import GOLD_ADR_PINS, GOLD_PINS, gold_path, gold_triples, triple_differences, triples
+from services.adg.gold import GOLD_ADR_PINS, GOLD_PINS, dump_gold_edges, gold_path, gold_triples, triple_differences, triples
 from services.cpt import GitAdapter, process_diff
 from services.cpt.dismissal import Dismissal, compute_identity_hash, filter_dismissed, violation_identity, violation_short_id
-from services.cpt.resolution import Violation
+from services.cpt.resolution import Violation, governed_module
 from services.graph.connector import GraphStore
 from services.models import ChangedFQN, Diff, DiffResult, FQNKind
 from services.commit_update import UpdateResult, commit_update
@@ -42,6 +42,9 @@ def _violation_to_dict(v: Violation) -> dict:
         "object": v.constraint.object,
         "matched_fqn": str(v.matched_fqn),
         "changed_fqn": str(v.changed_fqn),
+        "governed_fqn": str(governed_module(v)),
+        "fan_in": v.fan_in,
+        "governed_file_path": v.governed_file_path,
         "code_fingerprint": v.code_fingerprint,
         "change_type": v.change_type,
         "match_status": v.match_status.value,
@@ -275,6 +278,9 @@ def detect(
                 for f in dr.diff_result.changed_fqns
             ],
             "violations": [_violation_to_dict(v) for v in dr.cpt_result.violations],
+            # #190: the pre-dedup firings, keyed on the governed module, that the
+            # replay records (survivors are the same objects as in `violations`)
+            "raw_violations": [_violation_to_dict(v) for v in dr.cpt_result.raw_violations],
             "orphans": [_constraint_to_dict(c) for c in dr.cpt_result.orphans],
             "self_loop_constraints": [_constraint_to_dict(c) for c in dr.cpt_result.self_loop_constraints],
         }
@@ -618,6 +624,16 @@ def seed_build(
         False, "--allow-off-pin",
         help="Build a gold seed off the census §5 pin, for a benchmark historical case (#163)",
     ),
+    constraints: Path | None = typer.Option(
+        None, "--constraints",
+        help="Load the rule set from a file (gold JSON shape, with scope) instead of "
+             "running the resolver; the pin check does not apply (#190)",
+    ),
+    constraints_out: Path | None = typer.Option(
+        None, "--constraints-out",
+        help="Write the resolver's rule set to a file (gold JSON shape, with scope) so "
+             "later samples can load it with --constraints (#190)",
+    ),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ) -> None:
     """Build an ADG seed snapshot from scratch."""
@@ -629,16 +645,37 @@ def seed_build(
         console.print(f"[red]Error:[/] Repository path does not exist: {repo_path}")
         raise typer.Exit(code=1)
 
+    source = _seed_source(gold, constraints, constraints_out, allow_off_pin)
+
     # parse repo into adg
     console.print("[bold]Step 1:[/] Parsing repository structure...")
     adg = parse_repo(repo_path)
     console.print(f"  Found {len(adg.nodes)} nodes, {len(adg.edges)} edges")
 
-    merged = _merge_constraints(repo_cfg, repo_path, adg, gold, config, allow_off_pin=allow_off_pin)
+    merged = _merge_constraints(repo_cfg, repo_path, adg, config, source)
     external_count = sum(1 for n in merged.nodes if n.kind == FQNKind.EXTERNAL)
     console.print(f"  {len(merged.constraint_edges)} constraint edges, {external_count} EXTERNAL nodes")
 
-    # Persist to Neo4j
+    read_back = _persist_seed(merged, repo, repo_path, gold)
+
+    if json_output:
+        output = {
+            "repo": repo,
+            "nodes": len(merged.nodes),
+            "edges": len(merged.edges),
+            "constraint_edges": len(merged.constraint_edges),
+            "external_nodes": external_count,
+        }
+        if gold:
+            output["gold_read_back"] = len(read_back)
+        console.print_json(json.dumps(output))
+        return
+
+    console.print(f"[bold green]Done[/] Seed built for [cyan]{repo}[/]")
+
+
+def _persist_seed(merged, repo: str, repo_path: Path, gold: bool):
+    """Step 4: persist the seed, and for a gold seed verify the read-back matches."""
     console.print("[bold]Step 4:[/] Persisting to Neo4j...")
     store = GraphStore(
         uri=os.getenv("NEO4J_URI", "bolt://neo4j:7687"),
@@ -664,34 +701,59 @@ def seed_build(
                 console.print(f"  [red]in seed, not in gold:[/] {triple}")
             raise typer.Exit(code=1)
         console.print(f"  Read back {len(read_back)} constraint edges, identical to the gold")
-
-    if json_output:
-        output = {
-            "repo": repo,
-            "nodes": len(merged.nodes),
-            "edges": len(merged.edges),
-            "constraint_edges": len(merged.constraint_edges),
-            "external_nodes": external_count,
-        }
-        if gold:
-            output["gold_read_back"] = len(read_back)
-        console.print_json(json.dumps(output))
-        return
-
-    console.print(f"[bold green]Done[/] Seed built for [cyan]{repo}[/]")
+    return read_back
 
 
-def _merge_constraints(repo_cfg, repo_path: Path, adg, gold: bool, config, allow_off_pin: bool = False):
-    """Step 2: the gold merge (`--gold`) or the resolver extraction."""
+@dataclass(frozen=True)
+class _SeedSource:
+    """Where a seed build's rule set comes from, and where to write it back."""
+    kind: str                     # "resolver" | "gold" | "file"
+    path: Path | None = None      # the constraint file, for kind == "file"
+    out: Path | None = None       # where the resolver's rule set is dumped (#190)
+    allow_off_pin: bool = False   # gold only: build off the census §5 pin (#163)
+
+
+def _seed_source(gold: bool, constraints: Path | None, constraints_out: Path | None,
+                 allow_off_pin: bool) -> _SeedSource:
+    """Classify the seed-build flags, refusing the combinations with no meaning."""
+    def refuse(message: str) -> None:
+        console.print(f"[red]Error:[/] {message}")
+        raise typer.Exit(code=1)
+
+    if constraints is not None and gold:
+        refuse("--constraints and --gold are mutually exclusive")
+    if constraints is not None and constraints_out is not None:
+        refuse("--constraints and --constraints-out are mutually exclusive")
+    if gold and constraints_out is not None:
+        refuse("--constraints-out needs the resolver; --gold skips it")
+    if constraints is not None:
+        return _SeedSource("file", path=constraints)
+    if gold:
+        return _SeedSource("gold", allow_off_pin=allow_off_pin)
+    return _SeedSource("resolver", out=constraints_out)
+
+
+def _merge_constraints(repo_cfg, repo_path: Path, adg, config, source: _SeedSource):
+    """Step 2: the rule-set load (`--constraints`), the gold merge (`--gold`), or
+    the resolver extraction."""
     pipeline = ADGPipeline()
-    if not gold:
+    if source.kind == "file":
+        # #190: the replay's ADR-set cache. No resolver, no pin check -- the
+        # constraint file is version-keyed by the caller, not the census pin.
+        console.print(f"[bold]Step 2:[/] Loading constraints from {source.path.name} (resolver skipped)...")
+        return pipeline.build_gold_seed(adg, source.path, project_root=repo_path)
+    if source.kind == "resolver":
         console.print("[bold]Step 2:[/] Resolving ADR constraints (unified agent)...")
         adr_dir = _resolve_adr_dir(repo_cfg, repo_path)
-        return pipeline.build_seed(adg, adr_dir, project_root=repo_path, config=config.langextract)
+        merged = pipeline.build_seed(adg, adr_dir, project_root=repo_path, config=config.langextract)
+        if source.out is not None:
+            dump_gold_edges(source.out, merged.constraint_edges)
+            console.print(f"  Wrote {len(merged.constraint_edges)} constraint edges to {source.out}")
+        return merged
 
     # census §5: a gold seed off its pin is a different benchmark. A benchmark
     # historical case is exactly that on purpose, so it has to say so (#163).
-    if allow_off_pin:
+    if source.allow_off_pin:
         console.print(f"[yellow]Note:[/] seeding off the census §5 pin at {(_git_sha(repo_path) or 'unknown')[:10]} "
                       f"(the ADR checkout is still pin-checked)")
     else:

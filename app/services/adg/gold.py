@@ -10,7 +10,7 @@ import json
 from collections import Counter
 from pathlib import Path
 
-from services.models import ConstraintEdge, PredicateType
+from services.models import ConstraintEdge, ConstraintScope, PredicateType
 
 GOLD_DIR = Path(__file__).resolve().parents[3] / "benchmark" / "gold"
 
@@ -48,8 +48,36 @@ def load_gold_edges(gold_file: Path) -> list[ConstraintEdge]:
                 justification=constraint["justification"],
                 adr_id=adr["adr_id"],
                 adr_path=adr["adr_path"],
+                # #190: carry scope on the wire. Missing or invalid -> RUNTIME,
+                # matching the Neo4j reader (connector.py); a dropped TOOLING
+                # edge would come back enforced (#159).
+                scope=ConstraintScope(constraint.get("scope", "runtime")),
             ))
     return edges
+
+
+def dump_gold_edges(path: Path, edges) -> None:
+    """ConstraintEdges -> the gold JSON shape, grouped by (adr_id, adr_path).
+
+    The writer twin of `load_gold_edges`, for `cpt seed build --constraints-out`
+    (#190): the replay caches the resolver's rule set per ADR version and loads
+    it back on later samples. `scope` rides along so TOOLING edges stay TOOLING.
+    """
+    groups: dict[tuple[str, str], dict] = {}
+    order: list[tuple[str, str]] = []
+    for edge in edges:
+        key = (edge.adr_id, edge.adr_path)
+        if key not in groups:
+            groups[key] = {"adr_id": edge.adr_id, "adr_path": edge.adr_path, "constraints": []}
+            order.append(key)
+        groups[key]["constraints"].append({
+            "subject": edge.subject,
+            "predicate": edge.predicate.value,
+            "object": edge.object,
+            "justification": edge.justification,
+            "scope": edge.scope.value,
+        })
+    Path(path).write_text(json.dumps([groups[k] for k in order], indent=2) + "\n")
 
 
 def triples(edges) -> list[tuple[str, str, str, str]]:
