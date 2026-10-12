@@ -26,11 +26,11 @@ The gate never runs eval harnesses. It reads the committed baseline reports and 
 - Ingestion: top-level `tests/ground_truth/<repo>_eval_report.json` (real repos: openlobby, python_tuf, tamr_client), aggregate blended (exact + 0.5*partial)/total >= 0.5667 (= (5 + 0.5*7)/15), FP <= 15 (the post-exclusion `false_positives` field, per #136).
 - Retrieval: top-level `tests/ground_truth/cpt_detect_eval_report.json`, real-repo keys only, exact + 0.5*partial >= 12.0 (of 14 expected), FP <= 1.
 
-flask/django synthetic rows are excluded from every gate denominator (smoke signal only, per the eval.md provenance section).
+flask/django synthetic rows are excluded from every gate denominator (smoke signal only, per the docs/eval.md provenance section).
 
 ### 2. Ratchet semantics under the freeze
 
-The floor moves only by deliberate re-baseline: re-run both groups at PYTHONHASHSEED=0 (ingestion k=2), diff against committed baselines, re-commit reports and constants together, record the row in eval.md (Change / Numbers / Impact / Comparability). A code change claimed eval-neutral that would move tallies therefore fails the gate until the baseline is consciously re-committed: no silent drift, and the freeze makes re-baselining expensive enough to stay rare.
+The floor moves only by deliberate re-baseline: re-run both groups at PYTHONHASHSEED=0 (ingestion k=2), diff against committed baselines, re-commit reports and constants together, record the row in docs/eval.md (Change / Numbers / Impact / Comparability). A code change claimed eval-neutral that would move tallies therefore fails the gate until the baseline is consciously re-committed: no silent drift, and the freeze makes re-baselining expensive enough to stay rare.
 
 ### 3. The 60% sub-floor is not a gate constant
 
@@ -56,5 +56,5 @@ Eval-side ingestion gate: k=2 worst-run (this issue's body) when LLM runs resume
 - #119 (gating mechanism; this ADR resolves its threshold and k questions)
 - #110 (ratchet mechanics, worst-run gate shape)
 - #107 (25-target superseded; sub-floor aspiration retained)
-- eval.md (baseline rows and comparability rules; this ADR's constants are the committed 2026-09-08T13-06-27 run)
+- docs/eval.md (baseline rows and comparability rules; this ADR's constants are the committed 2026-09-08T13-06-27 run)
 - #111 (benchmark curation, the next generalization evidence source)

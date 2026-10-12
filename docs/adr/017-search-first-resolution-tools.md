@@ -50,7 +50,7 @@ If the semble model is not cached and cannot be downloaded, `seed build` fails w
 
 ### 7. Eval re-recorded in the same change; ablation noted
 
-The resolver behavior change moves the 2026-09-01 ingestion baselines; the eval is re-run and `eval.md` re-recorded in the same change (gold set #117 is not yet curated, so nothing downstream pins the old numbers). The eval track notes an ablation dimension for the new surface (search on/off, `list_dependents` on/off) to be designed before the re-record.
+The resolver behavior change moves the 2026-09-01 ingestion baselines; the eval is re-run and `docs/eval.md` re-recorded in the same change (gold set #117 is not yet curated, so nothing downstream pins the old numbers). The eval track notes an ablation dimension for the new surface (search on/off, `list_dependents` on/off) to be designed before the re-record.
 
 ## Consequences
 

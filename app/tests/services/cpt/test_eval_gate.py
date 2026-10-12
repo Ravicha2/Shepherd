@@ -4,7 +4,7 @@ Asserts the committed baseline reports still satisfy the frozen ratchet
 constants. Never executes an eval harness: under the eval freeze (gold set
 evolved 3x; further iteration on the same set risks overfitting) the floor
 moves only by deliberate re-baseline, re-committing reports and constants
-together and recording the row in eval.md.
+together and recording the row in docs/eval.md.
 
 Denominators: real repos only (openlobby, python-tuf, tamr-client).
 flask/django are synthetic smoke fixtures, excluded from every gate tally.

@@ -8,7 +8,7 @@ Accepted (extends [ADR 009](./009-sound-cpt-reachability.md))
 
 ## Context
 
-The retrieval eval gold (`tests/ground_truth/cpt_detect_ground_truth.json`, baselines in `eval.md`) surfaced four blind spots where CPT detection diverges from ADR semantics. A grilling session (#108, decision comment 5472616138) walked each one and decided: fix the detection semantics, or accept and document as a limitation. The disposition matters because fixing a blind spot changes what the expanded gold set (#107) can claim to detect; documenting it bakes the blind spot into future GT as a known miss.
+The retrieval eval gold (`tests/ground_truth/cpt_detect_ground_truth.json`, baselines in `docs/eval.md`) surfaced four blind spots where CPT detection diverges from ADR semantics. A grilling session (#108, decision comment 5472616138) walked each one and decided: fix the detection semantics, or accept and document as a limitation. The disposition matters because fixing a blind spot changes what the expanded gold set (#107) can claim to detect; documenting it bakes the blind spot into future GT as a known miss.
 
 The four blind spots:
 
@@ -47,9 +47,9 @@ Guardrails:
 
 ### 4. Acceptance gate: eval FP tallies vs baseline
 
-The B3 approximation's accepted risk is syntactic overmatch (a shadowing case the textual check misses would draw a spurious edge). The gate: retrieval eval false-positive tallies vs the recorded baseline in `eval.md`. FP jump ⇒ approximation rejected, B3 reverts to documented limitation.
+The B3 approximation's accepted risk is syntactic overmatch (a shadowing case the textual check misses would draw a spurious edge). The gate: retrieval eval false-positive tallies vs the recorded baseline in `docs/eval.md`. FP jump ⇒ approximation rejected, B3 reverts to documented limitation.
 
-**Gate outcome (2026-08-31):** flask 1 FP (unchanged), python-tuf 0, openlobby 3 (unchanged), django 0 → 3. Adjudicated as **not a regression**: the 3 FPs are one firing repeated across three cases (ADR-002 `project.*` prohibits `users.models.*` at `project.urls`), caused by a factually correct new edge completing a transitive path the pre-#116 graph could not express. Even full descriptor-chain resolution would produce the same edge and the same firing. Kept, with the firing recorded as a documented over-trigger in the gold grading notes and the `eval.md` baseline.
+**Gate outcome (2026-08-31):** flask 1 FP (unchanged), python-tuf 0, openlobby 3 (unchanged), django 0 → 3. Adjudicated as **not a regression**: the 3 FPs are one firing repeated across three cases (ADR-002 `project.*` prohibits `users.models.*` at `project.urls`), caused by a factually correct new edge completing a transitive path the pre-#116 graph could not express. Even full descriptor-chain resolution would produce the same edge and the same firing. Kept, with the firing recorded as a documented over-trigger in the gold grading notes and the `docs/eval.md` baseline.
 
 ## Documented limitations (stay)
 
@@ -60,5 +60,5 @@ The B3 approximation's accepted risk is syntactic overmatch (a shadowing case th
 ## Consequences
 
 - django `django-violating-view` and `django-compliant-view-via-connector` stay in the gated retrieval set — no denominator exclusion needed, since B3 is fixed rather than documented.
-- Retrieval baselines pre-#115, post-#115, and post-#116 are recorded in `eval.md`; the post-#116 django row carries 3 documented FPs, so future changes must not be confused by the jump from the post-#115 row.
+- Retrieval baselines pre-#115, post-#115, and post-#116 are recorded in `docs/eval.md`; the post-#116 django row carries 3 documented FPs, so future changes must not be confused by the jump from the post-#115 row.
 - The eval remains report-only: accuracy is printed and written, never gated; thresholds are deferred to the #107 expanded gold set.

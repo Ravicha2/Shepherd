@@ -2,7 +2,7 @@
 
 - **Status:** research note (contract-details pass, not a survey) — deliverable for issue #141
 - **Date:** 2026-09-10
-- **Related:** ADR 017 (`docs/adr/017-search-first-resolution-tools.md`), issue #141, plan note `notes/node_search_lit_review_plan.md`
+- **Related:** ADR 017 (`docs/adr/017-search-first-resolution-tools.md`), issue #141, plan note `docs/research/node_search_lit_review_plan.md`
 - **Evidence base:** /tmp/opencode/evidence/{researcher_0,researcher_1,researcher_2}_toolresults.md (fetched 2026-09-10); line refs below were computed against the raw files during the source-gathering run and are cited file:line per source
 - **Scope:** response contracts of `node_search`-shaped tools only — ranking, caps/overflow, kind labels, external-import indexing, signatures. NOT a survey of agent tooling.
 
