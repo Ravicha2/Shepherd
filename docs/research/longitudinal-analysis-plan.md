@@ -211,6 +211,43 @@ churn and the durability number measures busyness — that would withdraw the DV
 >   layer actually claims: do fixes hold. Where the pool exists, nothing is
 >   lost.
 
+> **Dated note (2026-10-15) — the pool-emptiness number is computed; the branch is set by a clock the
+> plan does not name.** The note above rests the Test 2 branch on a measured claim: "Flowkit's records
+> show that pool is empty there: no governed module of usable size under the fired rules never fires."
+> #193's body corrected *where* it comes from — **code, not records**, since records persist firing
+> violations only — and it is now computed and committed
+> (`research-exp-setup/records/pool_emptiness/{flowkit,experimenter}.json`; method and caveats in
+> `research-exp-setup/docs/issue-193-pool-emptiness.md`). One half of the sentence needs correcting;
+> the other half carries the claim.
+>
+> - **The pool is not empty.** Under the pinned re-derivation (the reading the note above is written
+>   against), flowkit has **324** never-fired governed-module instances under its 5 fired rules
+>   (**163** distinct modules); experimenter has **4,261** (**569** distinct) under its 11 fired rules.
+>   The "never fires" half of the sentence is false as literally stated.
+> - **The load-bearing half is "of usable size."** A pool member is usable only if it matches a treated
+>   module under the same rule within 0.5 SD on fan-in, churn and age. Whether any member is usable
+>   depends on the reference clock chosen for the control's **own** measures — a control has no fix
+>   sample, and the note above never names one:
+>   - flowkit — 0 usable at the module's last appearance (⇒ fallback), 12 at its first appearance,
+>     **23** at the rule's median fix sample (⇒ the matched design runs);
+>   - experimenter — 0 usable at first appearance (⇒ fallback), 3 at last appearance, **5** at the
+>     median fix sample (⇒ the matched design runs).
+>
+>   The two repos flip at *opposite* clocks, so the branch is set by an unstated clock choice rather
+>   than by the data alone.
+> - **What changes in the arithmetic:** the conditional is real, but it is not decided by emptiness.
+>   The clock for a control's measures must be named — or both readings reported — before either repo's
+>   branch is quoted. Flowkit's fallback survives only under the last-appearance clock; under the
+>   fix-era clock flowkit has 23 usable controls and the matched design would run.
+> - **What does not change:** Test 2's runnability gate (below 10 certified lapses ⇒ not-run; flowkit
+>   n=1, experimenter 8 raw of which 1 genuine) is untouched — this number decides which branch *would*
+>   run, not whether it runs. And a never-fired module is not yet a never-*violated* one where the rule
+>   is change-triggered: the pool splits into **touched** (in some sample commit's diff ⇒ genuinely
+>   clean) and **untouched** (never in a diff ⇒ merely unobserved), measured at 310/14 for flowkit and
+>   4,010/251 for experimenter. For both repos **every usable control is in the touched part**, so the
+>   split does not move either verdict; it matters only because it is the difference between the plan's
+>   wording ("never-violated") and what the number can support.
+
 Two tests is a small family: a standard **Holm correction** across the pair
 keeps the "you ran many tests" objection quiet. (Holm correction: a standard
 recipe that demands stronger evidence when more than one claim is tested.)
@@ -323,6 +360,82 @@ pre-agreed add-back. It is *not* added now — the panel stays three.
 > which histories were admitted. With three repos fixed up front, the
 > "phenomenon is rare" and "phenomenon is common" outcomes are both clean reads
 > of the same pre-declared panel.
+
+> **Dated note (2026-10-15) — power specifics, computed: both cheap repos land in outcome 3, and
+> the 10-lapse gate is measured, not revised.** §8 defers "power specifics (what n would be needed
+> to shrink the intervals) — computed once the pilot repos yield real counts." Both cheap repos now
+> have counts — experimenter ran 2026-10-14/15 ([#193](https://github.com/Ravicha2/Shepherd/issues/193));
+> flowkit's re-derivation is on the books (#208) — so the deferral is discharged here. Every figure,
+> the per-predicate split and the derivations live in
+> `research-exp-setup/docs/issue-193-power-note.md`; this note is the decision it settles.
+>
+> **The counts.** experimenter (204 samples, 0 merges; raw, pinned and re-derived tables
+> byte-identical — no extraction drift): `lapses/fixes` 8/4,413 = 0.18% (Wilson 0.09–0.36%), §3 rows
+> 8/3,984 = 0.20% (0.10–0.40%), split 139 `prohibits` rows / 1 lapse (0.72%) and 3,845 `requires`
+> rows / 7 lapses (0.18%). flowkit canonical (#208): 144/1,254 §3 lapses, **all** on the sample-21
+> merge artefact; off-artefact 0/1,110 = 0.00%.
+>
+> **Test 1 is indeterminate on both — and not for want of samples.** experimenter's recurrence point
+> estimate sits **below its own measured floor** (14/4,685 = 0.30%, §5's 2026-10-10 note); when the
+> estimate is already under the floor, no n clears it — more samples narrow the interval onto a
+> value below the floor instead of pushing it above. flowkit's raw reading (9.96%) looks clearable,
+> but 144 of its 145 raw lapses are the artefact; de-artefacted it sits at the floor too. The
+> sensitivity is steep: under a constant-rate assumption it takes a genuine rate of **≥2–3× the
+> floor** before the required n comes anywhere near a pilot's reach.
+>
+> **Test 2 is not run on either repo, and the pre-named gate holds.** Both sit below 10 certified
+> lapses on every reading — experimenter 8 raw, of which 1 is genuine; flowkit 1 raw / 0 re-derived
+> — and since certification can only shrink counts, the gate's verdict is robust and #207's number
+> 10 needs **no revision**. Were the gate lifted, the design would still be indeterminate: the
+> 0.67–1.5 band needs roughly **47 events per arm** (`SE(log HR) ≈ sqrt(2/D)`, so
+> `1.96·sqrt(2/D) < |ln 1.5|`), and each cheap repo is one to two orders of magnitude short of that
+> before the control side is counted at all.
+>
+> **What this changes, and what it does not.** Changed: the deferred power question is answered, and
+> the runnability gate is now a measured number rather than an argument. Unchanged: the row
+> definition, the censoring rules, the two tests, the Holm correction, the 0.67–1.5 margin, the
+> 30-event note rule, the template, the horizons, and the three-repo panel. The recurrence readings
+> stay a **floor** (§7's 2N-undercounting). The cheapest lever that changes a *state* is denser
+> sampling of experimenter (~44 min at N=20 buys 255 samples and clears the gate); the only lever
+> that can change the *verdict* is running home-assistant — which is exactly why HA's interpretation
+> is fixed here, before it runs.
+>
+> **Reason.** Power is only meaningful against counts that exist. Both cheap repos' intervals are
+> too wide to clear either the noise floor or the gate, and the only larger history in the
+> pre-declared panel is HA's. If HA also lands in outcome 3, that is the finding — the phenomenon is
+> rare at this sampling resolution — not a reason to re-cut the panel.
+
+> **Dated note (2026-10-15) — Test 2's placement is decided per design, before HA runs.** The
+> deferred-decision bullet above ("whether the matched comparison (Test 2) is *reported* in the
+> paper or kept in the appendix") names one thing. #207's note made it two designs — a matched
+> primary where a never-violated governed pool exists, and a permutation fallback where it does not
+> — so the placement is decided **per design, not per study**, as #193's body requires.
+>
+> - **The matched design goes to the paper, wherever on the panel it runs.** It is the
+>   pre-registered primary, and it is the only design that carries the history-predicts-future claim
+>   the DV is about: spots that broke a rule against matched spots under the same rule that never
+>   did. A primary analysis that runs on one panel repo is a per-repo cell in the paper (§6), not an
+>   appendix robustness check.
+> - **The permutation fallback goes to the appendix**, with one pre-declared exception: if the
+>   matched design runs on **no** panel repo, the fallback *is* the study's Test 2 and is reported
+>   in the paper, labelled as the fallback, with its restricted-null (exchangeability) caveat stated
+>   in the text. The default is appendix because the fallback is not a matched comparison at all —
+>   it compares each fixed module to its own dynamics, so it cannot carry the deterrence-shaped
+>   claim — and because a substitute belongs beside the thing it substitutes for, not in its place.
+>
+> **What this changes in the arithmetic, and what it does not.** Nothing about the row definition,
+> the censoring rules, the two tests' mechanics, the Holm correction, the 0.67–1.5 margin, the
+> 30-event note rule, the template or the horizons. It fixes the paper/appendix call in advance for
+> each design, so the call cannot be made after the numbers are seen — which is the whole reason it
+> was deferred.
+>
+> **Evidence at the time of the call, and why the call is still live.** Both cheap repos sit below
+> the pre-named 10-certified-lapse gate, so neither design is exercised on them: flowkit has 1
+> genuine raw lapse (0 in the canonical re-derivation), experimenter has 8 raw §3 lapses of which 7
+> sit on one sample (142) and 1 is genuine (sample 41). The placement is therefore live only if
+> home-assistant clears the gate, and it is pre-declared now so that HA's pool result cannot choose
+> its own venue. The pool-emptiness number that gates the matched design is committed at
+> `research-exp-setup/records/pool_emptiness/`.
 
 ## 9. What this study does not claim
 
