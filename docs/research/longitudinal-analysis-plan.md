@@ -295,6 +295,35 @@ note text.
 near-silent, that is itself the finding, and python-tuf (minutes to add) is the
 pre-agreed add-back. It is *not* added now — the panel stays three.
 
+> **Dated note (2026-10-14) — the python-tuf escape hatch is withdrawn; the
+> panel is three repos, finally.** The paragraph above is superseded in place
+> and is not a live requirement. Decided on the owner's call ([#193](https://github.com/Ravicha2/Shepherd/issues/193),
+> 2026-10-14): python-tuf is **not** re-added at the pilot gate or at any later
+> point. Its add-back is withdrawn, not deferred, so it is no longer a
+> pilot-gate decision at all — what §8 *defers* is unchanged otherwise (the
+> paper-vs-appendix placement of Test 2, per design; power specifics; #185's
+> wording).
+>
+> **What this changes in the arithmetic, and what it does not.** Nothing about
+> the row definition, the censoring rules, the two tests, the Holm correction,
+> the equivalence margin, the 30-event note rule, the template or the horizons.
+> What it removes is one branch of the interpretation: a near-silent cheap-repo
+> result can no longer be answered by substituting a repo with different
+> history. It is reported as the finding it is — counts over denominators with
+> Wilson intervals, under the plan's standing note below 30 events (§6) — and
+> the low-recurrence reading stays a **floor**, per §7's 2N-undercounting
+> asymmetry. The panel is flowkit + experimenter + home-assistant, and the
+> census's "nearly free to add back" line for python-tuf
+> ([`longitudinal-replay-census.md`](./longitudinal-replay-census.md) §4) is
+> read as available-and-declined, not as a pending option.
+>
+> **Reason.** A panel chosen after seeing how quiet the first two repos were is
+> a panel chosen on the outcome; adding a third repo specifically because the
+> others came back silent makes the recurrence estimate partly a function of
+> which histories were admitted. With three repos fixed up front, the
+> "phenomenon is rare" and "phenomenon is common" outcomes are both clean reads
+> of the same pre-declared panel.
+
 ## 9. What this study does not claim
 
 - Not *"Shepherd is good"* — the benchmark carries system quality.
