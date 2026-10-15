@@ -47,7 +47,11 @@ we can honestly claim to see.
 > the intersection (AI-assisted + ADR-carrying + Python) essentially unoccupied; the
 > best-documented instance is **Shepherd itself** — 248 commits since 2026-05-28, 18 ADRs since
 > 2026-06-08 of which **11 carry explicit supersession pointers**, and **80 of 248 commits (32%)
-> co-authored by Claude**, the first one the day after the first ADR.
+> co-authored by Claude**, the first one the day after the first ADR. These are the #193 ticket's
+> figures; the frozen-clone re-derivation in
+> `research-exp-setup/docs/issue-212-shepherd-self-ingestion.md` §4 gives **249** commits and **10**
+> supersession pointers under the implemented status rule — the ticket's 11 is the union, a rule
+> difference rather than a miscount.
 >
 > **Pre-registered before any run of it** ([#212](https://github.com/Ravicha2/Shepherd/issues/212)):
 > a pilot replay of Shepherd's own history, as a viability probe of the AI-assisted population —
@@ -113,11 +117,12 @@ alongside for comparison with other studies.
 > `research-exp-setup/docs/issue-193-experimenter-evaluation.md`) measured what the rules in that
 > product actually are, now that two repos have run.
 >
-> - **The rows are dominated by one pattern.** 3,845 of experimenter's 3,984 rows and 1,253 of
+> - **The rows are dominated by one pattern.** 3,840 of experimenter's 3,984 rows and 1,253 of
 >   flowkit's 1,254 come from `requires_dependency <subject>.* → <library>` rules whose firing
 >   condition is "the changed module does not import `<library>`" — met by ~99% of modules in both
 >   repos (experimenter: `graphene_django` 3 of 664 modules, `kinto_http` 3, `celery` 4,
->   `pydantic` 5; flowkit: `redis` 1 of 577, `flask_jwt_extended` 0). The source ADRs are
+>   `pydantic` 5; flowkit: `redis` 1 of 577, `flask_jwt_extended` 0); experimenter's other 5
+>   `requires` rows are `requires_implementation`. The source ADRs are
 >   system-level statements — flowkit 0005's "API-backend communication will be via zeromq, IPC in
 >   the backend will be mediated by redis", experimenter 0002's graphene-django "would be used in
 >   the back-end" — lowered to per-module dependency assertions over a repo-wide subject.
@@ -182,7 +187,11 @@ alongside for comparison with other studies.
 >
 > What the pilot's own tables become under this split: experimenter's compliance list is **149 rows
 > / 1 lapse** (0.67%, Wilson 0.12–3.70%) against 3,835 / 7 on the change-firing side; flowkit's is
-> **1 row / 0 lapses** against 1,253 / 144. Both cheap repos fall further below the 10-certified-lapse
+> **1 row / 0 lapses** against 1,253 / 144. This split and §8's per-predicate split (139 `prohibits`
+> / 3,845 `requires`) are two cuts of the same 3,984 rows, bridged by the 10 bounded-subject
+> `requires` rules (5 `requires_dependency` + 5 `requires_implementation`, all
+> `experimenter.experimenter.visualization.*`): 139 + 10 = 149 compliance, 3,845 − 10 = 3,835
+> change-firing. Both cheap repos fall further below the 10-certified-lapse
 > gate on the list that carries the tests, so the gate's verdict and #207's number are unchanged —
 > and the compliance-list intervals are now readings of what the sentence above says they are. A
 > bounded-subject `requires_*` rule earns its compliance place only where its requirement is one
