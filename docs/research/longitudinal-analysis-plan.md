@@ -99,9 +99,12 @@ we can honestly claim to see.
 > `app.* → …suppress_outweighed_requires`, 8 each from ADR 004's two `app.services.*` rules, 5 from
 > ADR 015's `app.* → app.services.extract.*`, 2 from ADR 007's `app.* → openai`, 1 from ADR 017's
 > `app.* → semble`. Whole-package subjects (`app.*`, `app.services.*`) govern ~47 of the 53 module FQNs
-> and fire almost everywhere; the specificity guard flags three rules `CANDIDATE TO MOVE` and moves
-> none, while ADR 004's are scored "unscored → kept". The corpus is measured, but what it measures is
-> the extractor.
+> and fire almost everywhere. The specificity guard flags three rules `CANDIDATE TO MOVE` and moves all
+> three (`app.* → openai`, `app.* → semble`, `app.services.commit_update.* → neo4j`) — those moves are
+> every one of the 663 change_firing rows and 3 of the 33 lapses. The other 30 lapses sit in rules the
+> guard structurally cannot score: ADR 004's two (a module pattern; a code symbol) and ADR 010's
+> `requires_implementation` are "unscored → kept", and ADR 015's `prohibits_dependency` is never scored.
+> The corpus is measured, but what it measures is the extractor.
 >
 > **Nothing here supports a claim about AI-assisted compliance either way**, and the authorship
 > contrast cannot rescue it: the AI/human split (19/25) partitions the same artefact firings
@@ -114,8 +117,14 @@ we can honestly claim to see.
 > it to establish — the population is measurable, and measuring it needs (a) subject specificity
 > checked against the ADR's actual decision, (b) a repo-root namespace test that does not assume the
 > package is named after the repo (`repo_root_namespaces("shepherd")` is empty because the package is
-> `app/`, so no subject can ever be `change_firing`), and (c) tier-1 resolution that reads the
+> `app/`, so the root test routes nothing and the whole split rests on the specificity guard, which only
+> reaches library-object `requires_dependency` rules), and (c) tier-1 resolution that reads the
 > *direction* of a supersession rather than matching a substring in the status.
+>
+> *(Corrected in place, same date, before this reached a PR: the note first said the guard "moves none"
+> and that "no subject can ever be `change_firing`". Both are false — the guard moves three rules, and
+> those three are the only source of change_firing rows. The harness report's addendum carries the
+> corrected mechanism.)*
 
 ## 2. A worked example
 
