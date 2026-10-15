@@ -301,6 +301,15 @@ alongside for comparison with other studies.
 > (the note above), not as work to do. A *new* repo entering the study still chooses its sampling
 > N once, at registration — that is a design choice, not resampling ([#212](https://github.com/Ravicha2/Shepherd/issues/212)).
 
+> **Dated note (2026-10-16) — the two-list split now validates a rule before it can carry a test, and on the Shepherd corpus the compliance list is 1 row / 0 lapses.** The #212 pilot's reading was withdrawn because every one of its 33 lapses and 95% of its firings came from rules that do not restate their ADR's decision, and because the split's first defence — the repo-root test — was a no-op on a repo whose package is not named after it. Both are fixed on the harness ([#214](https://github.com/Ravicha2/Shepherd/issues/214)):
+>
+> - the repo root namespace is read from **package metadata** (`pyproject.toml` / `setup.py` / `setup.cfg`, kept when it covers at least 0.8 of the module inventory), so Shepherd's `app/` is a root namespace and its `app.*` subjects are repo-root-wide. The cheap repos are unchanged: experimenter stays `experimenter`, flowkit has no single-package root.
+> - every rule then gets a **subject-breadth** and an **object-resolution** verdict for every predicate and object kind, not only the one library shape the specificity guard could score. `kind_mismatch` (predicate and object kind are incompatible) and `decayed` (a code object that resolves in fewer than half the sample trees) **withdraw** the rule from the corpus; `over_broad` (a root namespace, or a container package governing at least half the inventory) and `tautological` (a `requires_*` object imported by at most `SPECIFICITY_FLOOR` of the modules the rule governs) **move** it to change-firing. Every flag is reported per rule in `withdrawn_rules` / `moved_rules`, and a flagged rule supplies no counted lapse **or fix** in either list — `authorship.py` reads the verdicts for the same reason.
+>
+> What the frozen Shepherd corpus then reads: compliance **1 row / 0 lapses**, change-firing **1,351 / 0** across five moved rules, and four rules withdrawn carrying **606** rows. The six artefact rules that produced all 33 lapses are flagged, and the corpus total changes by exactly those rules' rows (1 + 1,351 + 606 = 1,958). The cheap repos' artifacts are byte-identical, so their compliance lists stay 1 (flowkit) and 149 (experimenter).
+>
+> **This is not a rescued reading, and it must not be read as one.** On Shepherd the fixed split leaves almost nothing on the list that carries the tests, and the pilot's conclusion stands: the corpus measured the extractor. Measuring this population's compliance needs subjects specific to each ADR's actual decision — an extraction-side change, not a post-hoc filter — and any re-measurement buys its own pre-registration under §1's note. No reading is promoted here.
+
 ## 4. The two measurements, per repository
 
 1. **Of the governed modules that were fixed, how many lapsed?**
