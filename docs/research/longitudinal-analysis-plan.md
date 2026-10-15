@@ -71,6 +71,69 @@ we can honestly claim to see.
 > machinery needs: authorship labels (the 80/248 in-history markers), and tier-1 supersession,
 > which was empty in both cheap repos and is present here (11 ADRs with pointers).
 
+> **Dated note (2026-10-15) — the pilot was attempted and is blocked before any reading; both
+> pre-registered readings stand, untouched.** The registration above was executed on 2026-10-15:
+> Shepherd was cloned to a full-history copy frozen at `f3296c7`, registered, and the N=5 plan built
+> (219-commit window → 44 samples, `verify: PASS`, the governed window starting at the first ADR
+> commit `ea6c523`). The replay then died at sample 13 of 44 on a **403 from the extraction model —
+> the OpenRouter key's $20 cap is exhausted and does not reset.** The corpus, the three readings, the
+> two-list split, tier-1 supersession and the repeat check therefore do **not** exist, and **no
+> reading was produced**: nothing here is upgraded, and the "louder" / "quiet" readings are neither
+> confirmed nor weakened by anything the pilot has shown so far. The pilot's own machinery is in
+> place and resumable — the abort was clean, the clone is back at its pin, and only the 20 missing
+> `(adr_id, blob)` extractions would cost credits once the key is unblocked (owner action: replace
+> `OPENROUTER_API_KEY` or raise its cap). The **panel decision stays deferred**: it is made on
+> construct grounds, and there is not yet a reading to accompany it.
+
+> **Dated note (2026-10-15, later the same day) — the pilot COMPLETED, and its loud reading is
+> withdrawn.** The extraction cap was lifted (owner action) and the replay
+> resumed: **44 of 44 samples**, then the whole chain — `pin_extraction` → `replay_pinned` →
+> `events` ×3 → `events_lists` → `inert_rules` → `pool_emptiness` → `adr_precedence` →
+> `replay.py --repeat-check` → `authorship`. The repeat check is **PASS on all 39 sites**; the three
+> readings are **identical** (every pinned/rederived delta is +0 — no extraction drift here).
+>
+> **The headline is loud.** 11,007 firings; 1,958 §3 rows; **33 lapses (1.7%, Wilson 1.2–2.4%)**, 30 of
+> them in the compliance list. Against the human panel's single genuine failure in ~15 years this is
+> roughly three orders of magnitude louder, so §1's pre-registered *loud* reading ("more violations,
+> more lapses — the phenomenon the memory layer exists for is real in the population it serves") would
+> be satisfied on the numbers alone.
+>
+> **It is withdrawn — and NOT because the population is quiet.** Every one of the 33 lapses comes from
+> a rule that does not restate its ADR's decision: 9 from ADR 010's
+> `app.* → …suppress_outweighed_requires`, 8 each from ADR 004's two `app.services.*` rules, 5 from
+> ADR 015's `app.* → app.services.extract.*`, 2 from ADR 007's `app.* → openai`, 1 from ADR 017's
+> `app.* → semble`. Whole-package subjects (`app.*`, `app.services.*`) govern 47 of the 53 module FQNs in
+> the corpus union — the 6 they do not reach are the `benchmark.*` scripts, outside the `app` package —
+> and fire almost everywhere. The specificity guard flags three rules `CANDIDATE TO MOVE` and moves all
+> three (`app.* → openai`, `app.* → semble`, `app.services.commit_update.* → neo4j`) — those moves are
+> every one of the 663 change_firing rows and 3 of the 33 lapses. The other 30 lapses sit in rules the
+> guard structurally cannot score: ADR 004's two (a module pattern; a code symbol) and ADR 010's
+> `requires_implementation` are "unscored → kept", and ADR 015's `prohibits_dependency` is never scored.
+> So only the 3 moved rules are *scored* artefact; the other 30 are **unmeasured**, not tautological —
+> the withdrawal there rests on a prose reading, not a mechanism. That is the count §5 computes for
+> flowkit (144 of its 145 raw lapses are the artefact, so it sits at the floor); here the guard reaches
+> 3 of the 33. The corpus is measured, but what it measures is the extractor.
+>
+> **Nothing here supports a claim about AI-assisted compliance either way**, and the authorship
+> contrast cannot rescue it: the AI/human split (19/25) partitions the same artefact firings
+> (6,366 vs 4,641 violations; 11 vs 22 lapses), so it is a split of extraction noise by commit
+> authorship. Any statement that AI-assisted development drifts more — or less — would be an artefact
+> claim wearing a compliance label.
+>
+> **The panel decision stays deferred**, still on construct grounds and now for a second reason: no
+> valid reading was produced. What the pilot *does* establish is the machinery half the ticket asked
+> it to establish — the population is measurable, and measuring it needs (a) subject specificity
+> checked against the ADR's actual decision, (b) a repo-root namespace test that does not assume the
+> package is named after the repo (`repo_root_namespaces("shepherd")` is empty because the package is
+> `app/`, so the root test routes nothing and the whole split rests on the specificity guard, which only
+> reaches library-object `requires_dependency` rules), and (c) tier-1 resolution that reads the
+> *direction* of a supersession rather than matching a substring in the status.
+>
+> *(Corrected in place, same date, before this reached a PR: the note first said the guard "moves none"
+> and that "no subject can ever be `change_firing`". Both are false — the guard moves three rules, and
+> those three are the only source of change_firing rows. The harness report's addendum carries the
+> corrected mechanism.)*
+
 ## 2. A worked example
 
 Rule R says: *modules under `homeassistant.components.*` must not import
