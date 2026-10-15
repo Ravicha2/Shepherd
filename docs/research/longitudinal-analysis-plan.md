@@ -49,9 +49,9 @@ we can honestly claim to see.
 > 2026-06-08 of which **11 carry explicit supersession pointers**, and **80 of 248 commits (32%)
 > co-authored by Claude**, the first one the day after the first ADR. These are the #193 ticket's
 > figures; the frozen-clone re-derivation in
-> `research-exp-setup/docs/issue-212-shepherd-self-ingestion.md` §4 gives **249** commits and **10**
-> supersession pointers under the implemented status rule — the ticket's 11 is the union, a rule
-> difference rather than a miscount.
+> `research-exp-setup/docs/issue-212-shepherd-self-ingestion.md` §4 gives **249** commits and **6**
+> supersession pointers under the implemented status rule — the ticket's 11 is the union, a
+> rule-and-scope difference rather than a miscount.
 >
 > **Pre-registered before any run of it** ([#212](https://github.com/Ravicha2/Shepherd/issues/212)):
 > a pilot replay of Shepherd's own history, as a viability probe of the AI-assisted population —
