@@ -82,7 +82,7 @@ we can honestly claim to see.
 > construct grounds, and there is not yet a reading to accompany it.
 
 > **Dated note (2026-10-15, later the same day) — the pilot COMPLETED, and its loud reading is
-> withdrawn as a measurement artefact.** The extraction cap was lifted (owner action) and the replay
+> withdrawn.** The extraction cap was lifted (owner action) and the replay
 > resumed: **44 of 44 samples**, then the whole chain — `pin_extraction` → `replay_pinned` →
 > `events` ×3 → `events_lists` → `inert_rules` → `pool_emptiness` → `adr_precedence` →
 > `replay.py --repeat-check` → `authorship`. The repeat check is **PASS on all 39 sites**; the three
@@ -98,13 +98,17 @@ we can honestly claim to see.
 > a rule that does not restate its ADR's decision: 9 from ADR 010's
 > `app.* → …suppress_outweighed_requires`, 8 each from ADR 004's two `app.services.*` rules, 5 from
 > ADR 015's `app.* → app.services.extract.*`, 2 from ADR 007's `app.* → openai`, 1 from ADR 017's
-> `app.* → semble`. Whole-package subjects (`app.*`, `app.services.*`) govern ~47 of the 53 module FQNs
+> `app.* → semble`. Whole-package subjects (`app.*`, `app.services.*`) govern 47 of the 53 module FQNs in
+> the corpus union — the 6 they do not reach are the `benchmark.*` scripts, outside the `app` package —
 > and fire almost everywhere. The specificity guard flags three rules `CANDIDATE TO MOVE` and moves all
 > three (`app.* → openai`, `app.* → semble`, `app.services.commit_update.* → neo4j`) — those moves are
 > every one of the 663 change_firing rows and 3 of the 33 lapses. The other 30 lapses sit in rules the
 > guard structurally cannot score: ADR 004's two (a module pattern; a code symbol) and ADR 010's
 > `requires_implementation` are "unscored → kept", and ADR 015's `prohibits_dependency` is never scored.
-> The corpus is measured, but what it measures is the extractor.
+> So only the 3 moved rules are *scored* artefact; the other 30 are **unmeasured**, not tautological —
+> the withdrawal there rests on a prose reading, not a mechanism. That is the count §5 computes for
+> flowkit (144 of its 145 raw lapses are the artefact, so it sits at the floor); here the guard reaches
+> 3 of the 33. The corpus is measured, but what it measures is the extractor.
 >
 > **Nothing here supports a claim about AI-assisted compliance either way**, and the authorship
 > contrast cannot rescue it: the AI/human split (19/25) partitions the same artefact firings
