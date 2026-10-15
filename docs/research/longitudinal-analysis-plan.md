@@ -310,6 +310,17 @@ alongside for comparison with other studies.
 >
 > **This is not a rescued reading, and it must not be read as one.** On Shepherd the fixed split leaves almost nothing on the list that carries the tests, and the pilot's conclusion stands: the corpus measured the extractor. Measuring this population's compliance needs subjects specific to each ADR's actual decision — an extraction-side change, not a post-hoc filter — and any re-measurement buys its own pre-registration under §1's note. No reading is promoted here.
 
+> **Dated note (2026-10-16) — tier 1 now resolves from supersession direction, and the study's first tier-1 application is recorded.** Decision 2's tier 1 was implemented as "an ADR whose status contains a supersession word makes its constraints non-binding". On the shepherd corpus that rule misfired in both directions: it flagged the three ADRs whose statuses *supersede* others (015, 017, 020) as retired, and it could not resolve the corpus's one real conflict from direction, so ADR 008 vs ADR 014 fell to tier 2 with a reason — "neither status marks supersession" — that was false for the pair, since both statuses carry marks. Fixed on the harness ([#215](https://github.com/Ravicha2/Shepherd/issues/215)):
+>
+> - the status field is parsed for **directed** edges — "superseded by [ADR 14]" (backward) and "supersedes ADR 14 extraction stage, retains …" (forward) — with issue references, `extends` and body prose excluded; `superseded` means *this ADR is retired*, so a supersedER is not flagged;
+> - a directed edge between the two parties resolves at **tier 1**, and the reason states the direction;
+> - a **clause-scoped** edge retires the pair only when its clause names the conflict's subject or object; otherwise direction is withheld and the pair falls to tier 2, with the scope in the reason and `clause_scoped` / `applied` on the resolution. ADR 014 retires only its extraction stage and keeps its resolution approach, so a conflict in the retained part is no longer retired by it;
+> - the tier-2 wording now names **retirement** rather than the presence of a mark, which is true whether or not a side is a supersedER.
+>
+> What the frozen corpus reads: the 008/014 pair resolves at **tier 1** — winner ADR 014 (its `requires_dependency`), retired ADR 008's `prohibits_implementation` — the study's first tier-1 application; `tier1_status_marks` is the five ADRs carrying a retirement mark (005, 007, 008, 012, 014), three of them only partially retired. The cheap repos are unaffected: flowkit rebuilds byte-identically (0 conflicts) and experimenter's single conflict keeps its tier-2 outcome with a corrected reason.
+>
+> **What this does not change:** no constraint is retired from any rule set and no detection is re-run — applying the tier to detection stays HA prep's call. Tier 2 remains a reported heuristic whose every application is written out, and no reading is promoted by this note.
+
 ## 4. The two measurements, per repository
 
 1. **Of the governed modules that were fixed, how many lapsed?**
