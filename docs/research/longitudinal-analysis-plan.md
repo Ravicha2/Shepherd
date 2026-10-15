@@ -38,6 +38,35 @@ intent, so we do not say "decision regression," "re-introduction," "robustness,"
 or "enforcement." A governed module was clean, and then it wasn't. That is all
 we can honestly claim to see.
 
+> **Dated note (2026-10-15, owner) — the study's population is opened as a question, before HA
+> runs.** The panel so far — flowkit, experimenter, home-assistant — is human-managed: humans write
+> the changes, and human review culture is where the ADRs live. The sentence at the top of this
+> section, though, is said to an **agent** working agent-written code, and the owner's hypothesis
+> is that the two populations differ: AI-assisted development drifts from ADRs more, precisely
+> because the actor lacks the memory this study is about. A probe of prominent public repos found
+> the intersection (AI-assisted + ADR-carrying + Python) essentially unoccupied; the
+> best-documented instance is **Shepherd itself** — 248 commits since 2026-05-28, 18 ADRs since
+> 2026-06-08 of which **11 carry explicit supersession pointers**, and **80 of 248 commits (32%)
+> co-authored by Claude**, the first one the day after the first ADR.
+>
+> **Pre-registered before any run of it** ([#212](https://github.com/Ravicha2/Shepherd/issues/212)):
+> a pilot replay of Shepherd's own history, as a viability probe of the AI-assisted population —
+> **not a panel addition**. Both readings are declared now, per §7's discipline:
+>
+> - **If the history is louder than the human panel's** — more violations, more lapses — the
+>   phenomenon the memory layer exists for is real in the population it serves. What that confirms
+>   is the **premise** (there is something for memory to do), not the performance: detection
+>   quality stays the benchmark's job, per the category-error rule in this section.
+> - **If the history is quiet** — even the most on-point case leaves the memory layer little to
+>   do. Also a finding, per this section: *"if come-backs are rare, the memory layer has little to
+>   do."*
+>
+> Neither reading upgrades itself after the fact, and the panel decision is made on **construct
+> grounds** — whether the AI-assisted population is the one the problem statement targets — not on
+> this pilot's outcome. The pilot determines whether that population is measurable, and what its
+> machinery needs: authorship labels (the 80/248 in-history markers), and tier-1 supersession,
+> which was empty in both cheap repos and is present here (11 ADRs with pointers).
+
 ## 2. A worked example
 
 Rule R says: *modules under `homeassistant.components.*` must not import
@@ -190,6 +219,15 @@ alongside for comparison with other studies.
 > **Reason.** The pilot's finding was that one list was carrying two different things; the cheap
 > fix is to stop pretending they are the same number, not to re-cut the data. And precedence is how
 > human readers already resolve the 0002/0008 case — the machine should do the same, visibly.
+
+> **Dated note (2026-10-15, owner) — decision 3 is closed without action.** The owner's call: no
+> sampling-robustness work — no redefinition of the lapse rule, no denser resampling of the
+> existing repos. The data agrees: on the compliance lists the cheap repos hold **1** lapse
+> (experimenter) and **0** (flowkit), so no redefinition of the lapse rule can manufacture events;
+> and §8's power note already showed that denser sampling clears the runnability gate but not the
+> verdict. The two-sample/sampling-alignment property stays documented as the caveat it already is
+> (the note above), not as work to do. A *new* repo entering the study still chooses its sampling
+> N once, at registration — that is a design choice, not resampling ([#212](https://github.com/Ravicha2/Shepherd/issues/212)).
 
 ## 4. The two measurements, per repository
 
