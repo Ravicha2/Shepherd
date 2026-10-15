@@ -78,6 +78,62 @@ reported as a secondary readout only if the counts turn out large.)
 **Time is measured in commits** (settled in #182), with calendar days saved
 alongside for comparison with other studies.
 
+> **Dated note (2026-10-15) — on the `requires` side, the "rule" in one module × one rule is
+> satisfied by "the module changed".** The experimenter pilot's evaluation
+> ([#193](https://github.com/Ravicha2/Shepherd/issues/193); evidence in
+> `research-exp-setup/docs/issue-193-experimenter-evaluation.md`) measured what the rules in that
+> product actually are, now that two repos have run.
+>
+> - **The rows are dominated by one pattern.** 3,845 of experimenter's 3,984 rows and 1,253 of
+>   flowkit's 1,254 come from `requires_dependency <subject>.* → <library>` rules whose firing
+>   condition is "the changed module does not import `<library>`" — met by ~99% of modules in both
+>   repos (experimenter: `graphene_django` 3 of 664 modules, `kinto_http` 3, `celery` 4,
+>   `pydantic` 5; flowkit: `redis` 1 of 577, `flask_jwt_extended` 0). The source ADRs are
+>   system-level statements — flowkit 0005's "API-backend communication will be via zeromq, IPC in
+>   the backend will be mediated by redis", experimenter 0002's graphene-django "would be used in
+>   the back-end" — lowered to per-module dependency assertions over a repo-wide subject.
+> - **So on that side a row's "fix" and "lapse" are not repair and regression.** Under the
+>   two-sample rule a certified fix is two consecutive samples in which the governed node did not
+>   change, and a lapse is two consecutive samples in which it did: the row tracks change
+>   alignment, and resampling at a different N pairs different changes up. The worked case: the
+>   rule × module behind 7 of experimenter's 8 lapses fires at samples
+>   `[0, 11, 31, 37, 56, 125, 142, 143, 188]`, and only 142/143 are consecutive — so only that pair
+>   is a sustained presence, and therefore the only lapse.
+> - **The `prohibits` side is unaffected.** Those rules are state-checked, so presence is a
+>   property of the code rather than of what changed, and fix and lapse are genuine state
+>   transitions. Experimenter's other lapse is exactly that one: `prohibits_dependency cirrus.* →
+>   experimenter.*` (ADR 0009). flowkit has no `prohibits` firing at all, so its table is the
+>   exposed case in full — and this is the split §5's note requires being reported separately.
+>
+> **Three decisions this note opens rather than makes** (each wants its own dated note; the row
+> definition above stays as written until one lands):
+>
+> 1. **May a broad-wildcard change-triggered rule carry the headline denominator?** Either report
+>    that family separately and compute recurrence on semantically bounded rows — state-checked
+>    `prohibits`, plus `requires` rules whose subject is a bounded module set — or keep the
+>    definition as frozen and pre-declare the caveat in the reporting template.
+> 2. **Supersession.** `requires experimenter.* → graphene_django` (ADR 0002) and `prohibits
+>    experimenter.* → graphene_django` (ADR 0008, the later move off GraphQL) are both in force in
+>    the same versions: the detector applies every ADR as binding and does not model a later one
+>    retiring an earlier one.
+> 3. **Sampling alignment.** Whether the lapse rule needs a persistence criterion that a change in
+>    N cannot manufacture.
+>
+> **What this changes, and what it does not.** Changed: *what the study may divide by* — and
+> therefore what the recurrence rate is a rate **of** — has to be settled before HA runs, because
+> HA inherits the extraction pipeline and the plan does not permit re-interpreting a headline
+> afterwards. §8's power note reasons over these same rates; its n-arithmetic is unchanged (it is
+> a property of the counts), but the denominator it divides by is the one decided here. Not
+> changed: the detector, the pinning, the re-derivation and the events model did exactly what they
+> claim — the run reproduces at all 30 repeat-check sites — and the two tests' mechanics, Holm, the
+> 0.67–1.5 margin, the 30-event note rule, the template, the horizons, the runnability gate (both
+> cheap repos stay not-run) and the three-repo panel all stand.
+>
+> **Reason.** A cheap-repo pilot exists to decide whether the measurement means what the plan
+> assumes, before the expensive run is bought. The cheap repos' tables are a pure function of
+> saved records and pinned caches — no re-run is needed to settle this — so it is cheap now and
+> expensive to discover after HA.
+
 ## 4. The two measurements, per repository
 
 1. **Of the governed modules that were fixed, how many lapsed?**
