@@ -67,6 +67,20 @@ we can honestly claim to see.
 > machinery needs: authorship labels (the 80/248 in-history markers), and tier-1 supersession,
 > which was empty in both cheap repos and is present here (11 ADRs with pointers).
 
+> **Dated note (2026-10-15) — the pilot was attempted and is blocked before any reading; both
+> pre-registered readings stand, untouched.** The registration above was executed on 2026-10-15:
+> Shepherd was cloned to a full-history copy frozen at `f3296c7`, registered, and the N=5 plan built
+> (219-commit window → 44 samples, `verify: PASS`, the governed window starting at the first ADR
+> commit `ea6c523`). The replay then died at sample 13 of 44 on a **403 from the extraction model —
+> the OpenRouter key's $20 cap is exhausted and does not reset.** The corpus, the three readings, the
+> two-list split, tier-1 supersession and the repeat check therefore do **not** exist, and **no
+> reading was produced**: nothing here is upgraded, and the "louder" / "quiet" readings are neither
+> confirmed nor weakened by anything the pilot has shown so far. The pilot's own machinery is in
+> place and resumable — the abort was clean, the clone is back at its pin, and only the 20 missing
+> `(adr_id, blob)` extractions would cost credits once the key is unblocked (owner action: replace
+> `OPENROUTER_API_KEY` or raise its cap). The **panel decision stays deferred**: it is made on
+> construct grounds, and there is not yet a reading to accompany it.
+
 ## 2. A worked example
 
 Rule R says: *modules under `homeassistant.components.*` must not import
