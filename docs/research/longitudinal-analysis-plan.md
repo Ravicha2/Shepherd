@@ -133,6 +133,63 @@ alongside for comparison with other studies.
 > assumes, before the expensive run is bought. The cheap repos' tables are a pure function of
 > saved records and pinned caches — no re-run is needed to settle this — so it is cheap now and
 > expensive to discover after HA.
+>
+> **Dated note (2026-10-15, owner) — two of those three decisions are taken: the §3 table is
+> reported as two lists, and contradictions between ADRs resolve by precedence rather than being
+> enforced side by side.** Decided on the owner's call in the [#193](https://github.com/Ravicha2/Shepherd/issues/193)
+> evaluation thread. Decision 3 (whether the lapse rule needs a criterion a change in N cannot
+> manufacture) stays open, with the note above.
+>
+> **Decision 1 — two lists.** Every §3 row is assigned to one list at reporting time, by what the
+> violation's presence actually is a property of:
+>
+> - **Compliance list** — the violation is a property of the *code state*: `prohibits_*` rules
+>   (state-checked at every sample), plus `requires_*` rules whose subject names a bounded module
+>   subtree rather than the whole repository. This list carries the plan's two tests, the headline
+>   recurrence cell, the floors, the Holm correction and the equivalence band.
+> - **Change-firing list** — everything else, headed by the repo-wide wildcard `requires_dependency`
+>   family. Reported in the same template beside the compliance list, under a standing label:
+>   *a row here means the governed node changed, not that compliance failed.*
+>
+> What the pilot's own tables become under this split: experimenter's compliance list is **149 rows
+> / 1 lapse** (0.67%, Wilson 0.12–3.70%) against 3,835 / 7 on the change-firing side; flowkit's is
+> **1 row / 0 lapses** against 1,253 / 144. Both cheap repos fall further below the 10-certified-lapse
+> gate on the list that carries the tests, so the gate's verdict and #207's number are unchanged —
+> and the compliance-list intervals are now readings of what the sentence above says they are. A
+> bounded-subject `requires_*` rule earns its compliance place only where its requirement is one
+> most governed modules actually meet; the implementation reports that specificity check beside the
+> split, and any near-tautological bounded rule moves to the change-firing list rather than staying
+> in it.
+>
+> **Decision 2 — precedence, not side-by-side enforcement.** The detector applies every ADR as
+> binding and models no supersession; the pilot caught the direct case, ADR 0002 requiring
+> graphene_django (878 change-firing rows) while the later ADR 0008 prohibits it (111 compliance
+> rows). From the pilot on, contradictions resolve by tier:
+>
+> - **Tier 1 — explicit.** An ADR whose own status metadata marks it superseded, deprecated or
+>   retracted makes its constraints non-binding; the constraint is retired and the change is
+>   counted in §3's existing rule-withdrawal censoring category, not as an amendment. The pilot
+>   found this tier nearly empty: experimenter's ADRs carry MADR-style `- Status: accepted` lines,
+>   flowkit's carry `## Status` headers, and neither repo's ADRs contain a supersession pointer
+>   anywhere in their text.
+> - **Tier 2 — implicit, and reported.** Where two ADRs state directly opposite constraints on the
+>   same subject and object and neither carries status metadata, the later-numbered ADR wins, and
+>   the conflict is reported as a checkable finding beside the tables rather than resolved silently
+>   — because an ADR can also specialise rather than supersede, "later wins" is a heuristic whose
+>   every application is visible.
+>
+> **What this changes, and what it does not.** The §3 row-definition sentence above ("one row = one
+> module × one rule") now names two lists, and every template cell that carries a test reads from
+> the compliance list; the change-firing list is context, never an arm. Unchanged: the tests'
+> mechanics, Holm, the 0.67–1.5 margin, the 30-event note rule, the horizons, the runnability gate,
+> the three-repo panel, and the published artifacts — the split is a classification of the saved
+> rows, computed from the committed tables and rule sets with no detect re-run. Applying tier 2 to
+> the rule sets themselves (retiring constraints before detection rather than filtering rows after)
+> would need re-detection and is **not** part of this decision; the HA prep decides it.
+>
+> **Reason.** The pilot's finding was that one list was carrying two different things; the cheap
+> fix is to stop pretending they are the same number, not to re-cut the data. And precedence is how
+> human readers already resolve the 0002/0008 case — the machine should do the same, visibly.
 
 ## 4. The two measurements, per repository
 
