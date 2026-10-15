@@ -81,6 +81,42 @@ we can honestly claim to see.
 > `OPENROUTER_API_KEY` or raise its cap). The **panel decision stays deferred**: it is made on
 > construct grounds, and there is not yet a reading to accompany it.
 
+> **Dated note (2026-10-15, later the same day) — the pilot COMPLETED, and its loud reading is
+> withdrawn as a measurement artefact.** The extraction cap was lifted (owner action) and the replay
+> resumed: **44 of 44 samples**, then the whole chain — `pin_extraction` → `replay_pinned` →
+> `events` ×3 → `events_lists` → `inert_rules` → `pool_emptiness` → `adr_precedence` →
+> `replay.py --repeat-check` → `authorship`. The repeat check is **PASS on all 39 sites**; the three
+> readings are **identical** (every pinned/rederived delta is +0 — no extraction drift here).
+>
+> **The headline is loud.** 11,007 firings; 1,958 §3 rows; **33 lapses (1.7%, Wilson 1.2–2.4%)**, 30 of
+> them in the compliance list. Against the human panel's single genuine failure in ~15 years this is
+> roughly three orders of magnitude louder, so §1's pre-registered *loud* reading ("more violations,
+> more lapses — the phenomenon the memory layer exists for is real in the population it serves") would
+> be satisfied on the numbers alone.
+>
+> **It is withdrawn — and NOT because the population is quiet.** Every one of the 33 lapses comes from
+> a rule that does not restate its ADR's decision: 9 from ADR 010's
+> `app.* → …suppress_outweighed_requires`, 8 each from ADR 004's two `app.services.*` rules, 5 from
+> ADR 015's `app.* → app.services.extract.*`, 2 from ADR 007's `app.* → openai`, 1 from ADR 017's
+> `app.* → semble`. Whole-package subjects (`app.*`, `app.services.*`) govern ~47 of the 53 module FQNs
+> and fire almost everywhere; the specificity guard flags three rules `CANDIDATE TO MOVE` and moves
+> none, while ADR 004's are scored "unscored → kept". The corpus is measured, but what it measures is
+> the extractor.
+>
+> **Nothing here supports a claim about AI-assisted compliance either way**, and the authorship
+> contrast cannot rescue it: the AI/human split (19/25) partitions the same artefact firings
+> (6,366 vs 4,641 violations; 11 vs 22 lapses), so it is a split of extraction noise by commit
+> authorship. Any statement that AI-assisted development drifts more — or less — would be an artefact
+> claim wearing a compliance label.
+>
+> **The panel decision stays deferred**, still on construct grounds and now for a second reason: no
+> valid reading was produced. What the pilot *does* establish is the machinery half the ticket asked
+> it to establish — the population is measurable, and measuring it needs (a) subject specificity
+> checked against the ADR's actual decision, (b) a repo-root namespace test that does not assume the
+> package is named after the repo (`repo_root_namespaces("shepherd")` is empty because the package is
+> `app/`, so no subject can ever be `change_firing`), and (c) tier-1 resolution that reads the
+> *direction* of a supersession rather than matching a substring in the status.
+
 ## 2. A worked example
 
 Rule R says: *modules under `homeassistant.components.*` must not import
