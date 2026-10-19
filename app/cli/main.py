@@ -17,6 +17,7 @@ from rich.table import Table
 from cli.config import RepoConfig, load_config
 from services.adg import parse_repo
 from services.adg.gold import GOLD_ADR_PINS, GOLD_PINS, dump_gold_edges, gold_path, gold_triples, triple_differences, triples
+from services.adg.route_inventory import build_route_inventory, repo_at_sha
 from services.cpt import GitAdapter, process_diff
 from services.cpt.dismissal import Dismissal, compute_identity_hash, filter_dismissed, violation_identity, violation_short_id
 from services.cpt.resolution import Violation, governed_module
@@ -233,6 +234,34 @@ def _run_detection(
         repo_cfg=repo_cfg,
         repo_path=repo_path,
     )
+
+
+@app.command()
+def routes(
+    path: Path = typer.Option(
+        ..., "--path",
+        help="Repository directory; with --sha this may be a --no-checkout clone",
+    ),
+    sha: str | None = typer.Option(
+        None, "--sha",
+        help="Read that commit's tracked tree via git archive (never a checkout)",
+    ),
+) -> None:
+    """Emit the route inventory (ADR 021) as deterministic JSON."""
+    if not path.exists():
+        console.print(f"[red]Error:[/] Repository path does not exist: {path}")
+        raise typer.Exit(code=1)
+    try:
+        if sha is None:
+            inventory = build_route_inventory(path)
+        else:
+            with repo_at_sha(path, sha) as work_tree:
+                inventory = build_route_inventory(work_tree)
+    except ValueError as e:
+        console.print(f"[red]Error:[/] {e}")
+        raise typer.Exit(code=1)
+
+    typer.echo(json.dumps(inventory.to_dict(), sort_keys=True, indent=2))
 
 
 violation_app = typer.Typer(help="List and dismiss CPT violations.")
