@@ -146,6 +146,66 @@ class TestFastApiDecorators:
 
         assert inventory.routes[0].methods == ("GET", "PUT")
 
+    def test_keyword_path_is_extracted(self, tmp_path: Path) -> None:
+        repo = _repo(tmp_path, {
+            "app/__init__.py": "",
+            "app/routes.py": """
+                from fastapi import APIRouter
+
+                router = APIRouter()
+
+                @router.get(path="/health")
+                def health():
+                    return {}
+            """,
+        })
+
+        inventory = build_route_inventory(repo)
+
+        assert inventory.gaps == ()
+        assert inventory.routes[0].raw_path == "/health"
+
+    def test_keyword_rule_is_extracted(self, tmp_path: Path) -> None:
+        repo = _repo(tmp_path, {
+            "app/__init__.py": "",
+            "app/views.py": """
+                from flask import Flask
+
+                app = Flask(__name__)
+
+                @app.route(rule="/health")
+                def health():
+                    return ""
+            """,
+        })
+
+        inventory = build_route_inventory(repo)
+
+        assert inventory.gaps == ()
+        assert inventory.routes[0].raw_path == "/health"
+
+    def test_stacked_decorators_keep_their_own_evidence_lines(self, tmp_path: Path) -> None:
+        repo = _repo(tmp_path, {
+            "app/__init__.py": "",
+            "app/routes.py": """
+                from fastapi import APIRouter
+
+                router = APIRouter()
+
+                @router.get("/a")
+                @router.post("/b")
+                def handler():
+                    return {}
+            """,
+        })
+
+        inventory = build_route_inventory(repo)
+
+        assert {(r.methods, r.raw_path, r.evidence.line) for r in inventory.routes} == {
+            (("GET",), "/a", 6),
+            (("POST",), "/b", 7),
+        }
+
     def test_methods_keyword_is_read_for_flask_route(self, tmp_path: Path) -> None:
         repo = _repo(tmp_path, {
             "app/__init__.py": "",
@@ -201,6 +261,54 @@ class TestFastApiDecorators:
 
         assert inventory.routes[0].methods == ("DELETE",)
         assert inventory.routes[0].canonical_path == "/items/{}"
+
+
+class TestCallFormRegistrations:
+    """Non-decorator registrations are reported, never silently dropped."""
+
+    def test_add_url_rule_is_reported_as_a_gap(self, tmp_path: Path) -> None:
+        repo = _repo(tmp_path, {
+            "app/__init__.py": "",
+            "app/views.py": """
+                from flask import Blueprint
+
+                bp = Blueprint("views", __name__)
+
+                bp.add_url_rule("/search/", "user_search", object)
+            """,
+        })
+
+        inventory = build_route_inventory(repo)
+
+        assert inventory.routes == ()
+        assert len(inventory.gaps) == 1
+        gap = inventory.gaps[0]
+        assert gap.reason == "non_decorator_registration"
+        assert gap.registration == "add_url_rule"
+        assert gap.raw_path == "/search/"
+        assert gap.handler_fqn == "app.views"
+        assert gap.file_path == "app/views.py"
+
+    def test_call_form_gap_uses_the_enclosing_function_fqn(self, tmp_path: Path) -> None:
+        repo = _repo(tmp_path, {
+            "app/__init__.py": "",
+            "app/routes.py": """
+                from fastapi import APIRouter
+
+                router = APIRouter()
+
+                def register():
+                    router.add_api_route("/health", object, methods=["GET"])
+            """,
+        })
+
+        inventory = build_route_inventory(repo)
+
+        assert inventory.routes == ()
+        assert inventory.gaps[0].reason == "non_decorator_registration"
+        assert inventory.gaps[0].registration == "add_api_route"
+        assert inventory.gaps[0].raw_path == "/health"
+        assert inventory.gaps[0].handler_fqn == "app.routes.register"
 
 
 class TestInventoryShape:
@@ -307,44 +415,44 @@ class TestInventoryShape:
 
 @pytest.mark.integration
 @pytest.mark.parametrize(
-    ("repo_id", "sha", "expected_method", "expected_path", "expected_handler"),
+    ("repo_id", "sha", "expected_routes"),
     [
         (
             "aegra",
             "d7d80c850010a9c5a3d2be59254c19b9eb0e25dd",
-            "POST",
-            "/threads/{thread_id}/runs",
-            "libs.aegra-api.src.aegra_api.api.runs.create_run",
+            (
+                ("POST", "/threads/{thread_id}/runs",
+                 "libs.aegra-api.src.aegra_api.api.runs.create_run"),
+                ("POST", "/threads/{thread_id}/runs/stream",
+                 "libs.aegra-api.src.aegra_api.api.runs.create_and_stream_run"),
+                ("POST", "/threads/{thread_id}/runs/wait",
+                 "libs.aegra-api.src.aegra_api.api.runs.wait_for_run"),
+            ),
         ),
         (
             "khoj",
             "b8eeefa0b1e8795e21ded99f2ffb7b34c6ab063c",
-            "GET",
-            "/auth/callback",
-            "src.khoj.routers.notion.notion_auth_callback",
+            (("GET", "/auth/callback",
+              "src.khoj.routers.notion.notion_auth_callback"),),
         ),
         (
             "indico",
             "17ba9730a713b0be704a0670f7016b8bcb59a390",
-            None,
-            None,
-            None,
+            (("GET", "/booking/<int:booking_id>",
+              "indico.modules.rb.blueprint.booking_link"),),
         ),
         (
             "mlflow",
             "990c8a780aa111f69842b0f42ce74af467fe9f57",
-            None,
-            None,
-            None,
+            (("POST", "/v1/chat/completions",
+              "mlflow.gateway.app.create_app_from_config.openai_chat_handler"),),
         ),
     ],
 )
 def test_pinned_clone_enumeration(
     repo_id: str,
     sha: str,
-    expected_method: str | None,
-    expected_path: str | None,
-    expected_handler: str | None,
+    expected_routes: tuple[tuple[str, str, str], ...],
 ) -> None:
     """The decorator enumerator runs on the real BAC-BENCH pinned trees.
 
@@ -360,11 +468,21 @@ def test_pinned_clone_enumeration(
 
     assert inventory.routes
     assert not any(gap.reason == "handler_not_in_adg" for gap in inventory.gaps)
-    if expected_handler is not None:
-        matches = [r for r in inventory.routes if r.handler_fqn == expected_handler]
-        assert matches, f"{expected_handler} missing from {repo_id}"
-        assert expected_method in matches[0].methods
-        assert structural_match(matches[0].raw_path, expected_path)
+    for method, path, handler in expected_routes:
+        matches = [r for r in inventory.routes if r.handler_fqn == handler]
+        assert matches, f"{handler} missing from {repo_id}"
+        assert method in matches[0].methods
+        assert structural_match(matches[0].raw_path, path)
+
+    if repo_id == "indico":
+        # The affected /search/ route is add_url_rule + a class-based view, so
+        # it must surface as a gap, not disappear from the inventory.
+        assert any(
+            gap.reason == "non_decorator_registration"
+            and gap.raw_path == "/search/"
+            and gap.file_path == "indico/modules/users/blueprint.py"
+            for gap in inventory.gaps
+        )
 
     if repo_id == "mlflow":
         # The AJAX artifact routes are built by _add_static_prefix(...), so the

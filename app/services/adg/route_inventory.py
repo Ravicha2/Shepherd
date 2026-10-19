@@ -15,7 +15,7 @@ import tarfile
 import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from tree_sitter import Parser
@@ -34,6 +34,12 @@ _FASTAPI_PARAM = re.compile(r"\{[^{}]+\}")
 _HTTP_VERBS = {"get", "post", "put", "patch", "delete", "head", "options"}
 _ROUTE_DECORATORS = {"route", "api_route"}
 _DEFINITION_TYPES = {"function_definition", "class_definition"}
+# Registrations made by a call in a body rather than a decorator. They are out
+# of scope for the decorator enumerator, but must still be visible as gaps.
+_CALL_FORM_REGISTRATIONS = {
+    "add_url_rule", "add_api_route", "add_api_websocket_route", "add_route",
+}
+_PATH_KEYWORDS = ("path", "rule")
 
 
 def canonical_path(raw_path: str) -> str:
@@ -86,7 +92,8 @@ class RouteGap:
     file_path: str
     line: int
     handler_fqn: str
-    decorator: str
+    registration: str
+    raw_path: str | None
     reason: str
 
 
@@ -96,33 +103,7 @@ class RouteInventory:
     gaps: tuple[RouteGap, ...] = ()
 
     def to_dict(self) -> dict:
-        return {
-            "routes": [
-                {
-                    "methods": list(route.methods),
-                    "raw_path": route.raw_path,
-                    "canonical_path": route.canonical_path,
-                    "handler_fqn": route.handler_fqn,
-                    "module": route.module,
-                    "registration_kind": route.registration_kind,
-                    "evidence": {
-                        "file_path": route.evidence.file_path,
-                        "line": route.evidence.line,
-                    },
-                }
-                for route in self.routes
-            ],
-            "gaps": [
-                {
-                    "file_path": gap.file_path,
-                    "line": gap.line,
-                    "handler_fqn": gap.handler_fqn,
-                    "decorator": gap.decorator,
-                    "reason": gap.reason,
-                }
-                for gap in self.gaps
-            ],
-        }
+        return asdict(self)
 
 
 @contextmanager
@@ -180,7 +161,8 @@ def build_route_inventory(repo_path: Path, adg: ADG | None = None) -> RouteInven
         r.evidence.file_path, r.evidence.line, r.handler_fqn, r.raw_path, r.methods,
     ))
     gaps.sort(key=lambda g: (
-        g.file_path, g.line, g.handler_fqn, g.decorator, g.reason,
+        g.file_path, g.line, g.handler_fqn, g.registration, g.reason,
+        g.raw_path or "",
     ))
     return RouteInventory(routes=tuple(routes), gaps=tuple(gaps))
 
@@ -216,6 +198,8 @@ def _walk(node, scope_fqn: FQN, rel_path: str,
             _walk(child, handler_fqn, rel_path, known_fqns, routes, gaps)
         return
 
+    _emit_call_form_gap(node, scope_fqn, rel_path, gaps)
+
     for child in node.children:
         _walk(child, scope_fqn, rel_path, known_fqns, routes, gaps)
 
@@ -236,14 +220,15 @@ def _emit_routes(decorated, handler_fqn: FQN, rel_path: str,
 
         line = child.start_point[0] + 1
         arguments = expression.child_by_field_name("arguments")
-        path_node = _first_positional(arguments)
+        path_node = _path_argument(arguments)
         raw_path = _literal_string(path_node)
         if raw_path is None:
             gaps.append(RouteGap(
                 file_path=rel_path,
                 line=line,
                 handler_fqn=str(handler_fqn),
-                decorator=attribute,
+                registration=attribute,
+                raw_path=None,
                 reason="non_literal_path",
             ))
             continue
@@ -254,7 +239,8 @@ def _emit_routes(decorated, handler_fqn: FQN, rel_path: str,
                 file_path=rel_path,
                 line=line,
                 handler_fqn=str(handler_fqn),
-                decorator=attribute,
+                registration=attribute,
+                raw_path=raw_path,
                 reason="non_literal_methods",
             ))
             continue
@@ -264,7 +250,8 @@ def _emit_routes(decorated, handler_fqn: FQN, rel_path: str,
                 file_path=rel_path,
                 line=line,
                 handler_fqn=str(handler_fqn),
-                decorator=attribute,
+                registration=attribute,
+                raw_path=raw_path,
                 reason="handler_not_in_adg",
             ))
             continue
@@ -280,6 +267,30 @@ def _emit_routes(decorated, handler_fqn: FQN, rel_path: str,
         ))
 
 
+def _emit_call_form_gap(node, scope_fqn: FQN, rel_path: str,
+                        gaps: list[RouteGap]) -> None:
+    """Report a body-level registration such as `bp.add_url_rule(...)`.
+
+    These are not decorators, so the enumerator cannot resolve their handler
+    statically; the enclosing scope is the best anchor and the registry must
+    still see the site instead of losing it.
+    """
+    if node.type != "call":
+        return
+    attribute = _callee_attribute(node.child_by_field_name("function"))
+    if attribute not in _CALL_FORM_REGISTRATIONS:
+        return
+    arguments = node.child_by_field_name("arguments")
+    gaps.append(RouteGap(
+        file_path=rel_path,
+        line=node.start_point[0] + 1,
+        handler_fqn=str(scope_fqn),
+        registration=attribute,
+        raw_path=_literal_string(_path_argument(arguments)),
+        reason="non_decorator_registration",
+    ))
+
+
 def _callee_attribute(callee) -> str:
     """The rightmost name of `app.get`, or "" for a bare decorator."""
     if callee is None or callee.type != "attribute":
@@ -288,13 +299,27 @@ def _callee_attribute(callee) -> str:
     return attribute.text.decode("utf-8") if attribute is not None else ""
 
 
-def _first_positional(arguments):
-    """First positional argument node, or None."""
-    if arguments is None:
-        return None
-    for child in arguments.children:
-        if child.is_named and child.type not in ("keyword_argument", "comment"):
-            return child
+def _keyword_arguments(arguments) -> dict[str, object]:
+    """Map keyword-argument names to their value nodes."""
+    return {
+        child.child_by_field_name("name").text.decode("utf-8"):
+            child.child_by_field_name("value")
+        for child in (arguments.children if arguments is not None else ())
+        if child.type == "keyword_argument"
+        and child.child_by_field_name("name") is not None
+    }
+
+
+def _path_argument(arguments):
+    """The route path: first positional, else `path=` or `rule=`."""
+    if arguments is not None:
+        for child in arguments.children:
+            if child.is_named and child.type not in ("keyword_argument", "comment"):
+                return child
+    keywords = _keyword_arguments(arguments)
+    for name in _PATH_KEYWORDS:
+        if name in keywords:
+            return keywords[name]
     return None
 
 
@@ -314,13 +339,7 @@ def _methods(attribute: str, arguments) -> tuple[str, ...] | None:
     if attribute in _HTTP_VERBS:
         return (attribute.upper(),)
 
-    kwargs = {
-        child.child_by_field_name("name").text.decode("utf-8"): child.child_by_field_name("value")
-        for child in (arguments.children if arguments is not None else ())
-        if child.type == "keyword_argument"
-        and child.child_by_field_name("name") is not None
-    }
-    declared = kwargs.get("methods")
+    declared = _keyword_arguments(arguments).get("methods")
     if declared is None:
         return ("GET",)  # Starlette/Flask default when methods is omitted
     if declared.type not in ("list", "tuple", "set"):

@@ -123,6 +123,29 @@ def test_routes_reads_a_pinned_sha_without_checkout(tmp_path: Path) -> None:
     assert payload["routes"][0]["handler_fqn"] == "app.views.old"
 
 
+def test_routes_sha_rerun_is_byte_identical(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    sha = _commit(repo, {
+        "app/__init__.py": "",
+        "app/views.py": (
+            "from flask import Blueprint\n"
+            "\n"
+            "bp = Blueprint('views', __name__)\n"
+            "\n"
+            "@bp.route('/items/<int:item_id>')\n"
+            "def item(item_id):\n"
+            "    return ''\n"
+        ),
+    }, "route")
+
+    first = runner.invoke(app, ["routes", "--path", str(repo), "--sha", sha])
+    second = runner.invoke(app, ["routes", "--path", str(repo), "--sha", sha])
+
+    assert first.exit_code == second.exit_code == 0
+    assert first.stdout == second.stdout
+
+
 def test_routes_rejects_an_unknown_sha(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     _init_repo(repo)
