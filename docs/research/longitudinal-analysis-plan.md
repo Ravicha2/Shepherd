@@ -1,5 +1,10 @@
 # Longitudinal analysis plan — issue #184
 
+> **Scope: PARKED longitudinal study ([#178](https://github.com/Ravicha2/Shepherd/issues/178)).**
+> Not the active experiment — the live one is the security eval ([#220](https://github.com/Ravicha2/Shepherd/issues/220)),
+> which lives in `research-exp-setup/security/`. Kept as the fallback spine; do not
+> extend this file for #220.
+
 **What this is.** The plan for turning the longitudinal replay (map
 [#178](https://github.com/Ravicha2/Shepherd/issues/178)) into numbers and claims.
 It is written **before** the replay runs and then frozen: after the run starts,

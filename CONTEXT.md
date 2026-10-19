@@ -1,5 +1,11 @@
 # Shepherd longitudinal decision-memory study
 
+> **Scope: PARKED longitudinal study ([#178](https://github.com/Ravicha2/Shepherd/issues/178)).**
+> This file is the domain language of the durability line only — not of Shepherd the
+> tool, and not of the active security eval ([#220](https://github.com/Ravicha2/Shepherd/issues/220)),
+> whose vocabulary is `../research-exp-setup/security/GLOSSARY.md`. Do not extend it
+> for #220.
+
 The COMP9992 headline study (map [#178](https://github.com/Ravicha2/Shepherd/issues/178)):
 replaying the histories of pinned repositories at a sampled every-N cadence and
 measuring how well ADR-governed compliance holds up over a repository's life.
@@ -72,6 +78,34 @@ A governed module under the *same* rule that never violated, matched to a
 treated module on fan-in, churn and age. The comparison that keeps "lapse"
 distinct from "busy spots get re-broken."
 
+**Equivalence band (HR 0.67–1.5)**:
+The pre-declared margin inside which treated and control lapse rates are
+called equivalent (outcome 2) on Test 2's matched design. It is a borrowed
+small-effect convention, not derived from the memory-layer claim; its
+smallest-effect justification (SESOI) is a **pre-HA obligation** — decided
+2026-10-16 to justify it in a dated note rather than drop it, so outcome 2
+stays reachable. Anchoring it to magnitudes measured elsewhere (e.g. the
+benchmark's own effect sizes) calibrates the threshold; it does not mix the
+study's claim with system quality (§1's category-error rule forbids the
+conflation, not the calibration).
+_Avoid_: presenting 0.67–1.5 as derived; editing the band after HA's
+numbers are seen.
+
+**Outcome 3, informative vs uninformative**:
+The plan's "too few events to tell" verdict (§7) is a real finding only when
+the cell's Wilson interval excludes rates that would matter for the claim.
+A cell compatible with every rate is honest uncertainty, not a finding:
+report the counts, claim nothing. Experimenter's compliance cell (1/149,
+Wilson 0.12–3.70%) rules out visible-lapse recurrence (lapses persisting
+≥2 sample gaps) above ~3.7% — informative, thinly. Flowkit's (0 events over
+1 watch, Wilson 0–79%) is compatible with any rate — uninformative. The
+standard is external: an indeterminate is a finding only if it constrains
+(Altman & Bland 1995; Lakens, *Statistical Inferences* §9 — both tests
+failing is "inconclusive").
+_Avoid_: "outcome 3 is a finding" without the informative/uninformative
+qualification; reading an uninformative cell as evidence of absence.
+(Settled in the 2026-10-16 evaluation grilling.)
+
 ## Relationships
 
 - **Compliance durability** is measured over **treated modules**, as a recurrence
@@ -82,6 +116,9 @@ distinct from "busy spots get re-broken."
   discarded before it does.
 - A **matched control** shares the treated module's rule and its fan-in, churn
   and age.
+- An **outcome 3** cell carries a conclusion only where it is informative —
+  its interval excludes rates that would matter; an uninformative cell
+  reports counts and claims nothing.
 
 ## Example dialogue
 
