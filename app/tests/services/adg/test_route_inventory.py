@@ -68,6 +68,21 @@ class TestCanonicalPath:
     def test_structural_match_rejects_different_segment_counts(self) -> None:
         assert not structural_match("/users/{id}", "/users/{id}/posts")
 
+    def test_django_re_path_groups_become_param_segments(self) -> None:
+        assert canonical_path(r"^download/(?P<id>[^/]+)/$") == "/download/{}/"
+        assert canonical_path(r"^api/v1/users/(?P<user_id>\d+)/$") == "/api/v1/users/{}/"
+
+    def test_django_re_path_unnamed_and_alternative_groups(self) -> None:
+        assert canonical_path(
+            r"^admin/pages/(?P<page_id>\d+)/revisions/compare/(live|earliest|\d+)\.\.\.(live|latest)/$"
+        ) == "/admin/pages/{}/revisions/compare/{}...{}/"
+
+    def test_re_path_matches_path_syntax_structurally(self) -> None:
+        assert structural_match(
+            r"^admin/pages/(?P<page_id>\d+)/edit/preview/$",
+            "/admin/pages/<int:page_id>/edit/preview/",
+        )
+
 
 class TestFastApiDecorators:
     """FastAPI verb decorators emit one record per decorator."""
@@ -261,6 +276,520 @@ class TestFastApiDecorators:
 
         assert inventory.routes[0].methods == ("DELETE",)
         assert inventory.routes[0].canonical_path == "/items/{}"
+
+
+class TestDjangoUrlconf:
+    """Django urlpatterns are enumerated by traversing path/re_path entries."""
+
+    def test_path_function_view_is_enumerated(self, tmp_path: Path) -> None:
+        repo = _repo(tmp_path, {
+            "app/__init__.py": "",
+            "app/views.py": """
+                def health(request):
+                    return None
+            """,
+            "app/urls.py": """
+                from django.urls import path
+                from app import views
+
+                urlpatterns = [
+                    path("health/", views.health, name="health"),
+                ]
+            """,
+        })
+
+        inventory = build_route_inventory(repo)
+
+        assert inventory.gaps == ()
+        route = inventory.routes[0]
+        assert route.raw_path == "/health/"
+        assert route.canonical_path == "/health/"
+        assert route.handler_fqn == "app.views.health"
+        assert route.module == "app.urls"
+        assert route.registration_kind == "urlconf"
+        assert route.evidence.file_path == "app/urls.py"
+        assert route.evidence.line == 6
+
+    def test_nested_include_prefixes_cbv_and_re_path(self, tmp_path: Path) -> None:
+        repo = _repo(tmp_path, {
+            "app/__init__.py": "",
+            "app/api/__init__.py": "",
+            "app/views.py": """
+                def health(request):
+                    return None
+
+                class ReportView:
+                    def post(self, request, pk):
+                        return None
+            """,
+            "app/api/urls.py": """
+                from django.urls import path
+                from app import views
+
+                urlpatterns = [
+                    path("health/", views.health, name="health"),
+                ]
+            """,
+            "app/urls.py": """
+                from django.urls import include, path, re_path
+                from app.api import urls as api_urls
+                from app import views
+
+                urlpatterns = [
+                    path("api/v1/", include((api_urls, "api"), namespace="api")),
+                    path("admin/", include([
+                        path("reports/<int:pk>/", views.ReportView.as_view()),
+                    ])),
+                    re_path(r"^legacy/(?P<id>\\d+)/$", views.health),
+                ]
+            """,
+        })
+
+        inventory = build_route_inventory(repo)
+
+        assert inventory.gaps == ()
+        by_path = {route.canonical_path: route for route in inventory.routes}
+        assert set(by_path) == {
+            "/api/v1/health/", "/admin/reports/{}/", "/legacy/{}/",
+        }
+        assert by_path["/api/v1/health/"].handler_fqn == "app.views.health"
+        assert by_path["/admin/reports/{}/"].handler_fqn == "app.views.ReportView"
+        assert by_path["/admin/reports/{}/"].methods == ("POST",)
+        assert by_path["/legacy/{}/"].handler_fqn == "app.views.health"
+
+
+class TestDjangoUrlconfConstruction:
+    """Urlconf lists are built in the many ways real repos build them."""
+
+    def test_append_and_extend_are_traversed(self, tmp_path: Path) -> None:
+        repo = _repo(tmp_path, {
+            "app/__init__.py": "",
+            "app/views.py": """
+                def health(request):
+                    return None
+
+                def about(request):
+                    return None
+            """,
+            "app/extra_urls.py": """
+                from django.urls import path
+                from app import views
+
+                urlpatterns = [
+                    path("extra/", views.about),
+                ]
+            """,
+            "app/urls.py": """
+                from django.urls import include, path
+                from app import views
+
+                urlpatterns = [path("health/", views.health)]
+                urlpatterns.append(path("about/", views.about))
+                urlpatterns.extend([path("", include("app.extra_urls"))])
+            """,
+        })
+
+        inventory = build_route_inventory(repo)
+
+        assert inventory.gaps == ()
+        assert {
+            route.canonical_path for route in inventory.routes
+        } == {"/health/", "/about/", "/extra/"}
+
+    def test_reassignment_from_the_previous_list_keeps_prior_entries(self, tmp_path: Path) -> None:
+        repo = _repo(tmp_path, {
+            "app/__init__.py": "",
+            "app/views.py": """
+                def health(request):
+                    return None
+
+                def about(request):
+                    return None
+            """,
+            "app/urls.py": """
+                from django.urls import path
+                from app import views
+
+                urlpatterns = [path("health/", views.health)]
+                urlpatterns = urlpatterns + [path("about/", views.about)]
+            """,
+        })
+
+        inventory = build_route_inventory(repo)
+
+        assert inventory.gaps == ()
+        assert {
+            route.canonical_path for route in inventory.routes
+        } == {"/health/", "/about/"}
+
+    def test_branch_assignments_are_all_enumerated(self, tmp_path: Path) -> None:
+        repo = _repo(tmp_path, {
+            "app/__init__.py": "",
+            "app/views.py": """
+                def health(request):
+                    return None
+            """,
+            "app/urls.py": """
+                from django.conf import settings
+                from django.urls import include, path
+                from app import views
+
+                base = [path("health/", views.health)]
+                if settings.PREFIXED:
+                    urlpatterns = [path("prefixed/", include(base))]
+                else:
+                    urlpatterns = base
+            """,
+        })
+
+        inventory = build_route_inventory(repo)
+
+        assert {
+            route.canonical_path for route in inventory.routes
+        } == {"/health/", "/prefixed/health/"}
+
+    def test_imported_urlpatterns_are_expanded_not_treated_as_a_root(self, tmp_path: Path) -> None:
+        repo = _repo(tmp_path, {
+            "app/__init__.py": "",
+            "app/api/__init__.py": "",
+            "app/views.py": """
+                def health(request):
+                    return None
+            """,
+            "app/api/asset.py": """
+                from django.urls import path
+                from app import views
+
+                urlpatterns = [path("asset/", views.health)]
+            """,
+            "app/api/aggregate.py": """
+                from django.urls import path
+
+                from app.api.asset import urlpatterns as asset_patterns
+                from app import views
+
+                urlpatterns = [*asset_patterns, path("extra/", views.health)]
+            """,
+            "app/urls.py": """
+                from django.urls import include, path
+
+                urlpatterns = [path("api/", include("app.api.aggregate"))]
+            """,
+        })
+
+        inventory = build_route_inventory(repo)
+
+        assert inventory.gaps == ()
+        assert {
+            route.canonical_path for route in inventory.routes
+        } == {"/api/asset/", "/api/extra/"}
+
+    def test_import_rooted_names_resolve_to_repo_rooted_fqns(self, tmp_path: Path) -> None:
+        repo = _repo(tmp_path, {
+            "apps/api/plane/__init__.py": "",
+            "apps/api/plane/api/__init__.py": "",
+            "apps/api/plane/views.py": """
+                def health(request):
+                    return None
+            """,
+            "apps/api/plane/api/other_urls.py": """
+                from django.urls import path
+                from plane.views import health
+
+                urlpatterns = [path("health/", health)]
+            """,
+            "apps/api/plane/urls.py": """
+                from django.urls import include, path
+
+                urlpatterns = [path("api/", include("plane.api.other_urls"))]
+            """,
+        })
+
+        inventory = build_route_inventory(repo)
+
+        assert inventory.gaps == ()
+        route = inventory.routes[0]
+        assert route.canonical_path == "/api/health/"
+        assert route.handler_fqn == "apps.api.plane.views.health"
+
+
+class TestDjangoUrlconfWrappers:
+    """Django's url-list helpers and dynamic mounts keep routes visible."""
+
+    def test_imported_pattern_list_variable_is_expanded(self, tmp_path: Path) -> None:
+        repo = _repo(tmp_path, {
+            "app/__init__.py": "",
+            "app/views.py": """
+                def health(request):
+                    return None
+
+                def about(request):
+                    return None
+            """,
+            "app/shared.py": """
+                from django.urls import path
+                from app import views
+
+                common_patterns = [path("health/", views.health)]
+            """,
+            "app/urls.py": """
+                from django.urls import path
+                from app import views
+                from app.shared import common_patterns
+
+                urlpatterns = common_patterns + [path("about/", views.about)]
+            """,
+        })
+
+        inventory = build_route_inventory(repo)
+
+        assert inventory.gaps == ()
+        assert {
+            route.canonical_path for route in inventory.routes
+        } == {"/health/", "/about/"}
+
+    def test_shared_pattern_list_keeps_its_defining_module_for_handler_resolution(
+        self, tmp_path: Path,
+    ) -> None:
+        repo = _repo(tmp_path, {
+            "app/__init__.py": "",
+            "app/handlers.py": """
+                def health(request):
+                    return None
+            """,
+            "app/shared.py": """
+                from django.urls import path
+                from app.handlers import health
+
+                common_patterns = [path("health/", health)]
+            """,
+            "app/urls.py": """
+                from app.shared import common_patterns
+
+                urlpatterns = common_patterns
+            """,
+        })
+
+        inventory = build_route_inventory(repo)
+
+        assert inventory.gaps == ()
+        assert inventory.routes[0].handler_fqn == "app.handlers.health"
+
+    def test_package_reexports_resolve_to_the_defining_module(self, tmp_path: Path) -> None:
+        repo = _repo(tmp_path, {
+            "app/__init__.py": "",
+            "app/views/__init__.py": """
+                from app.views.impl import HealthView
+            """,
+            "app/views/impl.py": """
+                class HealthView:
+                    def get(self, request):
+                        return None
+            """,
+            "app/urls.py": """
+                from django.urls import path
+                from app.views import HealthView
+
+                urlpatterns = [path("health/", HealthView.as_view())]
+            """,
+        })
+
+        inventory = build_route_inventory(repo)
+
+        assert inventory.gaps == ()
+        assert inventory.routes[0].handler_fqn == "app.views.impl.HealthView"
+
+    def test_pattern_decorator_wrapper_keeps_the_wrapped_entries(self, tmp_path: Path) -> None:
+        repo = _repo(tmp_path, {
+            "app/__init__.py": "",
+            "app/views.py": """
+                def health(request):
+                    return None
+            """,
+            "app/urls.py": """
+                from django.urls import path
+                from app import views
+                from app.decorators import decorate_urlpatterns, never_cache
+
+                urlpatterns = [path("health/", views.health)]
+                urlpatterns = decorate_urlpatterns(urlpatterns, never_cache)
+            """,
+            "app/decorators.py": """
+                def never_cache(view):
+                    return view
+
+                def decorate_urlpatterns(patterns, decorator):
+                    return patterns
+            """,
+        })
+
+        inventory = build_route_inventory(repo)
+
+        assert inventory.gaps == ()
+        assert [route.canonical_path for route in inventory.routes] == ["/health/"]
+
+    def test_dynamic_prefix_still_traverses_the_included_module(self, tmp_path: Path) -> None:
+        repo = _repo(tmp_path, {
+            "app/__init__.py": "",
+            "app/views.py": """
+                def health(request):
+                    return None
+            """,
+            "app/inner_urls.py": """
+                from django.urls import path
+                from app import views
+
+                urlpatterns = [path("health/", views.health)]
+            """,
+            "app/urls.py": """
+                from django.conf import settings
+                from django.urls import include, url
+
+                urlpatterns = [url(r"%s" % settings.PREFIX, include("app.inner_urls"))]
+            """,
+        })
+
+        inventory = build_route_inventory(repo)
+
+        assert [route.canonical_path for route in inventory.routes] == ["/health/"]
+        assert [gap.reason for gap in inventory.gaps] == ["non_literal_path"]
+
+    def test_instance_as_view_resolves_to_the_class(self, tmp_path: Path) -> None:
+        repo = _repo(tmp_path, {
+            "app/__init__.py": "",
+            "app/views.py": """
+                class ThreadsList:
+                    def get(self, request):
+                        return None
+            """,
+            "app/urls.py": """
+                from django.urls import url
+                from app import views
+
+                urlpatterns = [url(r"^threads/$", views.ThreadsList().as_view())]
+            """,
+        })
+
+        inventory = build_route_inventory(repo)
+
+        assert inventory.gaps == ()
+        assert inventory.routes[0].handler_fqn == "app.views.ThreadsList"
+
+    def test_reassigning_with_the_previous_list_on_the_right_keeps_entries(self, tmp_path: Path) -> None:
+        repo = _repo(tmp_path, {
+            "app/__init__.py": "",
+            "app/views.py": """
+                def health(request):
+                    return None
+
+                def debug(request):
+                    return None
+            """,
+            "app/urls.py": """
+                from django.conf import settings
+                from django.urls import path
+                from app import views
+
+                urlpatterns = [path("health/", views.health)]
+                if settings.DEBUG:
+                    urlpatterns = [path("debug/", views.debug)] + urlpatterns
+            """,
+        })
+
+        inventory = build_route_inventory(repo)
+
+        assert inventory.gaps == ()
+        assert {
+            route.canonical_path for route in inventory.routes
+        } == {"/health/", "/debug/"}
+
+
+class TestDrfRouters:
+    """router.register resolves to ViewSet action FQNs and @action routes."""
+
+    def test_register_and_actions_are_enumerated(self, tmp_path: Path) -> None:
+        repo = _repo(tmp_path, {
+            "app/__init__.py": "",
+            "app/views.py": """
+                from rest_framework import viewsets
+                from rest_framework.decorators import action
+
+                class NoteViewSet(viewsets.ModelViewSet):
+                    @action(detail=True)
+                    def archive(self, request, pk):
+                        return None
+
+                    @action(detail=False, methods=["post"], url_path="bulk-create")
+                    def bulk_create(self, request):
+                        return None
+            """,
+            "app/urls.py": """
+                from django.urls import include, path
+                from rest_framework import routers
+                from app import views
+
+                router = routers.DefaultRouter()
+                router.register(r"notes", views.NoteViewSet, basename="note")
+
+                urlpatterns = [
+                    path("api/", include(router.urls)),
+                ]
+            """,
+        })
+
+        inventory = build_route_inventory(repo)
+
+        assert inventory.gaps == ()
+        by_route = {
+            (route.raw_path, route.methods): route for route in inventory.routes
+        }
+        assert set(by_route) == {
+            ("/api/notes/", ("GET",)),
+            ("/api/notes/", ("POST",)),
+            ("/api/notes/{pk}/", ("GET",)),
+            ("/api/notes/{pk}/", ("PUT",)),
+            ("/api/notes/{pk}/", ("PATCH",)),
+            ("/api/notes/{pk}/", ("DELETE",)),
+            ("/api/notes/{pk}/archive/", ("GET",)),
+            ("/api/notes/bulk-create/", ("POST",)),
+        }
+        assert by_route[("/api/notes/", ("POST",))].handler_fqn == (
+            "app.views.NoteViewSet.create"
+        )
+        assert by_route[("/api/notes/{pk}/archive/", ("GET",))].handler_fqn == (
+            "app.views.NoteViewSet.archive"
+        )
+        assert by_route[("/api/notes/bulk-create/", ("POST",))].handler_fqn == (
+            "app.views.NoteViewSet.bulk_create"
+        )
+        assert {
+            route.registration_kind for route in inventory.routes
+        } == {"router"}
+
+    def test_i18n_patterns_and_extended_urlpatterns(self, tmp_path: Path) -> None:
+        repo = _repo(tmp_path, {
+            "app/__init__.py": "",
+            "app/views.py": """
+                def health(request):
+                    return None
+            """,
+            "app/urls.py": """
+                from django.conf.urls.i18n import i18n_patterns
+                from django.urls import include, path, re_path
+                from app import views
+
+                shared = [path("a/", views.health)]
+                urlpatterns = i18n_patterns(path("i18n/", include((shared, "x"))))
+                urlpatterns += [re_path(r"^b/$", views.health)]
+            """,
+        })
+
+        inventory = build_route_inventory(repo)
+
+        assert inventory.gaps == ()
+        assert {
+            route.canonical_path for route in inventory.routes
+        } == {"/i18n/a/", "/b/"}
 
 
 class TestCallFormRegistrations:
