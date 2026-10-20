@@ -32,6 +32,10 @@ _FLASK_PARAM = re.compile(r"<[^<>]+>")
 _FASTAPI_PARAM = re.compile(r"\{[^{}]+\}")
 # Django re_path: (?P<id>\d+) and unnamed alternatives (live|latest). Groups
 # are matched innermost-first so a simple regex need not balance parentheses.
+# ponytail: `[^()]*` stops at any inner paren, and named/non-capturing groups
+# are not revisited after `_REGEX_GROUP` strips their interior, so a nested
+# `(?P<slug>(a|b))` stays uncanonicalised. Ceiling is flat Django patterns;
+# upgrade to a paren-counting scanner if nested named groups start mattering.
 _REGEX_NAMED_GROUP = re.compile(r"\(\?P<[^>]+>[^()]*\)")
 _REGEX_NONCAPTURING = re.compile(r"\(\?:[^()]*\)")
 _REGEX_GROUP = re.compile(r"\((?!\?)[^()]*\)")
