@@ -278,6 +278,45 @@ class TestFastApiDecorators:
         assert inventory.routes[0].canonical_path == "/items/{}"
 
 
+class TestFastApiRouterPrefixes:
+    """A decorated route joins the mount chain that reaches its router."""
+
+    def test_apirouter_prefixes_and_include_router_compose(self, tmp_path: Path) -> None:
+        repo = _repo(tmp_path, {
+            "app/__init__.py": "",
+            "app/api.py": """
+                from fastapi import APIRouter
+
+                router = APIRouter(prefix="/v1")
+                admin = APIRouter(prefix="/admin")
+
+                @router.get("/health")
+                def health():
+                    return {}
+
+                @admin.get("/users/{user_id}")
+                def user(user_id: int):
+                    return {}
+            """,
+            "app/main.py": """
+                from fastapi import FastAPI
+
+                from app.api import admin, router
+
+                app = FastAPI()
+                router.include_router(admin)
+                app.include_router(router, prefix="/api")
+            """,
+        })
+
+        inventory = build_route_inventory(repo)
+        by_handler = {route.handler_fqn: route for route in inventory.routes}
+
+        assert by_handler["app.api.health"].raw_path == "/api/v1/health"
+        assert by_handler["app.api.user"].raw_path == "/api/v1/admin/users/{user_id}"
+        assert by_handler["app.api.user"].canonical_path == "/api/v1/admin/users/{}"
+
+
 class TestDjangoUrlconf:
     """Django urlpatterns are enumerated by traversing path/re_path entries."""
 
@@ -961,7 +1000,7 @@ class TestInventoryShape:
         (
             "khoj",
             "b8eeefa0b1e8795e21ded99f2ffb7b34c6ab063c",
-            (("GET", "/auth/callback",
+            (("GET", "/api/notion/auth/callback",
               "src.khoj.routers.notion.notion_auth_callback"),),
         ),
         (
