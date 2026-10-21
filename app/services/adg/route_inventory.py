@@ -1,8 +1,9 @@
 """Route inventory: a deterministic derived view over the ADG (ADR 021).
 
-Enumerates the HTTP request surface as route -> handler -> module. Decorator
-registration only for now (FastAPI and Flask). Guards are deliberately not
-extracted: decorator stacks and permission classes are the reading agent's job.
+Enumerates the HTTP request surface as route -> handler -> module: decorators
+(FastAPI and Flask), Django URLconf, DRF routers, and FastAPI router mount
+chains (`APIRouter(prefix=...)` plus `include_router`). Guards are deliberately
+not extracted: decorator stacks and permission classes are the reading agent's job.
 """
 
 from __future__ import annotations
@@ -717,9 +718,8 @@ def _pattern_gap(module: _Module, line: int, reason: str,
 
 
 def _enumerate_urlconf_routes(
-    repo_path: Path, known_fqns: frozenset[str],
+    model: _UrlconfModel, known_fqns: frozenset[str],
 ) -> tuple[list[RouteRecord], list[RouteGap]]:
-    model = _UrlconfModel.build(repo_path)
     routes: list[RouteRecord] = []
     gaps: list[RouteGap] = []
     for root in model.roots():
@@ -1043,6 +1043,164 @@ def _action_route(decorator, name: str):
     return detail, url_path.strip("/"), methods
 
 
+# --- FastAPI APIRouter mount chain ------------------------------------------
+
+_FASTAPI_ROUTER_CALLS = {"APIRouter", "FastAPI"}
+
+
+@dataclass(frozen=True)
+class _FastApiRouter:
+    prefixes: tuple[str, ...]
+    is_app: bool = False
+
+
+@dataclass(frozen=True)
+class _FastApiMount:
+    parent: tuple[str, str] | None  # None: an app the parsed tree does not define
+    child: tuple[str, str]
+    prefix: str
+
+
+def _join_fastapi(prefix: str, path: str) -> str:
+    """FastAPI's prefix + path rule; a bare `/` route keeps its slash."""
+    if not prefix:
+        return path
+    if not path:
+        return prefix
+    if path == "/":
+        return prefix.rstrip("/") + "/"
+    return prefix.rstrip("/") + "/" + path.lstrip("/")
+
+
+def _fastapi_prefix(value) -> str | None:
+    """The router's constructor prefix, or None when *value* is not a router.
+
+    A non-literal prefix is treated as empty rather than guessed; the route is
+    then short by that prefix but still visible. The benchmark repos spell
+    every router prefix as a literal.
+    """
+    if not (isinstance(value, ast.Call) and _tail(value.func) in _FASTAPI_ROUTER_CALLS):
+        return None
+    keywords = {kw.arg: kw.value for kw in value.keywords if kw.arg}
+    return _literal_ast(keywords.get("prefix")) or ""
+
+
+def _resolve_router_dotted(dotted: str | None, model: _UrlconfModel,
+                           routers: dict[tuple[str, str], _FastApiRouter],
+                           seen: frozenset[str] = frozenset()) -> tuple[str, str] | None:
+    """Resolve `module.attr` to the router variable, following re-exports."""
+    if not dotted or dotted in seen:
+        return None
+    parent, _, name = dotted.rpartition(".")
+    module = model.module_for(parent)
+    if module is None:
+        return None
+    if (module.fqn, name) in routers:
+        return (module.fqn, name)
+    imported = module.imports.get(name)
+    if imported and imported != dotted:
+        return _resolve_router_dotted(imported, model, routers, seen | {dotted})
+    return None
+
+
+class _FastApiModel:
+    """Static mount graph for `APIRouter(prefix=...)` and `include_router`."""
+
+    def __init__(self, model: _UrlconfModel):
+        self.routers: dict[tuple[str, str], _FastApiRouter] = {}
+        self.mounts: list[_FastApiMount] = []
+        self.by_object: dict[tuple[str, str], tuple[str, ...]] = {}
+        self._collect(model)
+        self._index_objects(model)
+
+    def prefixes_for(self, module_fqn: str, object_name: str) -> tuple[str, ...]:
+        """Every mounted prefix an expression like `router` carries."""
+        return self.by_object.get((module_fqn, object_name), ())
+
+    def _collect(self, model: _UrlconfModel) -> None:
+        for module in model.modules.values():
+            for name, values in module.assignments.items():
+                prefixes = tuple(sorted({
+                    prefix for value in values
+                    if (prefix := _fastapi_prefix(value)) is not None
+                }))
+                if prefixes:
+                    self.routers[(module.fqn, name)] = _FastApiRouter(
+                        prefixes=prefixes,
+                        is_app=any(
+                            isinstance(value, ast.Call) and _tail(value.func) == "FastAPI"
+                            for value in values
+                        ),
+                    )
+        for module in model.modules.values():
+            for node in ast.walk(module.tree):
+                if not (isinstance(node, ast.Call)
+                        and _tail(node.func) == "include_router"
+                        and node.args):
+                    continue
+                parent = _resolve_router_dotted(
+                    _resolve_expr(node.func.value, module), model, self.routers,
+                )
+                child = _resolve_router_dotted(
+                    _resolve_expr(node.args[0], module), model, self.routers,
+                )
+                if child is None:
+                    continue
+                keywords = {kw.arg: kw.value for kw in node.keywords if kw.arg}
+                self.mounts.append(_FastApiMount(
+                    parent=parent,
+                    child=child,
+                    prefix=_literal_ast(keywords.get("prefix")) or "",
+                ))
+
+    def _index_objects(self, model: _UrlconfModel) -> None:
+        prefixes = self._prefixes()
+        for module in model.modules.values():
+            for name in module.assignments:
+                key = _resolve_router_dotted(
+                    f"{module.fqn}.{name}", model, self.routers,
+                )
+                if key is not None:
+                    self.by_object[(module.fqn, name)] = prefixes.get(key, ())
+            for name, imported in module.imports.items():
+                key = _resolve_router_dotted(imported, model, self.routers)
+                if key is not None:
+                    self.by_object.setdefault(
+                        (module.fqn, name), prefixes.get(key, ()),
+                    )
+
+    def _prefixes(self) -> dict[tuple[str, str], tuple[str, ...]]:
+        found: dict[tuple[str, str], set[str]] = {}
+        for key, router in self.routers.items():
+            if router.is_app:
+                self._walk(key, "", found, frozenset())
+        for mount in self.mounts:
+            if mount.parent is None:
+                self._walk(mount.child, mount.prefix, found, frozenset())
+        for key, router in self.routers.items():
+            if key not in found:
+                # Never mounted in this tree: its own prefix is all we know.
+                found[key] = set(router.prefixes)
+        return {key: tuple(sorted(values)) for key, values in found.items()}
+
+    def _walk(self, key: tuple[str, str], incoming: str,
+              found: dict[tuple[str, str], set[str]],
+              visited: frozenset[tuple[str, str]]) -> None:
+        if key in visited:
+            return
+        router = self.routers[key]
+        for own in router.prefixes:
+            effective = _join_fastapi(incoming, own)
+            found.setdefault(key, set()).add(effective)
+            for mount in self.mounts:
+                if mount.parent == key:
+                    self._walk(
+                        mount.child,
+                        _join_fastapi(effective, mount.prefix),
+                        found, visited | {key},
+                    )
+
+
 def build_route_inventory(repo_path: Path, adg: ADG | None = None) -> RouteInventory:
     """Enumerate decorator- and URLconf-registered routes at *repo_path*.
 
@@ -1055,6 +1213,8 @@ def build_route_inventory(repo_path: Path, adg: ADG | None = None) -> RouteInven
     parser = Parser(PY_LANGUAGE)
     routes: list[RouteRecord] = []
     gaps: list[RouteGap] = []
+    model = _UrlconfModel.build(repo_path)
+    fastapi = _FastApiModel(model)
 
     for py_file in python_files(repo_path):
         rel_path = str(py_file.relative_to(repo_path))
@@ -1064,9 +1224,12 @@ def build_route_inventory(repo_path: Path, adg: ADG | None = None) -> RouteInven
             # parse_repo skips unparseable files; stay on the same file set.
             continue
         module_fqn = FQN.from_path(rel_path)
-        _walk(tree.root_node, module_fqn, rel_path, known_fqns, routes, gaps)
+        _walk(
+            tree.root_node, module_fqn, str(module_fqn), rel_path,
+            known_fqns, routes, gaps, fastapi,
+        )
 
-    urlconf_routes, urlconf_gaps = _enumerate_urlconf_routes(repo_path, known_fqns)
+    urlconf_routes, urlconf_gaps = _enumerate_urlconf_routes(model, known_fqns)
     routes.extend(urlconf_routes)
     gaps.extend(urlconf_gaps)
 
@@ -1085,16 +1248,17 @@ def build_route_inventory(repo_path: Path, adg: ADG | None = None) -> RouteInven
     return RouteInventory(routes=tuple(routes), gaps=tuple(gaps))
 
 
-def _walk(node, scope_fqn: FQN, rel_path: str,
+def _walk(node, scope_fqn: FQN, module_fqn: str, rel_path: str,
           known_fqns: frozenset[str], routes: list[RouteRecord],
-          gaps: list[RouteGap]) -> None:
+          gaps: list[RouteGap], fastapi: _FastApiModel) -> None:
     if node.type in _DEFINITION_TYPES:
         name_node = node.child_by_field_name("name")
         if name_node is None:
             return
         child_fqn = scope_fqn.child(name_node.text.decode("utf-8"))
         for child in node.children:
-            _walk(child, child_fqn, rel_path, known_fqns, routes, gaps)
+            _walk(child, child_fqn, module_fqn, rel_path, known_fqns,
+                  routes, gaps, fastapi)
         return
 
     if node.type == "decorated_definition":
@@ -1110,21 +1274,34 @@ def _walk(node, scope_fqn: FQN, rel_path: str,
         handler_fqn = scope_fqn.child(name_node.text.decode("utf-8"))
         if definition.type == "function_definition":
             _emit_routes(
-                node, handler_fqn, rel_path, known_fqns, routes, gaps
+                node, handler_fqn, module_fqn, rel_path, known_fqns,
+                routes, gaps, fastapi,
             )
         for child in definition.children:
-            _walk(child, handler_fqn, rel_path, known_fqns, routes, gaps)
+            _walk(child, handler_fqn, module_fqn, rel_path, known_fqns,
+                  routes, gaps, fastapi)
         return
 
     _emit_call_form_gap(node, scope_fqn, rel_path, gaps)
 
     for child in node.children:
-        _walk(child, scope_fqn, rel_path, known_fqns, routes, gaps)
+        _walk(child, scope_fqn, module_fqn, rel_path, known_fqns,
+              routes, gaps, fastapi)
 
 
-def _emit_routes(decorated, handler_fqn: FQN, rel_path: str,
+def _callee_object(callee) -> str:
+    """The router expression of `router.get`: its name, or "" for a chain."""
+    if callee is None or callee.type != "attribute":
+        return ""
+    obj = callee.child_by_field_name("object")
+    if obj is None or obj.type != "identifier":
+        return ""
+    return obj.text.decode("utf-8")
+
+
+def _emit_routes(decorated, handler_fqn: FQN, module_fqn: str, rel_path: str,
                  known_fqns: frozenset[str], routes: list[RouteRecord],
-                 gaps: list[RouteGap]) -> None:
+                 gaps: list[RouteGap], fastapi: _FastApiModel) -> None:
     for child in decorated.children:
         if child.type != "decorator":
             continue
@@ -1174,15 +1351,23 @@ def _emit_routes(decorated, handler_fqn: FQN, rel_path: str,
             ))
             continue
 
-        routes.append(RouteRecord(
-            methods=methods,
-            raw_path=raw_path,
-            canonical_path=canonical_path(raw_path),
-            handler_fqn=str(handler_fqn),
-            module=str(FQN.from_path(rel_path)),
-            registration_kind="decorator",
-            evidence=RouteEvidence(file_path=rel_path, line=line),
-        ))
+        # A FastAPI decorator path is relative to its router; the mount chain
+        # is what makes it joinable to a request path. Unknown objects (Flask
+        # blueprints, unmodelled callables) keep the bare decorator path.
+        prefixes = fastapi.prefixes_for(
+            module_fqn, _callee_object(callee),
+        ) or ("",)
+        for prefix in prefixes:
+            mounted_path = _join_fastapi(prefix, raw_path)
+            routes.append(RouteRecord(
+                methods=methods,
+                raw_path=mounted_path,
+                canonical_path=canonical_path(mounted_path),
+                handler_fqn=str(handler_fqn),
+                module=str(FQN.from_path(rel_path)),
+                registration_kind="decorator",
+                evidence=RouteEvidence(file_path=rel_path, line=line),
+            ))
 
 
 def _emit_call_form_gap(node, scope_fqn: FQN, rel_path: str,
