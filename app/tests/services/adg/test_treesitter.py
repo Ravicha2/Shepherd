@@ -12,8 +12,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from services.fqn import FQN
 from services.models import ADG, Edge, FQNKind, FQNNode
 from services.adg import parse_repo
@@ -693,3 +691,30 @@ class TestCodeHashNormalization:
             fqn="mod",
         )
         assert after.code_hash != before.code_hash
+
+
+# ===========================================================================
+# 10. python_files discovery
+# ===========================================================================
+
+
+class TestPythonFiles:
+    """Deterministic discovery of non-test Python files for ADG parsing."""
+
+    def test_excludes_tests_and_hidden_files(self, tmp_path: Path) -> None:
+        from services.adg.treesitter import python_files
+
+        (tmp_path / "app").mkdir()
+        (tmp_path / "app" / "main.py").write_text("x = 1\n")
+        (tmp_path / "app" / "util.py").write_text("y = 2\n")
+        (tmp_path / "app" / "test_util.py").write_text("assert True\n")
+        (tmp_path / "app" / "foo_test.py").write_text("assert True\n")
+        (tmp_path / "tests").mkdir()
+        (tmp_path / "tests" / "helper.py").write_text("z = 3\n")
+        (tmp_path / ".hidden").mkdir()
+        (tmp_path / ".hidden" / "ignored.py").write_text("w = 4\n")
+
+        files = python_files(tmp_path)
+        rel_files = [str(f.relative_to(tmp_path)) for f in files]
+        assert rel_files == ["app/main.py", "app/util.py"]
+

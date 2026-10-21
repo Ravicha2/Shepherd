@@ -13,7 +13,9 @@ import logging
 import os
 import re
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import Any
 
 from openai import OpenAI
 
@@ -146,6 +148,11 @@ class ResolutionTrace:
     tool_calls: list[dict] = field(default_factory=list)
     hit_cap: bool = False
     parse_failed: bool = False
+    # Items the model returned that never became edges (bad JSON, missing
+    # subject/object, unknown predicate). `parse_failed` only covers a wholly
+    # unusable response; a partially-parsing response used to be trimmed in
+    # silence, so a freeze could record the survivors as a clean run (#224).
+    parse_dropped: list[dict] = field(default_factory=list)
     pre_validation_edges: list[dict] = field(default_factory=list)
     # ADR 019: edges the LLM returned with a `none` scope verdict. They never
     # materialize as constraints, but a wrong `none` silently deletes a real
@@ -471,7 +478,52 @@ def _verdict_for(item: dict, subject: str, object_: str, predicate: PredicateTyp
                 "scope": _NONE_SCOPE,
             })
         return None
-    return _SCOPE_BY_NAME.get(scope_name, ConstraintScope.RUNTIME)
+    if isinstance(scope_name, str):
+        return _SCOPE_BY_NAME.get(scope_name, ConstraintScope.RUNTIME)
+    return ConstraintScope.RUNTIME
+
+
+def _parse_single_edge(
+    item: object,
+    adr_id: str,
+    adr_path: str,
+    none_verdict_edges: list[dict] | None,
+    drop: Callable[[str, object], None],
+) -> ConstraintEdge | None:
+    if not isinstance(item, dict):
+        log.warning("unified_resolver: skipping non-object edge: %s", item)
+        drop("not_an_object", item)
+        return None
+    subject = item.get("subject", "")
+    object_ = item.get("object", "")
+    predicate_str = item.get("predicate", "")
+    if not subject or not object_:
+        log.warning("unified_resolver: skipping edge with empty subject or object: %s", item)
+        drop("missing_subject_or_object", item)
+        return None
+    try:
+        predicate = PredicateType(predicate_str)
+    except ValueError:
+        log.warning("unified_resolver: unknown predicate %s, skipping", predicate_str)
+        drop("unknown_predicate", item)
+        return None
+    scope = _verdict_for(item, subject, object_, predicate, none_verdict_edges)
+    if scope is None:
+        return None
+    try:
+        return ConstraintEdge(
+            subject=subject,
+            predicate=predicate,
+            object=object_,
+            justification=item.get("justification", ""),
+            adr_id=item.get("adr_id", adr_id),
+            adr_path=item.get("adr_path", adr_path),
+            scope=scope,
+        )
+    except ValueError:
+        log.warning("unified_resolver: invalid edge skipped: %s", item)
+        drop("invalid_edge", item)
+        return None
 
 
 def _parse_edges(
@@ -479,53 +531,40 @@ def _parse_edges(
     adr_id: str,
     adr_path: str,
     none_verdict_edges: list[dict] | None = None,
+    dropped: list[dict] | None = None,
 ) -> list[ConstraintEdge]:
     """Parse a resolver response into edges, applying the per-edge scope verdict.
 
     ADR 019 decision 1: `scope` is a per-edge key (`runtime` | `tooling` |
     `none`); a `none` verdict emits no edge (see `_verdict_for`).
+
+    A collector passed as `dropped` records every item that did not survive
+    parsing, so a partially-garbled response is auditable rather than silently
+    trimmed (#224). `none` verdicts are deliberate decisions, not drops.
     """
+    def _drop(reason: str, item: object) -> None:
+        if dropped is not None:
+            dropped.append({"reason": reason, "item": item})
+
     cleaned = _extract_json(response_content)
     try:
         data = json.loads(cleaned)
     except (json.JSONDecodeError, TypeError):
         log.warning("unified_resolver: failed to parse LLM response as JSON: %s", response_content[:200])
+        _drop("invalid_json", response_content[:500])
         return []
 
     if isinstance(data, dict):
         data = [data]
+    elif not isinstance(data, list):
+        _drop("not_a_list", data)
+        return []
 
     edges: list[ConstraintEdge] = []
     for item in data:
-        if not isinstance(item, dict):
-            continue
-        subject = item.get("subject", "")
-        object_ = item.get("object", "")
-        predicate_str = item.get("predicate", "")
-        if not subject or not object_:
-            log.warning("unified_resolver: skipping edge with empty subject or object: %s", item)
-            continue
-        try:
-            predicate = PredicateType(predicate_str)
-        except ValueError:
-            log.warning("unified_resolver: unknown predicate %s, skipping", predicate_str)
-            continue
-        scope = _verdict_for(item, subject, object_, predicate, none_verdict_edges)
-        if scope is None:
-            continue
-        try:
-            edges.append(ConstraintEdge(
-                subject=subject,
-                predicate=predicate,
-                object=object_,
-                justification=item.get("justification", ""),
-                adr_id=item.get("adr_id", adr_id),
-                adr_path=item.get("adr_path", adr_path),
-                scope=scope,
-            ))
-        except ValueError:
-            log.warning("unified_resolver: invalid edge skipped: %s", item)
-            continue
+        edge = _parse_single_edge(item, adr_id, adr_path, none_verdict_edges, _drop)
+        if edge is not None:
+            edges.append(edge)
     return edges
 
 
@@ -641,7 +680,7 @@ def _log_trace(
 
     def _edge_provenance(subject: str, object_: str) -> dict[str, list[str]]:
         """Per edge side, the tool names whose results covered it (#137)."""
-        covering = {"subject": [], "object": []}
+        covering: dict[str, list[str]] = {"subject": [], "object": []}
         for call in trace.tool_calls:
             for result_fqn in call.get("result_fqns", []):
                 if call["name"] in covering["subject"] and call["name"] in covering["object"]:
@@ -667,6 +706,7 @@ def _log_trace(
             }
             for e in edges
         ],
+        "parse_dropped": trace.parse_dropped,
         "pre_validation_edges": trace.pre_validation_edges,
         "none_verdict_edges": trace.none_verdict_edges,
         "hit_cap": trace.hit_cap,
@@ -677,6 +717,33 @@ def _log_trace(
     }
     with open(trace_path, "a") as f:
         f.write(json.dumps(record) + "\n")
+
+
+def _process_response_edges(
+    content: str,
+    adr_id: str,
+    adr_path: str,
+    adg: ADG,
+    trace: ResolutionTrace,
+) -> tuple[list[ConstraintEdge], ResolutionTrace]:
+    none_verdict_edges: list[dict] = []
+    parse_dropped: list[dict] = []
+    edges = _materialize_edges(
+        _parse_edges(content, adr_id, adr_path, none_verdict_edges, parse_dropped), adg
+    )
+    valid_edges = [e for e in edges if _validate_edge(e, adg)]
+    if len(valid_edges) < len(edges):
+        dropped = [e for e in edges if e not in valid_edges]
+        log.warning("unified_resolver: dropped %d edges with nonexistent FQNs for %s", len(dropped), adr_id)
+    trace.pre_validation_edges = [
+        {"subject": e.subject, "object": e.object, "predicate": e.predicate.value, "valid": e in valid_edges}
+        for e in edges
+    ]
+    trace.none_verdict_edges = none_verdict_edges
+    trace.parse_dropped = parse_dropped
+    trace.parse_failed = any(d.get("reason") == "invalid_json" for d in parse_dropped)
+    _log_trace(adr_id, adr_path, valid_edges, trace)
+    return valid_edges, trace
 
 
 def resolve_adr_constraints(
@@ -714,7 +781,7 @@ def resolve_adr_constraints(
         root_packages=root_packages, external_packages_hint=external_packages_hint,
     )
 
-    messages = [
+    messages: list[dict[str, Any]] = [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": "Identify architectural constraints in this ADR and resolve them to FQN patterns."},
     ]
@@ -753,17 +820,8 @@ def resolve_adr_constraints(
 
         if not msg.tool_calls:
             if msg.content:
-                none_verdict_edges: list[dict] = []
-                edges = _materialize_edges(
-                    _parse_edges(msg.content, adr_id, adr_path, none_verdict_edges), adg
-                )
-                valid_edges = [e for e in edges if _validate_edge(e, adg)]
-                if len(valid_edges) < len(edges):
-                    dropped = [e for e in edges if e not in valid_edges]
-                    log.warning("unified_resolver: dropped %d edges with nonexistent FQNs for %s", len(dropped), adr_id)
-                pre_val = [{"subject": e.subject, "object": e.object, "predicate": e.predicate.value, "valid": e in valid_edges} for e in edges]
-                trace = ResolutionTrace(tool_calls=tool_call_trace, hit_cap=False, parse_failed=False, pre_validation_edges=pre_val, none_verdict_edges=none_verdict_edges, **_session_cost())
-                _log_trace(adr_id, adr_path, valid_edges, trace)
+                trace = ResolutionTrace(tool_calls=tool_call_trace, hit_cap=False, **_session_cost())
+                valid_edges, _ = _process_response_edges(msg.content, adr_id, adr_path, adg, trace)
                 return valid_edges
             log.warning("unified_resolver: LLM returned empty response for %s", adr_id)
             trace = ResolutionTrace(tool_calls=tool_call_trace, hit_cap=False, parse_failed=True, **_session_cost())
@@ -801,17 +859,8 @@ def resolve_adr_constraints(
         response = _complete(messages=messages)
         content = response.choices[0].message.content
         if content:
-            none_verdict_edges: list[dict] = []
-            edges = _materialize_edges(
-                _parse_edges(content, adr_id, adr_path, none_verdict_edges), adg
-            )
-            valid_edges = [e for e in edges if _validate_edge(e, adg)]
-            if len(valid_edges) < len(edges):
-                dropped = [e for e in edges if e not in valid_edges]
-                log.warning("unified_resolver: dropped %d edges with nonexistent FQNs for %s", len(dropped), adr_id)
-            pre_val = [{"subject": e.subject, "object": e.object, "predicate": e.predicate.value, "valid": e in valid_edges} for e in edges]
-            trace = ResolutionTrace(tool_calls=tool_call_trace, hit_cap=True, parse_failed=False, pre_validation_edges=pre_val, none_verdict_edges=none_verdict_edges, **_session_cost())
-            _log_trace(adr_id, adr_path, valid_edges, trace)
+            trace = ResolutionTrace(tool_calls=tool_call_trace, hit_cap=True, **_session_cost())
+            valid_edges, _ = _process_response_edges(content, adr_id, adr_path, adg, trace)
             return valid_edges
     except Exception:
         log.warning("unified_resolver: best-effort request failed for %s", adr_id)
@@ -835,7 +884,7 @@ if __name__ == "__main__":
         Edge(source="app", target="app.api", kind="CONTAINS"),
         Edge(source="app", target="app.db", kind="CONTAINS"),
     ]
-    adg = ADG(nodes=nodes, edges=edges_list)
+    adg = ADG(nodes=tuple(nodes), edges=tuple(edges_list))
 
     # _extract_json tests
     assert _extract_json('```json\n[{"subject": "app.api.*"}]\n```') == '[{"subject": "app.api.*"}]'
