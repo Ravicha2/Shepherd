@@ -377,6 +377,19 @@ def _is_test_file(path: Path, repo_root: Path) -> bool:
     return name.startswith("test_") or name.endswith("_test.py")
 
 
+def python_files(repo_path: Path) -> list[Path]:
+    """The Python files the ADG parses, in deterministic order.
+
+    Shared with derived views (route inventory, ADR 021) so their file set and
+    FQN construction cannot drift from the graph's.
+    """
+    return sorted(
+        p for p in repo_path.rglob("*.py")
+        if not _is_test_file(p, repo_path)
+        and not any(part.startswith(".") for part in p.relative_to(repo_path).parts)
+    )
+
+
 def parse_repo(repo_path: Path) -> ADG:
     """
     Walk all .py files in repo_path and extract FQN nodes and edges.
@@ -384,11 +397,7 @@ def parse_repo(repo_path: Path) -> ADG:
     nodes: list[FQNNode] = []
     edges: list[Edge] = []
 
-    py_files = sorted(
-        p for p in repo_path.rglob("*.py")
-        if not _is_test_file(p, repo_path)
-        and not any(part.startswith(".") for part in p.relative_to(repo_path).parts)
-    )
+    py_files = python_files(repo_path)
     parser = Parser(PY_LANGUAGE)
 
     # Pass 1: read sources + create module nodes

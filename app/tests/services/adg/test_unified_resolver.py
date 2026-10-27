@@ -5,7 +5,6 @@ Tests mock the LLM API to verify resolution orchestration, not instruction-follo
 from __future__ import annotations
 
 import json
-import os
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -556,6 +555,76 @@ class TestParseEdges:
         edges = _parse_edges(data, "ADR-001", "docs/adr/001.md")
         assert edges[0].adr_id == "ADR-001"
         assert edges[0].adr_path == "docs/adr/001.md"
+
+
+class TestParseEdgesDropped:
+    def test_dropped_collects_partially_parsed_items(self) -> None:
+        # #224: a garbled response that only partially parses must be auditable.
+        data = json.dumps([
+            {"subject": "app.api.*", "object": "app.db.*",
+             "predicate": "prohibits_dependency", "justification": "ok"},
+            {"subject": "", "object": "app.db.*", "predicate": "prohibits_dependency"},
+            {"subject": "app.a", "object": "app.b", "predicate": "unknown_predicate"},
+        ])
+        dropped: list[dict] = []
+        edges = _parse_edges(data, "ADR-001", "docs/adr/001.md", dropped=dropped)
+        assert len(edges) == 1
+        assert [d["reason"] for d in dropped] == [
+            "missing_subject_or_object",
+            "unknown_predicate",
+        ]
+
+    def test_dropped_ignores_none_verdict(self) -> None:
+        payload = [{
+            "subject": "app.api.*", "object": "app.db.*",
+            "predicate": "prohibits_dependency", "scope": "none",
+        }]
+        dropped: list[dict] = []
+        assert _parse_edges(json.dumps(payload), "ADR-001", "docs/adr/001.md",
+                            dropped=dropped) == []
+        assert dropped == []
+
+
+class TestDroppedTrace:
+    def test_trace_logs_parse_dropped(self, sample_adg: ADG, tmp_path) -> None:
+        responses = [
+            _make_mock_response(
+                content=json.dumps([
+                    {
+                        "subject": "app.api.*",
+                        "object": "app.db.*",
+                        "predicate": "prohibits_dependency",
+                        "justification": "API must not import DB modules directly",
+                        "adr_id": "ADR-001",
+                        "adr_path": "docs/adr/001.md",
+                    },
+                    {
+                        "subject": "app.a",
+                        "object": "app.b",
+                        "predicate": "unknown_predicate",
+                    },
+                ])
+            )
+        ]
+        with patch.dict("os.environ", {"RESOLVER_TRACE_DIR": str(tmp_path)}):
+            edges = _run_unified(ADR_PROHIBIT_DEP, "ADR-001", "docs/adr/001.md", sample_adg, responses)
+        assert len(edges) == 1
+        record = json.loads((tmp_path / "resolver_traces.jsonl").read_text().strip())
+        assert len(record["parse_dropped"]) == 1
+        assert record["parse_dropped"][0]["reason"] == "unknown_predicate"
+        assert record["parse_failed"] is False
+
+    def test_trace_sets_parse_failed_on_invalid_json(self, sample_adg: ADG, tmp_path) -> None:
+        responses = [
+            _make_mock_response(content="This is not JSON content")
+        ]
+        with patch.dict("os.environ", {"RESOLVER_TRACE_DIR": str(tmp_path)}):
+            edges = _run_unified(ADR_PROHIBIT_DEP, "ADR-001", "docs/adr/001.md", sample_adg, responses)
+        assert edges == []
+        record = json.loads((tmp_path / "resolver_traces.jsonl").read_text().strip())
+        assert len(record["parse_dropped"]) == 1
+        assert record["parse_dropped"][0]["reason"] == "invalid_json"
+        assert record["parse_failed"] is True
 
 
 # -- Test: JSONL trace logging -------------------------------------------------

@@ -1,5 +1,10 @@
 # Decision log — plan §5 dated notes (issue #207)
 
+> **Scope: PARKED longitudinal study ([#178](https://github.com/Ravicha2/Shepherd/issues/178)).**
+> Not the active experiment — the live one is the security eval ([#220](https://github.com/Ravicha2/Shepherd/issues/220)),
+> which lives in `research-exp-setup/security/`. Kept as the fallback spine; do not
+> extend this file for #220.
+
 The grill session of 2026-10-10 that produced the two dated notes in
 [`longitudinal-analysis-plan.md`](./longitudinal-analysis-plan.md) §5
 (Test 1 close-out, Test 2 redesign). Every number cited was verified against

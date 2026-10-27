@@ -4,6 +4,12 @@ Shepherd detects Architectural Decision Record (ADR) violations in Python reposi
 
 Part of a research project at UNSW (University of New South Wales).
 
+**Research status (2026-10-19):** the active experiment is the graph-anchored security evaluation
+([#220](https://github.com/Ravicha2/Shepherd/issues/220), `research-exp-setup/security/`); the
+longitudinal decision-memory study ([#178](https://github.com/Ravicha2/Shepherd/issues/178)) is
+parked as the fallback spine. The two do not share results, records or vocabulary — see
+[`docs/research/README.md`](docs/research/README.md) and `research-exp-setup/docs/README.md`.
+
 ## Why Shepherd?
 
 Architectural decisions decay. Teams write ADRs to record constraints like "no direct database access from handlers" or "all HTTP calls go through the gateway", but nothing checks whether the code actually follows them. Manual review misses transitive violations: a new import that indirectly violates a constraint through a chain of dependencies. Shepherd automates this by:
