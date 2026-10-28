@@ -521,6 +521,20 @@ class TestParseEdges:
     def test_empty_array(self) -> None:
         assert _parse_edges("[]", "ADR-001", "docs/adr/001.md") == []
 
+    def test_requires_object_scope_round_trips(self) -> None:
+        """A6: the new predicate parses additively through the same seam."""
+        data = json.dumps([{
+            "subject": "app.routes.*",
+            "object": "app.auth.permissions",
+            "predicate": "requires_object_scope",
+            "justification": "Route handlers must scope the loaded object.",
+            "adr_id": "ADR-001",
+            "adr_path": "docs/adr/001.md",
+        }])
+        edges = _parse_edges(data, "ADR-001", "docs/adr/001.md")
+        assert len(edges) == 1
+        assert edges[0].predicate is PredicateType.REQUIRES_OBJECT_SCOPE
+
     def test_invalid_predicate_skipped(self) -> None:
         data = json.dumps([{
             "subject": "app.api.*",

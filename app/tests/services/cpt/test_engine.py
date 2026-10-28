@@ -31,6 +31,7 @@ from services.models import (
     FileChange,
     FQNKind,
     FQNNode,
+    Guard,
     PredicateType,
 )
 
@@ -484,6 +485,139 @@ class TestCheckStructuralPredicates:
 
 
 # ===========================================================================
+# 2b. check_object_scope_predicates: REQUIRES_OBJECT_SCOPE evaluation
+# ===========================================================================
+
+
+def _object_scope_adg(guards: tuple[Guard, ...], object_parameters: tuple[str, ...] = ("item_id",)) -> ADG:
+    """One route handler under a wildcard subject, plus a non-handler module.
+
+    The handler's facts are the only thing that varies; every other node in the
+    graph carries no object facts, which is what the subject filter must skip.
+    """
+    return ADG(
+        nodes=[
+            FQNNode(fqn=FQN.from_dotted("app.routes"), kind=FQNKind.MODULE,
+                    file_path="app/routes.py", line_start=0, line_end=40),
+            FQNNode(fqn=FQN.from_dotted("app.routes.detail"), kind=FQNKind.FUNCTION,
+                    file_path="app/routes.py", line_start=5, line_end=15,
+                    code_hash="handler-hash",
+                    object_parameters=object_parameters, guards=guards),
+            FQNNode(fqn=FQN.from_dotted("app.auth.permissions"), kind=FQNKind.MODULE,
+                    file_path="app/auth/permissions.py", line_start=0, line_end=20),
+        ],
+        constraint_edges=[ConstraintEdge(
+            subject="app.routes.*",
+            predicate=PredicateType.REQUIRES_OBJECT_SCOPE,
+            object="app.auth.permissions",
+            justification="Handlers must scope the loaded object to the requester.",
+            adr_id="ADR-A6",
+            adr_path="docs/adr/006-object-scope.md",
+            specificity=3.0,
+        )],
+    )
+
+
+class TestCheckObjectScopePredicates:
+    """REQUIRES_OBJECT_SCOPE reads handler node facts; no traversal."""
+
+    def test_unscoped_guard_fires(self) -> None:
+        from services.cpt.engine import check_object_scope_predicates, match_constraints
+
+        adg = _object_scope_adg(guards=(
+            Guard(symbol="coarse", predicate="login_required", scopes_object=False),
+        ))
+
+        violations = check_object_scope_predicates(match_constraints(adg), adg.node_of)
+
+        assert [str(v.matched_fqn) for v in violations] == ["app.routes.detail"]
+        assert "app.routes.detail" in violations[0].evidence
+        assert "requires_object_scope" in violations[0].evidence
+
+    def test_a_guard_that_scopes_the_object_is_silent(self) -> None:
+        from services.cpt.engine import check_object_scope_predicates, match_constraints
+
+        adg = _object_scope_adg(guards=(
+            Guard(symbol="check_access",
+                  predicate="item.owner_id != request.user.id",
+                  scopes_object=True),
+        ))
+
+        assert check_object_scope_predicates(match_constraints(adg), adg.node_of) == []
+
+    def test_no_guards_at_all_still_fires(self) -> None:
+        """Class (i): absence of a guard is the same failure, not a pass."""
+        from services.cpt.engine import check_object_scope_predicates, match_constraints
+
+        adg = _object_scope_adg(guards=())
+
+        violations = check_object_scope_predicates(match_constraints(adg), adg.node_of)
+
+        assert [str(v.matched_fqn) for v in violations] == ["app.routes.detail"]
+
+    def test_subject_wildcard_only_matches_handlers_carrying_object_facts(self) -> None:
+        from services.cpt.engine import check_object_scope_predicates, match_constraints
+
+        adg = _object_scope_adg(guards=()).with_nodes(
+            FQNNode(fqn=FQN.from_dotted("app.routes.helpers"), kind=FQNKind.FUNCTION,
+                    file_path="app/routes/helpers.py", line_start=0, line_end=20,
+                    object_parameters=()),
+        )
+
+        violations = check_object_scope_predicates(match_constraints(adg), adg.node_of)
+
+        assert [str(v.matched_fqn) for v in violations] == ["app.routes.detail"]
+
+
+class TestObjectScopeRouteJoin:
+    """The violation names the handler; the derived inventory joins it to a route."""
+
+    def test_violation_joins_to_method_and_path(self, tmp_path: Path) -> None:
+        from services.adg import parse_repo
+        from services.adg.object_scope import backfill_handler_facts
+        from services.adg.route_inventory import build_route_inventory
+        from services.cpt.engine import detect
+
+        repo = tmp_path / "repo"
+        (repo / "app" / "auth").mkdir(parents=True)
+        (repo / "app" / "__init__.py").write_text("")
+        (repo / "app" / "auth" / "__init__.py").write_text("")
+        (repo / "app" / "auth" / "permissions.py").write_text("")
+        (repo / "app" / "views.py").write_text(textwrap.dedent(
+            """
+            from flask import Blueprint
+
+            bp = Blueprint("views", __name__)
+
+            @bp.route("/items/<int:item_id>", methods=["GET"])
+            def get_item(item_id):
+                item = db.get(Item, item_id)
+                return item
+            """
+        ))
+        adg = backfill_handler_facts(parse_repo(repo), repo)
+        adg = adg.with_constraints(ConstraintEdge(
+            subject="app.views.*",
+            predicate=PredicateType.REQUIRES_OBJECT_SCOPE,
+            object="app.auth.permissions",
+            justification="Handlers must scope the loaded object.",
+            adr_id="ADR-A6",
+            adr_path="docs/adr/006-object-scope.md",
+        ))
+
+        (violation,) = detect(DiffResult(to_sha="abc123"), adg).violations
+        inventory = build_route_inventory(repo, adg=adg)
+        joined = [
+            f"{method} {route.canonical_path}"
+            for route in inventory.routes
+            if route.handler_fqn == str(violation.matched_fqn)
+            for method in route.methods
+        ]
+
+        assert joined == ["GET /items/{}"]
+
+
+# ===========================================================================
 # 3. check_change_triggered_predicates: REQUIRES_* evaluation
 # ===========================================================================
 
@@ -702,6 +836,28 @@ class TestResolve:
             evidence="test evidence",
             change_type="modified",
         )
+
+    def test_object_scope_requirement_does_not_outweigh_prohibits(self) -> None:
+        """A6: the object-scope rule shares the `requires_` prefix but is not a
+        presence requirement, so it must not suppress a prohibits row on the
+        same object."""
+        from services.cpt.resolution import resolve
+
+        v_prohibit = self._make_violation(
+            "app.routes.*", PredicateType.PROHIBITS_DEPENDENCY, "app.auth.permissions",
+            specificity=1.0, matched_fqn="app.routes", adr_id="ADR-001",
+        )
+        v_object_scope = self._make_violation(
+            "app.routes.*", PredicateType.REQUIRES_OBJECT_SCOPE, "app.auth.permissions",
+            specificity=3.0, matched_fqn="app.routes.detail", adr_id="ADR-002",
+        )
+
+        result = resolve([v_prohibit, v_object_scope])
+
+        assert {v.constraint.predicate for v in result} == {
+            PredicateType.PROHIBITS_DEPENDENCY,
+            PredicateType.REQUIRES_OBJECT_SCOPE,
+        }
 
     def test_specificity_higher_wins(self) -> None:
         from services.cpt.resolution import resolve
@@ -926,6 +1082,72 @@ class TestDetect:
         result = detect(diff, adg)
         require_violations = [v for v in result.violations if v.constraint.predicate == PredicateType.REQUIRES_DEPENDENCY and v.constraint.adr_id == "ADR-004"]
         assert len(require_violations) == 0
+
+    def test_detect_dispatches_object_scope_predicates(self) -> None:
+        from services.cpt.engine import detect
+        from services.cpt.resolution import governed_module
+
+        adg = _object_scope_adg(guards=())
+        result = detect(DiffResult(to_sha="abc123"), adg)
+
+        (violation,) = [v for v in result.violations
+                        if v.constraint.predicate is PredicateType.REQUIRES_OBJECT_SCOPE]
+        assert str(violation.matched_fqn) == "app.routes.detail"
+        assert violation.location == {"file_path": "app/routes.py", "line_start": 5, "line_end": 15}
+        assert str(governed_module(violation)) == "app.routes.detail"
+        assert violation.code_fingerprint is not None
+
+    def test_object_scope_row_does_not_suppress_a_prohibits_row(self) -> None:
+        from services.cpt.engine import detect
+
+        adg = _object_scope_adg(guards=()).with_edges(
+            Edge(source="app.routes.detail", target="app.auth.permissions", kind="IMPORTS"),
+        )
+        prohibit = ConstraintEdge(
+            subject="app.routes.*",
+            predicate=PredicateType.PROHIBITS_DEPENDENCY,
+            object="app.auth.permissions",
+            justification="Routes must not reach into the permission module.",
+            adr_id="ADR-PROHIBIT",
+            adr_path="docs/adr/007.md",
+            specificity=1.0,
+        )
+        adg = adg.with_constraints(prohibit)
+
+        result = detect(DiffResult(to_sha="abc123"), adg)
+
+        predicates = {v.constraint.predicate for v in result.violations}
+        assert PredicateType.PROHIBITS_DEPENDENCY in predicates
+        assert PredicateType.REQUIRES_OBJECT_SCOPE in predicates
+
+    @pytest.mark.parametrize(("specificity", "adr_id"), [
+        (5.0, "ADR-001"),   # prohibits outweighs object-scope
+        (3.0, "ADR-Z"),     # tie, prohibits is the newer row
+    ])
+    def test_satisfied_prohibits_row_does_not_suppress_object_scope(
+        self, specificity: float, adr_id: str,
+    ) -> None:
+        """A6 review: a prohibits row that outweighs (or ties-and-is-newer)
+        the object-scope row must not suppress it. With no IMPORTS edge the
+        prohibits row is satisfied and emits no violation of its own, so the
+        object-scope finding would otherwise vanish entirely."""
+        from services.cpt.engine import detect
+
+        adg = _object_scope_adg(guards=()).with_constraints(ConstraintEdge(
+            subject="app.routes.*",
+            predicate=PredicateType.PROHIBITS_DEPENDENCY,
+            object="app.auth.permissions",
+            justification="Routes must not reach into the permission module.",
+            adr_id=adr_id,
+            adr_path=f"docs/adr/{adr_id}.md",
+            specificity=specificity,
+        ))
+
+        result = detect(DiffResult(to_sha="abc123"), adg)
+
+        assert [v.constraint.predicate for v in result.violations] == [
+            PredicateType.REQUIRES_OBJECT_SCOPE,
+        ]
 
     def test_detect_no_violations_clean(self, sample_adg: ADG) -> None:
         from services.cpt.engine import detect

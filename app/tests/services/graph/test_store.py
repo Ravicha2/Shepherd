@@ -75,6 +75,35 @@ def sample_adg_with_constraints() -> ADG:
     return ADG(nodes=nodes, edges=edges, constraint_edges=constraints)
 
 
+class TestPredicateStoreMaps:
+    """The predicate <-> relationship-name maps must cover every enum member."""
+
+    def test_object_scope_member_survives_the_store_maps(self) -> None:
+        from services.graph.connector import (
+            PREDICATE_TO_REL,
+            PREDICATE_VALUES,
+            REL_TO_PREDICATE,
+            GraphStore,
+        )
+
+        assert PREDICATE_TO_REL[PredicateType.REQUIRES_OBJECT_SCOPE] == "REQUIRES_OBJECT_SCOPE"
+        assert REL_TO_PREDICATE["REQUIRES_OBJECT_SCOPE"] is PredicateType.REQUIRES_OBJECT_SCOPE
+        assert "REQUIRES_OBJECT_SCOPE" in PREDICATE_VALUES
+
+        edge = GraphStore._row_to_constraint_edge({
+            "predicate": "REQUIRES_OBJECT_SCOPE",
+            "subject": "app.views.*",
+            "object": "app.auth.permissions",
+            "justification": "Handlers must scope the loaded object.",
+            "adr_id": "ADR-A6",
+            "adr_path": "docs/adr/006.md",
+            "specificity": 3.0,
+            "scope": "runtime",
+        })
+
+        assert edge.predicate is PredicateType.REQUIRES_OBJECT_SCOPE
+
+
 # ===========================================================================
 # 4. Constraint edge CRUD
 # ===========================================================================

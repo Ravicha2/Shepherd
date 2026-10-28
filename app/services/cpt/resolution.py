@@ -4,7 +4,14 @@ from dataclasses import dataclass
 
 from services.fqn import FQN
 from services.resolver import MatchStatus, fqn_matches_pattern
-from services.models import ConstraintEdge
+from services.models import ConstraintEdge, PredicateType
+
+
+def _is_presence_requires(predicate: PredicateType) -> bool:
+    """A6: requires_object_scope shares the `requires_` prefix but is not a
+    presence requirement, so it must not pair with a prohibits row."""
+    return (predicate.value.startswith("requires_")
+            and predicate is not PredicateType.REQUIRES_OBJECT_SCOPE)
 
 
 def _subject_covers(subject_pattern: str, fqn: FQN) -> bool:
@@ -101,9 +108,9 @@ def resolve(violations: list[Violation]) -> list[Violation]:
                 continue
 
             violation_i_prohibit = violation_i.constraint.predicate.value.startswith("prohibits_")
-            violation_i_require = violation_i.constraint.predicate.value.startswith("requires_")
+            violation_i_require = _is_presence_requires(violation_i.constraint.predicate)
             violation_j_prohibit = violation_j.constraint.predicate.value.startswith("prohibits_")
-            violation_j_require = violation_j.constraint.predicate.value.startswith("requires_")
+            violation_j_require = _is_presence_requires(violation_j.constraint.predicate)
 
             if violation_i_prohibit and violation_j_require:
                 if _subject_covers(violation_j.constraint.subject, violation_i.matched_fqn):
@@ -151,7 +158,7 @@ def suppress_outweighed_requires(
     return [
         violation for violation in violations
         if not (
-            violation.constraint.predicate.value.startswith("requires_")
+            _is_presence_requires(violation.constraint.predicate)
             and any(
                 prohibits.object == violation.constraint.object
                 and (prohibits.specificity > violation.constraint.specificity or (prohibits.specificity == violation.constraint.specificity and prohibits.adr_id > violation.constraint.adr_id))

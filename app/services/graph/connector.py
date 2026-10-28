@@ -34,6 +34,9 @@ PREDICATE_TO_REL = {
     PredicateType.REQUIRES_IMPLEMENTATION: "REQUIRES_IMPLEMENTATION",
     PredicateType.REQUIRES_DEPENDENCY: "REQUIRES_DEPENDENCY",
     PredicateType.PROHIBITS_IMPLEMENTATION: "PROHIBITS_IMPLEMENTATION",
+    # A6 (#247): store_constraint_edge, _row_to_constraint_edge and the load
+    # query filters hard-index these maps, so the member must be here too.
+    PredicateType.REQUIRES_OBJECT_SCOPE: "REQUIRES_OBJECT_SCOPE",
 }
 
 REL_TO_PREDICATE = {val: key for key, val in PREDICATE_TO_REL.items()}

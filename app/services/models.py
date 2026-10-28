@@ -297,6 +297,10 @@ class PredicateType(Enum):
     REQUIRES_IMPLEMENTATION = "requires_implementation"
     REQUIRES_DEPENDENCY = "requires_dependency"
     PROHIBITS_IMPLEMENTATION = "prohibits_implementation"
+    # A6 (#247): a handler that loads a route object must scope that object to
+    # the requester. Deliberately outside ADR 004's 2x2; evaluated by its own
+    # node-fact checker, so it must stay out of the presence-rule prefix sweeps.
+    REQUIRES_OBJECT_SCOPE = "requires_object_scope"
 
 
 @dataclass
