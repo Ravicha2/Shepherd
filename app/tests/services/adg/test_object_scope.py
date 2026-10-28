@@ -15,7 +15,11 @@ from textwrap import dedent
 import pytest
 
 from services.adg import parse_repo
-from services.adg.object_scope import backfill_handler_facts, object_parameters
+from services.adg.object_scope import (
+    backfill_handler_facts,
+    object_parameters,
+    typed_object_parameters,
+)
 from services.adg.route_inventory import repo_at_sha
 from services.models import FQNNode
 
@@ -46,6 +50,13 @@ class TestObjectParameters:
     def test_non_object_parameters_are_dropped(self) -> None:
         """Pagination and filter slots name no object, so they are not facts."""
         assert object_parameters(["/items/?page=<int:page>&limit={limit}"]) == ()
+
+    def test_typed_object_parameters_name_only_converted_slots(self) -> None:
+        """A converter means the framework hands the handler a non-string."""
+        assert typed_object_parameters(
+            ["/users/<int:user_id>/", "/files/{file_path:path}/", "/tags/<slug>/"]) == (
+            "user_id",
+        )
 
 
 class TestNodeField:

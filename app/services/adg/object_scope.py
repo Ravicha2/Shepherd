@@ -19,8 +19,11 @@ from pathlib import Path
 from services.adg.route_inventory import build_route_inventory
 from services.models import ADG, Guard
 
-_FLASK_PARAM = re.compile(r"<(?:\w+:)?(?P<name>\w+)>")
-_FASTAPI_PARAM = re.compile(r"\{(?P<name>\w+)(?::[^}]*)?\}")
+_FLASK_PARAM = re.compile(r"<(?:(?P<converter>\w+):)?(?P<name>\w+)>")
+_FASTAPI_PARAM = re.compile(r"\{(?P<name>\w+)(?::(?P<converter>[^}]*))?\}")
+# Converters that hand the handler a non-string, so a comparison with an int
+# attribute is not an always-false guard.
+_TYPED_CONVERTER = re.compile(r"(?i)^(?:int|uuid|positiveint)$")
 
 # Generic object identifiers: every token is a framework idiom for "the object
 # this request names", never a case/repo/route/advisory name (#240).
@@ -34,8 +37,7 @@ _OBJECT_PARAM = re.compile(
 # name appears here (#240).
 _REQUESTER = re.compile(
     r"(?i)(?:request\.user|request\.session|request\.auth|self\.request|"
-    r"current_user|"
-    r"\buser\.(?:id|pk|role|email|is_admin|is_superuser|is_authenticated|permissions))"
+    r"current_user)"
 )
 _SCOPE_CALL = re.compile(
     r"(?i)(?:has_perm|has_permission|permission_denied|perm_check|check_access|"
@@ -51,16 +53,27 @@ _TYPED_PARAM = re.compile(r"(?i)\b(?:int|UUID|PositiveInt)\b")
 _INT_ATTR = re.compile(r"(?i)\.(?:id|pk|[a-z][a-z0-9_]*_id)$")
 
 
-def object_parameters(raw_paths: Iterable[str]) -> tuple[str, ...]:
-    """Object parameter names named by *raw_paths*, first-seen order."""
-    names = (
-        match.group("name")
+def _object_path_params(raw_paths: Iterable[str]):
+    return (
+        match
         for raw_path in raw_paths
         for pattern in (_FLASK_PARAM, _FASTAPI_PARAM)
         for match in pattern.finditer(raw_path)
         if _OBJECT_PARAM.match(match.group("name"))
     )
-    return tuple(dict.fromkeys(names))
+
+
+def object_parameters(raw_paths: Iterable[str]) -> tuple[str, ...]:
+    """Object parameter names named by *raw_paths*, first-seen order."""
+    return tuple(dict.fromkeys(
+        match.group("name") for match in _object_path_params(raw_paths)))
+
+
+def typed_object_parameters(raw_paths: Iterable[str]) -> tuple[str, ...]:
+    """Object parameters the route declares as int/uuid, so never a raw string."""
+    return tuple(dict.fromkeys(
+        match.group("name") for match in _object_path_params(raw_paths)
+        if _TYPED_CONVERTER.match(match.group("converter") or "")))
 
 
 # --- guard extraction -------------------------------------------------------
@@ -267,21 +280,26 @@ def _conditional_guard(func: ast.AST, compare: ast.AST) -> bool:
     node = compare
     while node in parents:
         parent = parents[node]
+        # An auth gate on the requester is not an object-field condition: the
+        # check still runs for every authenticated caller.
         if (isinstance(parent, ast.If) and parent.test is not compare
                 and isinstance(parent.test, (ast.Attribute, ast.Name))
-                and any(n is compare for n in ast.walk(parent))):
+                and not _REQUESTER.search(_text(parent.test))):
             return True
         node = parent
     return False
 
 
 def extract_guards(source: str, handler_fqn: str,
-                   object_parameters: Iterable[str] = ()) -> tuple[Guard, ...]:
+                   object_parameters: Iterable[str] = (),
+                   typed_parameters: Iterable[str] = ()) -> tuple[Guard, ...]:
     """The guards *handler_fqn* applies, as records; first-seen order.
 
-    Deterministic AST analysis only — no LLM, no network.
+    *typed_parameters* are path params the route converter already parses as
+    int/uuid. Deterministic AST analysis only — no LLM, no network.
     """
-    return _extract_guards(ast.parse(source), handler_fqn, object_parameters)
+    return _extract_guards(
+        ast.parse(source), handler_fqn, object_parameters, typed_parameters)
 
 
 def _comparison_guard(func: ast.AST, node: ast.Compare, origin: str,
@@ -356,14 +374,15 @@ def _guards_in(func: ast.AST, origin: str, tokens: set[str], params: set[str],
 
 
 def _extract_guards(tree: ast.Module, handler_fqn: str,
-                    object_parameters: Iterable[str]) -> tuple[Guard, ...]:
+                    object_parameters: Iterable[str],
+                    typed_parameters: Iterable[str] = ()) -> tuple[Guard, ...]:
     linked = _linked(tree, _resolve_handler(tree, handler_fqn))
     funcs = [func for func, _origin in linked]
     params = set(object_parameters)
     objects = {name for func in funcs for name in _assigned_objects(func)}
     tokens = params | objects
     converted = _converted_params(funcs, params)
-    typed = _typed_params(funcs, params)
+    typed = _typed_params(funcs, params) | set(typed_parameters)
     guards = [
         guard
         for func, origin in linked
@@ -387,14 +406,16 @@ def backfill_handler_facts(adg: ADG, repo_path: Path) -> ADG:
     trees: dict[str, ast.Module | None] = {}
 
     def facts(handler: str, file_path: str) -> tuple[tuple[str, ...], tuple[Guard, ...]]:
-        params = object_parameters(paths_by_handler[handler])
+        paths = paths_by_handler[handler]
+        params = object_parameters(paths)
+        typed = typed_object_parameters(paths)
         if file_path not in trees:
             try:
-                trees[file_path] = ast.parse((repo_path / file_path).read_text())
-            except (OSError, SyntaxError, UnicodeDecodeError):
+                trees[file_path] = ast.parse((repo_path / file_path).read_bytes())
+            except (OSError, SyntaxError):
                 trees[file_path] = None
         tree = trees[file_path]
-        guards = _extract_guards(tree, handler, params) if tree is not None else ()
+        guards = _extract_guards(tree, handler, params, typed) if tree is not None else ()
         return params, guards
 
     updated = []

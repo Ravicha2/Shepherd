@@ -31,34 +31,82 @@ SECURITY_REPOS = (
 )
 
 
-def test_django_re_path_named_group_yields_the_parameter_name() -> None:
-    assert object_parameters([r"/avatar/list/(?P<user_id>\d+)/"]) == ("user_id",)
+def _single_guard(source: str, handler: str,
+                  params: tuple[str, ...] = ()) -> Guard:
+    (guard,) = extract_guards(dedent(source), handler, params)
+    return guard
 
 
-def test_requester_object_comparison_is_a_scoping_guard() -> None:
-    source = dedent(
+@pytest.mark.parametrize("handler,params,source,expected", [
+    pytest.param(
+        "download", ("item_id",),
         """
         def download(request, item_id):
             item = get_object_or_404(Item, pk=item_id)
             if item.owner_id != request.user.id:
                 raise Http404()
             return item
-        """
-    )
-
-    guards = extract_guards(source, "download", ("item_id",))
-
-    assert guards == (
+        """,
         Guard(
             symbol="download",
             predicate="item.owner_id != request.user.id",
             scopes_object=True,
         ),
-    )
+        id="requester-object-comparison",
+    ),
+    pytest.param(
+        "show_list", ("user_id",),
+        """
+        def admin_or_owner_required(func):
+            def wrapped(request, user_id=None):
+                if not request.user.is_authenticated:
+                    return login_required(func)(request, user_id)
+                user_id_int = int(user_id) if user_id is not None else None
+                if request.user.is_administrator() or request.user.id == user_id_int:
+                    return func(request, user_id)
+            return wrapped
+
+        @admin_or_owner_required
+        def show_list(request, user_id=None):
+            user = get_object_or_404(User, pk=user_id)
+            return user
+        """,
+        Guard(
+            symbol="admin_or_owner_required",
+            predicate="request.user.id == user_id_int",
+            scopes_object=True,
+        ),
+        id="converted-path-parameter",
+    ),
+    pytest.param(
+        "detail", ("item_id",),
+        """
+        def detail(request, item_id):
+            item = get_object_or_404(Item, pk=item_id)
+            if request.user.is_authenticated:
+                if item.owner_id != request.user.id:
+                    raise Http404()
+            return item
+        """,
+        Guard(
+            symbol="detail",
+            predicate="item.owner_id != request.user.id",
+            scopes_object=True,
+        ),
+        id="auth-gate",
+    ),
+])
+def test_a_scoping_comparison_is_judged_by_where_and_how_it_runs(
+        handler: str, params: tuple[str, ...], source: str, expected: Guard) -> None:
+    assert _single_guard(source, handler, params) == expected
+
+
+def test_django_re_path_named_group_yields_the_parameter_name() -> None:
+    assert object_parameters([r"/avatar/list/(?P<user_id>\d+)/"]) == ("user_id",)
 
 
 def test_predicate_only_applied_when_an_object_field_is_truthy_does_not_scope() -> None:
-    source = dedent(
+    guard = _single_guard(
         """
         def object(self):
             o = get_object_or_404(CachedFile, id=self.kwargs['id'])
@@ -66,40 +114,32 @@ def test_predicate_only_applied_when_an_object_field_is_truthy_does_not_scope() 
                 if o.session_key != self.request.session.session_key:
                     raise Http404()
             return o
-        """
-    )
+        """,
+        "object")
 
-    guards = extract_guards(source, "object")
-
-    assert guards == (
-        Guard(
-            symbol="object",
-            predicate="o.session_key != self.request.session.session_key",
-            scopes_object=False,
-            conditional=True,
-        ),
+    assert guard == Guard(
+        symbol="object",
+        predicate="o.session_key != self.request.session.session_key",
+        scopes_object=False,
+        conditional=True,
     )
 
 
 def test_scoping_call_with_the_requester_is_a_guard() -> None:
-    source = dedent(
+    guard = _single_guard(
         """
         def object(self):
             o = get_object_or_404(CachedFile, id=self.kwargs['id'])
             if not o.allowed_for_session(self.request):
                 raise Http404()
             return o
-        """
-    )
+        """,
+        "object")
 
-    guards = extract_guards(source, "object")
-
-    assert guards == (
-        Guard(
-            symbol="o.allowed_for_session",
-            predicate="o.allowed_for_session(self.request)",
-            scopes_object=True,
-        ),
+    assert guard == Guard(
+        symbol="o.allowed_for_session",
+        predicate="o.allowed_for_session(self.request)",
+        scopes_object=True,
     )
 
 
@@ -128,7 +168,6 @@ def test_dead_guard_and_deny_branch_reinvoke_are_recorded() -> None:
             symbol="admin_or_owner_required",
             predicate="request.user.id == user_id",
             scopes_object=False,
-            conditional=True,
             dead=True,
         ),
         Guard(
@@ -140,34 +179,69 @@ def test_dead_guard_and_deny_branch_reinvoke_are_recorded() -> None:
     }
 
 
-def test_converted_path_parameter_clears_the_dead_guard() -> None:
+def test_a_local_named_user_is_not_the_requester() -> None:
     source = dedent(
         """
-        def admin_or_owner_required(func):
-            def wrapped(request, user_id=None):
-                if not request.user.is_authenticated:
-                    return login_required(func)(request, user_id)
-                user_id_int = int(user_id) if user_id is not None else None
-                if request.user.is_administrator() or request.user.id == user_id_int:
-                    return func(request, user_id)
-            return wrapped
-
-        @admin_or_owner_required
-        def show_list(request, user_id=None):
-            user = get_object_or_404(User, pk=user_id)
+        def detail(request, item_id, other_id):
+            user = get_object_or_404(User, pk=item_id)
+            if user.id != other_id:
+                raise Http404()
             return user
         """
     )
 
-    guards = extract_guards(source, "show_list", ("user_id",))
+    assert extract_guards(source, "detail", ("item_id", "other_id")) == ()
 
-    assert guards == (
-        Guard(
-            symbol="admin_or_owner_required",
-            predicate="request.user.id == user_id_int",
-            scopes_object=True,
-        ),
+
+def test_route_converter_clears_the_dead_guard(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    (repo / "app").mkdir(parents=True)
+    (repo / "app" / "__init__.py").write_text("")
+    (repo / "app" / "views.py").write_text(dedent(
+        """
+        from flask import Blueprint
+
+        bp = Blueprint("views", __name__)
+
+        @bp.route("/users/<int:user_id>/")
+        def get_user(user_id):
+            user = db.get(User, user_id)
+            if request.user.id != user_id:
+                raise PermissionError
+            return user
+        """
+    ))
+
+    filled = backfill_handler_facts(parse_repo(repo), repo)
+
+    (guard,) = filled.node_of["app.views.get_user"].guards
+    assert guard.dead is False
+    assert guard.scopes_object is True
+
+
+def test_a_byte_order_mark_does_not_hide_the_guards(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    (repo / "app").mkdir(parents=True)
+    (repo / "app" / "__init__.py").write_text("")
+    source = dedent(
+        """
+        from flask import Blueprint
+
+        bp = Blueprint("views", __name__)
+
+        @bp.route("/users/<user_id>/")
+        def get_user(user_id):
+            user = db.get(User, user_id)
+            if request.user.id != user.owner_id:
+                raise PermissionError
+            return user
+        """
     )
+    (repo / "app" / "views.py").write_bytes(b"\xef\xbb\xbf" + source.encode())
+
+    filled = backfill_handler_facts(parse_repo(repo), repo)
+
+    assert filled.node_of["app.views.get_user"].guards
 
 
 def test_back_fill_populates_object_parameters_and_guards(tmp_path: Path) -> None:
