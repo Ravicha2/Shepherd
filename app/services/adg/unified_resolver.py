@@ -300,6 +300,11 @@ object. An edge without a `scope` key is treated as `runtime`.
     pattern, OR any external package name, including packages NOT imported by the
     codebase (e.g., `rest_framework`, `mysql`). The linter checks for absence, so
     naming an absent package is a valid prohibition.
+  - `requires_object_scope`: object is the project's authorisation mechanism as a
+    module or package FQN — the module that defines the scoping check. Name the
+    module, not a bare decorator, function, or method: the object must resolve in
+    the graph as a module or package node. Object values that match no graph node
+    are dropped with the edge.
 
 Example: ADR requires Elasticsearch for fulltext search.
   subject: openlobby.core.*  (internal, from module list)
@@ -323,6 +328,20 @@ External packages imported by the codebase. Use these as the `requires_*` object
 - requires_dependency: subject must depend on (import) object
 - prohibits_implementation: subject must not implement (inherit from, subclass) or call object
 - requires_implementation: subject must implement (inherit from, subclass) or call object
+- requires_object_scope: subject must, for every object it loads from an incoming
+  request, establish that this requester may act on that specific object through
+  object — the project's authorisation mechanism.
+
+## Object scope versus presence
+
+The two `requires_*` shapes answer different questions. `requires_dependency`
+asks only whether the mechanism is present; `requires_object_scope` asks whether
+the mechanism, once present, decides the loaded object's access for this
+requester. When the decision mandates object-level authorisation, emit
+`requires_object_scope` **instead of** `requires_dependency` for that clause —
+never both, because the object-scope rule already fails a handler that applies
+no check at all. Use `requires_dependency` when the decision requires the
+component to be used and says nothing about what the component must decide.
 
 ## Wildcard
 
@@ -383,7 +402,7 @@ itself. If the ADR only describes a representation choice, emit no edge.
 Respond with a JSON array of constraint objects. Each object has:
 - subject: FQN pattern
 - object: FQN pattern
-- predicate: one of the four predicate types above
+- predicate: one of the five predicate types above
 - scope: one of "runtime" | "tooling" | "none" (see "Scope verdict")
 - justification: short explanation citing the ADR text
 - adr_id: "{adr_id}"

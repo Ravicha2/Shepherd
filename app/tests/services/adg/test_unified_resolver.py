@@ -26,6 +26,7 @@ from services.adg.unified_resolver import (
     _is_internal,
     _parse_edges,
     _root_segments,
+    _SYSTEM_PROMPT_TEMPLATE,
     _validate_edge,
     resolve_adr_constraints,
     ResolutionTrace,
@@ -520,6 +521,22 @@ class TestParseEdges:
 
     def test_empty_array(self) -> None:
         assert _parse_edges("[]", "ADR-001", "docs/adr/001.md") == []
+
+    def test_prompt_carries_object_scope_with_no_corpus_vocabulary(self) -> None:
+        """A6 (#248): the predicate section is role/boundary language only.
+
+        The lowering prompt must not carry the dev corpus's repo, case, route
+        or advisory names — otherwise the row set measures the benchmark, not
+        the pipeline (#240 anti-overfit rule).
+        """
+        prompt = _SYSTEM_PROMPT_TEMPLATE.lower()
+        assert "requires_object_scope" in prompt
+        assert "instead of" in prompt  # replacement, not side-by-side
+        corpus = (
+            "askbot", "langflow", "open-webui", "pretix", "tandoor", "weblate",
+            "ghsa", "bac-bench", "cwe-639", "owasp",
+        )
+        assert [name for name in corpus if name in prompt] == []
 
     def test_requires_object_scope_round_trips(self) -> None:
         """A6: the new predicate parses additively through the same seam."""
