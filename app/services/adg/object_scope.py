@@ -406,15 +406,15 @@ def _is_fetch_chain(node: ast.Call) -> bool:
 class _ChainFacts:
     """What one part of a fetch chain says about the object-scope verdict.
 
-    `object` is an object-identifier selection, `tied` says that selection
-    names a route object parameter, `requester` says the requester appears at
-    all, and `scope` says a requester filter binds an ownership field on the
-    conjunction path. Folding keeps AND/OR/negation structure instead of
-    treating the chain's arguments as an unordered bag.
+    `object` is an object-identifier selection, `covers` says which route
+    object parameters that selection names, `requester` says the requester
+    appears at all, and `scope` says a requester filter binds an ownership
+    field on the conjunction path. Folding keeps AND/OR/negation structure
+    instead of treating the chain's arguments as an unordered bag.
     """
 
     object: bool = False
-    tied: bool = False
+    covers: frozenset[str] = frozenset()
     requester: bool = False
     scope: bool = False
 
@@ -440,33 +440,46 @@ def _bound_field(parts: list[str]) -> str:
     return trimmed[-1]
 
 
-def _references(node: ast.AST, tokens: set[str]) -> bool:
-    """The expression names a route param itself, not a segment of a name.
+def _referenced_params(node: ast.AST,
+                       sources: dict[str, frozenset[str]]) -> frozenset[str]:
+    """The route object parameters *node* names, expanding local aliases.
 
     `item_id`, `kwargs['item_id']`, `int(item_id)` and `oid` (an alias) refer
     to the parameter; `other.id` does not, even when a parameter is called
     `id`. String constants count so `kwargs.get('item_id')` is seen too.
     """
     if isinstance(node, ast.Name):
-        return node.id in tokens
+        return sources.get(node.id, frozenset())
     if isinstance(node, ast.Constant):
-        return node.value in tokens
+        if isinstance(node.value, str):
+            return sources.get(node.value, frozenset())
+        return frozenset()
     if isinstance(node, ast.Attribute):
-        return _dotted(node) in tokens or _references(node.value, tokens)
+        name = _dotted(node)
+        if name in sources:
+            return sources[name]
+        return _referenced_params(node.value, sources)
     if isinstance(node, ast.Subscript):
-        return _references(node.slice, tokens) or _references(node.value, tokens)
+        return (_referenced_params(node.slice, sources)
+                | _referenced_params(node.value, sources))
     if isinstance(node, (ast.List, ast.Tuple)):
-        return any(_references(element, tokens) for element in node.elts)
-    return any(_references(child, tokens) for child in ast.iter_child_nodes(node))
+        found = frozenset()
+        for element in node.elts:
+            found |= _referenced_params(element, sources)
+        return found
+    found = frozenset()
+    for child in ast.iter_child_nodes(node):
+        found |= _referenced_params(child, sources)
+    return found
 
 
-def _param_aliases(func: ast.AST, params: set[str]) -> set[str]:
-    """Local names that carry a route object parameter (`oid = int(item_id)`)."""
-    aliases: set[str] = set()
+def _param_sources(func: ast.AST,
+                   params: set[str]) -> dict[str, frozenset[str]]:
+    """Each local name's route object parameters (`oid = int(item_id)`)."""
+    sources = {param: frozenset({param}) for param in params}
     # Two hops covers the usual `raw = kwargs['id']; oid = int(raw)`. A longer
     # chain fails safe: the chain does not tie and the handler fires.
     for _ in range(2):
-        known = params | aliases
         for node in ast.walk(func):
             if isinstance(node, ast.Assign):
                 targets, value = node.targets, node.value
@@ -474,10 +487,11 @@ def _param_aliases(func: ast.AST, params: set[str]) -> set[str]:
                 targets, value = (node.target,), node.value
             else:
                 continue
-            if (len(targets) == 1 and isinstance(targets[0], ast.Name)
-                    and _references(value, known)):
-                aliases.add(targets[0].id)
-    return aliases
+            if len(targets) == 1 and isinstance(targets[0], ast.Name):
+                found = _referenced_params(value, sources)
+                if found:
+                    sources[targets[0].id] = found
+    return sources
 
 
 def _is_requester_identity(node: ast.AST) -> bool:
@@ -487,7 +501,8 @@ def _is_requester_identity(node: ast.AST) -> bool:
     return bool(_REQUESTER_IDENTITY.match(_text(node)))
 
 
-def _keyword_facts(keyword: ast.keyword, tokens: set[str]) -> _ChainFacts:
+def _keyword_facts(keyword: ast.keyword,
+                   sources: dict[str, frozenset[str]]) -> _ChainFacts:
     if not keyword.arg:
         return _ChainFacts()
     parts = keyword.arg.split("__")
@@ -496,7 +511,7 @@ def _keyword_facts(keyword: ast.keyword, tokens: set[str]) -> _ChainFacts:
     selected = bool(_OBJECT_PARAM.match(parts[0])) and not mentions_requester
     return _ChainFacts(
         object=selected,
-        tied=selected and _references(value, tokens),
+        covers=_referenced_params(value, sources) if selected else frozenset(),
         requester=mentions_requester,
         scope=(_is_requester_identity(value)
                and bool(_OWNERSHIP_FIELD.match(_bound_field(parts)))),
@@ -506,48 +521,50 @@ def _keyword_facts(keyword: ast.keyword, tokens: set[str]) -> _ChainFacts:
 def _and_facts(facts: Iterable[_ChainFacts]) -> _ChainFacts:
     out = _ChainFacts()
     for fact in facts:
-        out = _ChainFacts(out.object or fact.object, out.tied or fact.tied,
+        out = _ChainFacts(out.object or fact.object, out.covers | fact.covers,
                           out.requester or fact.requester, out.scope or fact.scope)
     return out
 
 
-def _predicate_facts(node: ast.AST, tokens: set[str]) -> _ChainFacts:
+def _predicate_facts(node: ast.AST,
+                     sources: dict[str, frozenset[str]]) -> _ChainFacts:
     """A filter argument read with Django's AND/OR/negation structure."""
     if isinstance(node, ast.keyword):
-        return _keyword_facts(node, tokens)
+        return _keyword_facts(node, sources)
     if isinstance(node, ast.Call):
         name = _dotted(node.func) or ""
         if name == "Q" or name.endswith(".Q"):
             return _and_facts(
-                _predicate_facts(child, tokens)
+                _predicate_facts(child, sources)
                 for child in (*node.args, *node.keywords))
         # A queryset passed inline (`get_object_or_404(Model.objects.filter(
         # ...), pk=...)`) carries the requester filter in its own arguments.
         if _is_fetch_chain(node):
             return _and_facts(
-                _predicate_facts(child, tokens)
+                _predicate_facts(child, sources)
                 for child in (*node.args, *node.keywords))
     elif isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitAnd):
-        return _and_facts((_predicate_facts(node.left, tokens),
-                           _predicate_facts(node.right, tokens)))
+        return _and_facts((_predicate_facts(node.left, sources),
+                           _predicate_facts(node.right, sources)))
     elif isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
-        left = _predicate_facts(node.left, tokens)
-        right = _predicate_facts(node.right, tokens)
+        left = _predicate_facts(node.left, sources)
+        right = _predicate_facts(node.right, sources)
         merged = _and_facts((left, right))
         # An OR branch that selects by object id bypasses the ownership
         # branch: the object is reachable without the requester filter.
         if merged.object and merged.requester:
-            merged = _ChainFacts(merged.object, merged.tied,
+            merged = _ChainFacts(merged.object, merged.covers,
                                  merged.requester, False)
         return merged
     elif isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.Invert):
-        inner = _predicate_facts(node.operand, tokens)
-        return _ChainFacts(False, False, inner.requester, False)
+        inner = _predicate_facts(node.operand, sources)
+        return _ChainFacts(False, frozenset(), inner.requester, False)
     return _ChainFacts()
 
 
 def _chain_guard(func: ast.AST, node: ast.Call, origin: str,
-                 params: set[str], aliases: set[str]) -> Guard | None:
+                 params: set[str],
+                 sources: dict[str, frozenset[str]]) -> Guard | None:
     """A fetch chain judged as one guard: object id + requester filter (#253).
 
     The chain is the unit a developer writes and reads. Its links are split
@@ -559,17 +576,16 @@ def _chain_guard(func: ast.AST, node: ast.Call, origin: str,
     and `~Q(...)` negate, and an OR with the object identifier lets that branch
     bypass the requester, so neither scopes (#263 review).
     """
-    tokens = params | aliases
     facts = _ChainFacts()
     for call in _fetch_calls(node):
         inner = _and_facts(
-            _predicate_facts(arg, tokens)
+            _predicate_facts(arg, sources)
             for arg in (*call.args, *call.keywords))
         if _call_attr(call) == "exclude":
             # Excluded conditions hold everywhere except the excluded set, so
             # they never scope. The chain still touches the object it names:
             # `filter(owner=request.user).exclude(pk=item_id)` scopes.
-            inner = _ChainFacts(inner.object, inner.tied, inner.requester, False)
+            inner = _ChainFacts(inner.object, inner.covers, inner.requester, False)
         facts = _and_facts((facts, inner))
     if not (facts.object and facts.requester):
         return None
@@ -577,20 +593,25 @@ def _chain_guard(func: ast.AST, node: ast.Call, origin: str,
     # A chain scopes the handler's own object. With route object parameters
     # present the identifier must name one; without them there is nothing to
     # tie the chain to (#263 review).
-    tied = facts.tied or not params
+    tied = bool(facts.covers) or not params
+    scopes = facts.scope and tied and not conditional
     return Guard(
         symbol=origin,
         predicate=_text(node),
-        scopes_object=facts.scope and tied and not conditional,
+        scopes_object=scopes,
         conditional=conditional,
+        # Only a scoping chain covers; empty covers every parameter, which is
+        # the right reading when the handler has no route object parameters.
+        covers=tuple(sorted(facts.covers)) if scopes else (),
     )
 
 
 def _chain_guards(func: ast.AST, chain_mid: set[int], origin: str,
-                  params: set[str], aliases: set[str]) -> dict[int, Guard | None]:
+                  params: set[str],
+                  sources: dict[str, frozenset[str]]) -> dict[int, Guard | None]:
     """The outermost fetch chains of *func*, judged as units."""
     return {
-        id(node): _chain_guard(func, node, origin, params, aliases)
+        id(node): _chain_guard(func, node, origin, params, sources)
         for node in ast.walk(func)
         if isinstance(node, ast.Call) and id(node) not in chain_mid
         and _is_fetch_chain(node)
@@ -615,7 +636,7 @@ def _guards_in(func: ast.AST, origin: str, tokens: set[str], params: set[str],
                  and isinstance(parents.get(node), ast.Attribute)
                  and parents[node].value is node}
     chain_guards = _chain_guards(
-        func, chain_mid, origin, params, _param_aliases(func, params))
+        func, chain_mid, origin, params, _param_sources(func, params))
     parts = _chain_parts(func, chain_guards)
     guards: list[Guard] = []
     for node in ast.walk(func):

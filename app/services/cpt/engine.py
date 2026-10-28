@@ -441,6 +441,9 @@ def check_object_scope_predicates(
     Reads the handler node's guard facts directly — no BFS, no adjacency. The
     subject wildcard also matches modules and non-route functions; handlers with
     no object parameters never fire, so the filter is the object-fact check.
+    Every route object parameter must be covered: a guard that scopes one
+    loaded object does not clear a handler that loads two. An empty `covers`
+    means the guard covers every parameter (guards stored before the field).
     """
     violations: list[Violation] = []
     for matched_constraint in matched_constraints.values():
@@ -451,7 +454,11 @@ def check_object_scope_predicates(
             node = node_of.get(str(subject_fqn))
             if node is None or not node.object_parameters:
                 continue
-            if any(guard.scopes_object for guard in node.guards):
+            required = set(node.object_parameters)
+            scoping = [guard for guard in node.guards if guard.scopes_object]
+            if all(any(not guard.covers or param in guard.covers
+                       for guard in scoping)
+                   for param in required):
                 continue
             params = ", ".join(node.object_parameters)
             violations.append(Violation(

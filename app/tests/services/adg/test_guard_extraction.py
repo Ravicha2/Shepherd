@@ -160,6 +160,7 @@ def _single_guard(source: str, handler: str,
             symbol="detail",
             predicate="get_object_or_404(StaffSession, pk=self.kwargs['id'], user=self.request.user)",
             scopes_object=True,
+            covers=("id",),
         ),
         id="kwarg-subscript-ties-to-route-param",
     ),
@@ -174,6 +175,7 @@ def _single_guard(source: str, handler: str,
             symbol="detail",
             predicate="Item.objects.filter(pk=oid, owner=request.user).first()",
             scopes_object=True,
+            covers=("item_id",),
         ),
         id="local-alias-ties-to-route-param",
     ),
@@ -187,6 +189,7 @@ def _single_guard(source: str, handler: str,
             symbol="detail",
             predicate="get_object_or_404(Item.objects.filter(owner=request.user), pk=item_id)",
             scopes_object=True,
+            covers=("item_id",),
         ),
         id="inline-queryset-carries-the-requester-filter",
     ),
@@ -200,6 +203,7 @@ def _single_guard(source: str, handler: str,
             symbol="detail",
             predicate="Item.objects.filter(owner=request.user).exclude(pk=item_id).first()",
             scopes_object=True,
+            covers=("item_id",),
         ),
         id="exclude-narrowing-a-scoped-queryset-still-scopes",
     ),
@@ -248,6 +252,19 @@ def test_an_unrelated_ownership_fetch_does_not_clear_the_handler() -> None:
 
     assert guards
     assert not any(guard.scopes_object for guard in guards)
+
+
+def test_a_chain_guard_names_the_route_parameters_it_covers() -> None:
+    guards = extract_guards(
+        dedent(
+            """
+            def detail(request, item_id, owner_id):
+                return Item.objects.filter(pk=item_id, owner=request.user).first()
+            """
+        ),
+        "detail", ("item_id", "owner_id"))
+
+    assert [guard.covers for guard in guards if guard.scopes_object] == [("item_id",)]
 
 
 def test_django_re_path_named_group_yields_the_parameter_name() -> None:
