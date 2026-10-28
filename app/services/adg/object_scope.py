@@ -4,7 +4,8 @@ and the guards it applies.
 Framework idioms only — no case, repo, route or advisory names. Guard
 extraction is the deterministic extraction core of the POC-A pre-gate, ported
 file-scoped: a handler's decorators and callees are resolved within its own
-module.
+module. A fetch chain is judged as one unit, and a requester filter scopes
+only on an ownership field, never a tenant field (#253).
 """
 
 from __future__ import annotations
@@ -51,6 +52,22 @@ _COARSE_AUTH = re.compile(
 )
 _TYPED_PARAM = re.compile(r"(?i)\b(?:int|UUID|PositiveInt)\b")
 _INT_ATTR = re.compile(r"(?i)\.(?:id|pk|[a-z][a-z0-9_]*_id)$")
+# The fetch-chain shape `_assigned_objects` matches (kept in one place).
+_FETCH_CALL = re.compile(
+    r"(?i)(?:get_object_or_404|get_object|\.get$|\.first$|_by_id$|"
+    r"\.filter|\.objects$|^select$)")
+
+# Ownership versus tenancy (#253). A requester filter scopes only when it
+# touches a user-identity field. A tenant field passes every member of the
+# tenant, which is exactly the class-(ii) shape: the guard is present and
+# wrong. Generic BOLA/CWE-639 idiom only -- no case, repo, route or advisory
+# name appears here (#240).
+_OWNERSHIP_FIELD = re.compile(
+    r"(?i)^(?:user|user_id|created_by|created_by_id|owner|owner_id|"
+    r"shared|shared_with)$")
+_TENANT_FIELD = re.compile(
+    r"(?i)^(?:space|space_id|tenant|tenant_id|org|org_id|workspace|"
+    r"workspace_id|account|account_id)$")
 
 
 def _object_path_params(raw_paths: Iterable[str]):
@@ -130,8 +147,7 @@ def _assigned_objects(func: ast.AST) -> dict[str, ast.AST]:
         if not isinstance(value, ast.Call):
             continue
         name = _dotted(value.func) or ""
-        if re.search(r"(?i)(?:get_object_or_404|get_object|\.get$|\.first$|_by_id$|"
-                     r"\.filter|\.objects$|^select$)", name):
+        if _FETCH_CALL.search(name):
             for target in targets:
                 if isinstance(target, ast.Name):
                     out[target.id] = value
@@ -352,6 +368,87 @@ def _call_guard(func: ast.AST, node: ast.Call, tokens: set[str]) -> Guard | None
     return None
 
 
+def _fetch_calls(node: ast.AST) -> list[ast.Call]:
+    """The calls along a call chain's spine, outermost first."""
+    calls: list[ast.Call] = []
+    cur = node
+    while True:
+        if isinstance(cur, ast.Call):
+            calls.append(cur)
+            cur = cur.func
+        elif isinstance(cur, ast.Attribute):
+            cur = cur.value
+        else:
+            return calls
+
+
+def _is_fetch_chain(node: ast.Call) -> bool:
+    """The chain is rooted in a DB fetch, so it is guarded as one unit."""
+    return any(_FETCH_CALL.search(_dotted(call.func) or "")
+               for call in _fetch_calls(node))
+
+
+def _chain_guard(func: ast.AST, node: ast.Call, origin: str) -> Guard | None:
+    """A fetch chain judged as one guard: object id + requester filter (#253).
+
+    The chain is the unit a developer writes and reads. Its links are split
+    across `filter(...)` / `values_list(...)` / `Q(...)` calls, so judging a
+    sub-expression alone loses the pairing: a requester filter in one clause
+    and an object identifier in another. A requester filter scopes only when
+    it binds an ownership field; binding a tenant field passes every member of
+    the tenant and is the class-(ii) shape this slice targets.
+    """
+    selects_object = False
+    fields: set[str] = set()
+    for call in ast.walk(node):
+        if not isinstance(call, ast.Call):
+            continue
+        for keyword in call.keywords:
+            if not keyword.arg:
+                continue
+            # `field__lookup` / `relation__field`: the identifier is the head,
+            # an ownership/tenant binding can be any segment before the lookup
+            # operator (which never names a column).
+            parts = keyword.arg.split("__")
+            value = _text(keyword.value)
+            if _OBJECT_PARAM.match(parts[0]) and not _REQUESTER.search(value):
+                selects_object = True
+            elif _REQUESTER.search(value):
+                fields.update(
+                    part for part in parts
+                    if _OWNERSHIP_FIELD.match(part) or _TENANT_FIELD.match(part))
+    if not (selects_object and fields):
+        return None
+    conditional = _conditional_guard(func, node)
+    return Guard(
+        symbol=origin,
+        predicate=_text(node),
+        scopes_object=(any(_OWNERSHIP_FIELD.match(field) for field in fields)
+                       and not conditional),
+        conditional=conditional,
+    )
+
+
+def _chain_guards(func: ast.AST, chain_mid: set[int],
+                  origin: str) -> dict[int, Guard | None]:
+    """The outermost fetch chains of *func*, judged as units."""
+    return {
+        id(node): _chain_guard(func, node, origin)
+        for node in ast.walk(func)
+        if isinstance(node, ast.Call) and id(node) not in chain_mid
+        and _is_fetch_chain(node)
+    }
+
+
+def _chain_parts(func: ast.AST, chain_guards: dict[int, Guard | None]) -> set[int]:
+    """Comparisons inside a judged fetch chain are its parts, not its guard."""
+    return {
+        id(inner) for node in ast.walk(func)
+        if isinstance(node, ast.Call) and chain_guards.get(id(node))
+        for inner in ast.walk(node) if isinstance(inner, ast.Compare)
+    }
+
+
 def _guards_in(func: ast.AST, origin: str, tokens: set[str], params: set[str],
                converted: set[str], typed: set[str]) -> list[Guard]:
     parents = _parents(func)
@@ -360,12 +457,16 @@ def _guards_in(func: ast.AST, origin: str, tokens: set[str], params: set[str],
                  if isinstance(node, ast.Call)
                  and isinstance(parents.get(node), ast.Attribute)
                  and parents[node].value is node}
+    chain_guards = _chain_guards(func, chain_mid, origin)
+    parts = _chain_parts(func, chain_guards)
     guards: list[Guard] = []
     for node in ast.walk(func):
         if isinstance(node, ast.Compare):
+            if id(node) in parts:
+                continue
             guard = _comparison_guard(func, node, origin, tokens, params, converted, typed)
         elif isinstance(node, ast.Call) and id(node) not in chain_mid:
-            guard = _call_guard(func, node, tokens)
+            guard = chain_guards.get(id(node)) or _call_guard(func, node, tokens)
         else:
             continue
         if guard is not None:
