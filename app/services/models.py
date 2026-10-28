@@ -51,6 +51,9 @@ class FQNNode:
     # Content only — no name, no path — so a rename keeps it and an edit
     # changes it (#186: dismissal identity's code-state component).
     code_hash: str = ""
+    # Object parameter names this handler loads from its routes (#245). Empty
+    # for non-handlers; populated by the ingestion back-fill pass.
+    object_parameters: tuple[str, ...] = ()
 
     @classmethod
     def external(cls, fqn: str, role: DependencyRole = DependencyRole.UNKNOWN) -> FQNNode:

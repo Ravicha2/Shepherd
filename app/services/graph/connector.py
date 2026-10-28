@@ -78,6 +78,7 @@ class GraphStore:
             end_byte=props.get("end_byte", 0),
             code_hash=props.get("code_hash", ""),
             role=role,
+            object_parameters=tuple(props.get("object_parameters") or ()),
         )
 
     def create_schema(self) -> None:
@@ -107,13 +108,15 @@ class GraphStore:
                 "n.kind = $kind, n.file_path = $file_path, "
                 "n.line_start = $line_start, n.line_end = $line_end, "
                 "n.start_byte = $start_byte, n.end_byte = $end_byte, "
-                "n.role = $role, n.code_hash = $code_hash",
+                "n.role = $role, n.code_hash = $code_hash, "
+                "n.object_parameters = $object_parameters",
                 fqn=str(node.fqn), kind=node.kind.value,
                 file_path=node.file_path,
                 line_start=node.line_start, line_end=node.line_end,
                 start_byte=node.start_byte, end_byte=node.end_byte,
                 role=node.role.value,
                 code_hash=node.code_hash,
+                object_parameters=list(node.object_parameters),
             )
 
     # --- Edge CRUD ---
