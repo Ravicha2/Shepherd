@@ -652,6 +652,54 @@ def _external_packages(adg: ADG) -> set[str]:
     }
 
 
+@dataclass(frozen=True)
+class ObjectGrounding:
+    """How an emitted object FQN relates to the graph at this revision (#256).
+
+    `exact` and `unique_suffix` are grounded to a real node; `prefix` is an
+    internal namespace that contains nodes; `external` is a genuine third-party
+    package (its own label, never an orphan); only `unknown` is ungrounded.
+    """
+
+    label: str  # exact | unique_suffix | prefix | external | unknown
+    resolved_fqn: str | None = None
+    package: str | None = None
+
+    @property
+    def grounded(self) -> bool:
+        return self.label in ("exact", "unique_suffix", "prefix")
+
+    def as_dict(self) -> dict[str, str | None]:
+        return {
+            "label": self.label,
+            "resolved_fqn": self.resolved_fqn,
+            "package": self.package,
+        }
+
+
+def ground_object(fqn_pattern: str, adg: ADG) -> ObjectGrounding:
+    """Classify an emitted object FQN against the graph.
+
+    A wildcard base is compared as its base. Unique-suffix resolution is the
+    honest grounding for an object emitted without the repo's source root
+    (langflow's `langflow.services.auth.service` lives under
+    `src.backend.base...`). Ties are `unknown`: grounding on a coin-flip is
+    worse than reporting the row ungrounded.
+    """
+    base = fqn_pattern.rstrip(".*")
+    if base in adg.node_of:
+        return ObjectGrounding("exact", resolved_fqn=base)
+    resolved = adg.name_resolver.resolve_unique(base)
+    if resolved is not None:
+        return ObjectGrounding("unique_suffix", resolved_fqn=str(resolved))
+    if any(str(fqn).startswith(base + ".") for fqn in adg.fqns):
+        return ObjectGrounding("prefix")
+    first = base.split(".")[0]
+    if first in _external_packages(adg):
+        return ObjectGrounding("external", package=first)
+    return ObjectGrounding("unknown")
+
+
 def _validate_edge(edge: ConstraintEdge, adg: ADG) -> bool:
     """Return True if edge passes root-namespace-aware validation.
 
@@ -678,12 +726,10 @@ def _validate_edge(edge: ConstraintEdge, adg: ADG) -> bool:
 
     # Object: only validate if it looks internal (first segment in roots).
     # External objects pass for both requires_* (transitive deps) and prohibits_* (absent pkgs).
+    # Grounding accepts an exact node, a unique suffix, or an internal prefix
+    # (#256): an object emitted without the repo root is not a hallucination.
     obj_first = edge.object.split(".")[0].rstrip(".*")
-    if obj_first in roots:
-        obj_base = edge.object.rstrip(".*")
-        if not (obj_base in all_fqns or any(f.startswith(obj_base + ".") for f in all_fqns)):
-            return False
-    return True
+    return not (obj_first in roots and not ground_object(edge.object, adg).grounded)
 
 
 def _log_trace(
@@ -756,7 +802,13 @@ def _process_response_edges(
         dropped = [e for e in edges if e not in valid_edges]
         log.warning("unified_resolver: dropped %d edges with nonexistent FQNs for %s", len(dropped), adr_id)
     trace.pre_validation_edges = [
-        {"subject": e.subject, "object": e.object, "predicate": e.predicate.value, "valid": e in valid_edges}
+        {
+            "subject": e.subject,
+            "object": e.object,
+            "predicate": e.predicate.value,
+            "valid": e in valid_edges,
+            "object_grounding": ground_object(e.object, adg).as_dict(),
+        }
         for e in edges
     ]
     trace.none_verdict_edges = none_verdict_edges

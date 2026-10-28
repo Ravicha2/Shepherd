@@ -8,6 +8,7 @@ from functools import cached_property
 from types import MappingProxyType
 
 from services.fqn import FQN
+from services.resolver import NameResolver
 
 
 class FQNKind(Enum):
@@ -192,6 +193,16 @@ class ADG:
         """fqn -> node. Last wins on a duplicate FQN, exactly as the dict
         comprehension it replaces did."""
         return MappingProxyType({str(node.fqn): node for node in self.nodes})
+
+    @cached_property
+    def name_resolver(self) -> NameResolver:
+        """Suffix index over every node FQN, built once per graph (#256).
+
+        Object grounding resolves an emitted dotted name to the one real node
+        that ends with it. Built lazily: only the lowering path needs it, and
+        the index costs O(nodes x depth) to construct.
+        """
+        return NameResolver(set(self.fqns))
 
     @cached_property
     def role_of(self) -> Mapping[str, DependencyRole]:

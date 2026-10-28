@@ -28,6 +28,7 @@ from services.adg.unified_resolver import (
     _root_segments,
     _SYSTEM_PROMPT_TEMPLATE,
     _validate_edge,
+    ground_object,
     resolve_adr_constraints,
     ResolutionTrace,
     TOOL_CALL_CAP,
@@ -1301,3 +1302,114 @@ class TestHallucinationFiltering:
         assert len(edges) == 1
         assert edges[0].subject == "app.api.*"
         assert edges[0].object == "app.db.*"
+
+
+# -- Test: object grounding (#256) -------------------------------------------
+
+class TestObjectGrounding:
+    """How an emitted object FQN relates to the graph at this revision.
+
+    unique suffix is the honest grounding for an object emitted without the
+    repo's source root; a genuine third-party package is `external`, not an
+    orphan; only `unknown` is ungrounded.
+    """
+
+    def test_exact_node_is_grounded(self, sample_adg: ADG) -> None:
+        grounding = ground_object("app.auth.middleware", sample_adg)
+        assert grounding.label == "exact"
+        assert grounding.resolved_fqn == "app.auth.middleware"
+        assert grounding.grounded is True
+
+    def test_wildcard_base_is_classified_by_its_base(self, sample_adg: ADG) -> None:
+        assert ground_object("app.db.*", sample_adg).label == "exact"
+
+    def test_unique_suffix_resolves_to_the_full_fqn(self, sample_adg: ADG) -> None:
+        # The langflow shape (#249): emitted without the repo root.
+        grounding = ground_object("auth.middleware", sample_adg)
+        assert grounding.label == "unique_suffix"
+        assert grounding.resolved_fqn == "app.auth.middleware"
+        assert grounding.grounded is True
+
+    def test_ambiguous_suffix_is_not_grounded(self) -> None:
+        adg = ADG(
+            nodes=[
+                FQNNode(fqn=FQN.from_dotted("one.api.users"), kind=FQNKind.MODULE,
+                        file_path="one/api/users.py", line_start=0, line_end=0,
+                        start_byte=0, end_byte=0),
+                FQNNode(fqn=FQN.from_dotted("two.api.users"), kind=FQNKind.MODULE,
+                        file_path="two/api/users.py", line_start=0, line_end=0,
+                        start_byte=0, end_byte=0),
+            ],
+            edges=[],
+        )
+        grounding = ground_object("api.users", adg)
+        assert grounding.label == "unknown"
+        assert grounding.resolved_fqn is None
+        assert grounding.grounded is False
+
+    def test_internal_prefix_is_grounded(self) -> None:
+        adg = ADG(
+            nodes=[
+                FQNNode(fqn=FQN.from_dotted("app.repository.RepositoryBase"),
+                        kind=FQNKind.CLASS, file_path="app/repository/base.py",
+                        line_start=0, line_end=0, start_byte=0, end_byte=0),
+            ],
+            edges=[],
+        )
+        grounding = ground_object("app.repository", adg)
+        assert grounding.label == "prefix"
+        assert grounding.grounded is True
+
+    def test_external_package_is_its_own_label(self) -> None:
+        adg = ADG(
+            nodes=[
+                FQNNode(fqn=FQN.from_dotted("app"), kind=FQNKind.MODULE,
+                        file_path="app/__init__.py", line_start=0, line_end=0,
+                        start_byte=0, end_byte=0),
+            ],
+            edges=[Edge(source="app", target="rest_framework.permissions",
+                        kind="IMPORTS")],
+        )
+        grounding = ground_object("rest_framework.permissions", adg)
+        assert grounding.label == "external"
+        assert grounding.package == "rest_framework"
+        assert grounding.resolved_fqn is None
+        assert grounding.grounded is False
+
+    def test_unknown_object_is_not_grounded(self, sample_adg: ADG) -> None:
+        grounding = ground_object("missing.module.Thing", sample_adg)
+        assert grounding.label == "unknown"
+        assert grounding.grounded is False
+
+    def test_trace_records_the_resolved_fqn(self, sample_adg: ADG, tmp_path) -> None:
+        """The resolved FQN is auditable, not just the emitted string (#256)."""
+        content = json.dumps([{
+            "subject": "app.api.*",
+            "object": "auth.middleware",
+            "predicate": "prohibits_dependency",
+            "justification": "object emitted without the repo root",
+            "adr_id": "ADR-001",
+            "adr_path": "docs/adr/001.md",
+        }])
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value = _make_mock_response(content=content)
+
+        with patch("services.adg.unified_resolver.OpenAI", return_value=mock_client), \
+             patch.dict("os.environ", {
+                 "TEST_API_KEY": "test-key",
+                 "RESOLVER_TRACE_DIR": str(tmp_path),
+             }):
+            resolve_adr_constraints(
+                ADR_PROHIBIT_DEP, "ADR-001", "docs/adr/001.md", sample_adg,
+                _make_config(), _stub_backend,
+            )
+
+        record = json.loads(
+            (tmp_path / "resolver_traces.jsonl").read_text().splitlines()[-1]
+        )
+        (entry,) = record["pre_validation_edges"]
+        assert entry["object_grounding"] == {
+            "label": "unique_suffix",
+            "resolved_fqn": "app.auth.middleware",
+            "package": None,
+        }
