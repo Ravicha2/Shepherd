@@ -280,13 +280,16 @@ def test_back_fill_populates_object_parameters_and_guards(tmp_path: Path) -> Non
     assert adg.node_of["app.views.get_user"].guards == ()
 
 
-def _guards_at(repo: str, sha: str, handler_fqn: str) -> tuple[Guard, ...]:
+def _filled_at(repo: str, sha: str):
     root = SECURITY_REPOS / repo
     if not root.exists():
         pytest.skip(f"{root} is not present")
     with repo_at_sha(root, sha) as tree:
-        filled = backfill_handler_facts(parse_repo(tree), tree)
-    return filled.node_of[handler_fqn].guards
+        return backfill_handler_facts(parse_repo(tree), tree)
+
+
+def _guards_at(repo: str, sha: str, handler_fqn: str) -> tuple[Guard, ...]:
+    return _filled_at(repo, sha).node_of[handler_fqn].guards
 
 
 class TestPinnedGuardFixtures:
@@ -319,6 +322,20 @@ class TestPinnedGuardFixtures:
         assert not any(guard.scopes_object for guard in vulnerable)
         assert any(guard.symbol == "o.allowed_for_session" and guard.scopes_object
                    for guard in fixed)
+
+    def test_pretix_inherited_handler_gets_facts_and_flips_across_the_fix(self) -> None:
+        vulnerable = _filled_at("pretix", "703be2ebb82c0d1cacb41fc76e55ba30561414d6")
+        mixin_fqn = "src.pretix.api.views.exporters.ExportersMixin.download"
+
+        node = vulnerable.node_of[mixin_fqn]
+        assert "cfid" in node.object_parameters
+        assert "src.pretix.api.views.exporters.EventExportersViewSet.download" \
+            not in vulnerable.node_of
+        assert not any(guard.scopes_object for guard in node.guards)
+
+        fixed = _filled_at("pretix", "4b5651862c57c6e384822d1d23292342126c479a")
+        assert any(guard.symbol == "cf.allowed_for_session" and guard.scopes_object
+                   for guard in fixed.node_of[mixin_fqn].guards)
 
     def test_weblate_object_identifier_route_flips_across_the_fix(self) -> None:
         vulnerable = _guards_at(

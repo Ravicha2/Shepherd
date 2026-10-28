@@ -104,6 +104,74 @@ class TestBackfill:
         assert adg.node_of["app.views.item"].object_parameters == ()
 
 
+class TestInheritedHandlerAttribution:
+    """A route naming an inherited method attributes its facts to the definer."""
+
+    def test_mixin_defined_handler_receives_the_route_facts(self, tmp_path: Path) -> None:
+        repo = _repo(tmp_path, {
+            "app/__init__.py": "",
+            "app/views.py": """
+                from django.urls import include, path
+                from rest_framework.decorators import action
+                from rest_framework.routers import DefaultRouter
+                from rest_framework.viewsets import ViewSet
+
+                class ExportersMixin:
+                    @action(detail=True, methods=["GET"], url_path="download/(?P<cfid>[^/]+)")
+                    def download(self, *args, **kwargs):
+                        cf = get_object_or_404(CachedFile, id=kwargs["cfid"])
+                        return cf
+
+                class ExportersViewSet(ExportersMixin, ViewSet):
+                    pass
+
+                router = DefaultRouter()
+                router.register("exporters", ExportersViewSet)
+                urlpatterns = [path("api/", include(router.urls))]
+            """,
+        })
+
+        adg = parse_repo(repo)
+        filled = backfill_handler_facts(adg, repo)
+
+        mixin = filled.node_of["app.views.ExportersMixin.download"]
+        assert mixin.object_parameters == ("pk", "cfid")
+        assert "app.views.ExportersViewSet.download" not in filled.node_of
+        assert len(filled.nodes) == len(adg.nodes)
+
+
+class TestKwargsObjectIds:
+    """Ids a fetch reads from kwargs/self.kwargs are object parameters."""
+
+    def test_kwargs_and_self_kwargs_keys_are_accepted(self, tmp_path: Path) -> None:
+        repo = _repo(tmp_path, {
+            "app/__init__.py": "",
+            "app/views.py": """
+                from django.urls import path
+                from flask import Blueprint
+
+                bp = Blueprint("views", __name__)
+
+                @bp.route("/files/download/")
+                def download():
+                    cf = get_object_or_404(CachedFile, id=kwargs["cfid"])
+                    return cf
+
+                class PreviewView(TemplateView):
+                    def get(self, request, **kwargs):
+                        o = get_object_or_404(CachedFile, id=self.kwargs["file_id"])
+                        return o
+
+                urlpatterns = [path("preview/", PreviewView.as_view())]
+            """,
+        })
+
+        filled = backfill_handler_facts(parse_repo(repo), repo)
+
+        assert filled.node_of["app.views.download"].object_parameters == ("cfid",)
+        assert filled.node_of["app.views.PreviewView"].object_parameters == ("file_id",)
+
+
 class TestPinnedDjangoFixture:
     """The URLconf join works on the real pinned Django fixture."""
 
