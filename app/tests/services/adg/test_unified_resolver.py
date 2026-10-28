@@ -538,6 +538,19 @@ class TestParseEdges:
         )
         assert [name for name in corpus if name in prompt] == []
 
+    def test_object_scope_subject_must_cover_the_api_surfaces(self) -> None:
+        """A6 (#255): the subject must cover the handlers the rule governs.
+
+        A row anchored on a namespace with no request handlers cannot fire at
+        any revision, so the prompt has to ask for the API surfaces (or the
+        repo root when they span subtrees), not a same-named neighbour.
+        """
+        prompt = _SYSTEM_PROMPT_TEMPLATE.lower()
+        assert "requires_object_scope` subject coverage" in prompt
+        assert "http api surfaces" in prompt
+        assert "repo-root subject" in prompt
+        assert "lowering miss" in prompt
+
     def test_requires_object_scope_round_trips(self) -> None:
         """A6: the new predicate parses additively through the same seam."""
         data = json.dumps([{
