@@ -14,7 +14,7 @@ import ast
 import re
 from collections import defaultdict
 from collections.abc import Iterable
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from services.adg.route_inventory import build_route_inventory
@@ -382,13 +382,110 @@ def _fetch_calls(node: ast.AST) -> list[ast.Call]:
             return calls
 
 
+def _call_attr(call: ast.Call) -> str:
+    """The method name a chained call applies (`filter`, `exclude`)."""
+    func = call.func
+    return func.attr if isinstance(func, ast.Attribute) else (_dotted(func) or "")
+
+
 def _is_fetch_chain(node: ast.Call) -> bool:
     """The chain is rooted in a DB fetch, so it is guarded as one unit."""
     return any(_FETCH_CALL.search(_dotted(call.func) or "")
                for call in _fetch_calls(node))
 
 
-def _chain_guard(func: ast.AST, node: ast.Call, origin: str) -> Guard | None:
+@dataclass(frozen=True)
+class _ChainFacts:
+    """What one part of a fetch chain says about the object-scope verdict.
+
+    `object` is an object-identifier selection, `tied` says that selection
+    names a route object parameter, `requester` says the requester appears at
+    all, and `scope` says a requester filter binds an ownership field on the
+    conjunction path. Folding keeps AND/OR/negation structure instead of
+    treating the chain's arguments as an unordered bag.
+    """
+
+    object: bool = False
+    tied: bool = False
+    requester: bool = False
+    scope: bool = False
+
+
+# Django lookup suffixes, which name an operator and never a column.
+_LOOKUP = re.compile(
+    r"(?i)^(?:exact|iexact|contains|icontains|in|gt|gte|lt|lte|startswith|"
+    r"istartswith|endswith|iendswith|range|date|year|iso_year|month|day|week|"
+    r"week_day|iso_week_day|quarter|time|hour|minute|second|isnull|regex|"
+    r"iregex|search|similar|trigram_similar)$")
+
+
+def _bound_field(parts: list[str]) -> str:
+    """The column a `relation__field__lookup` kwarg binds.
+
+    The head names the column on the fetched model (`id__in`), the tail names
+    it after relation hops (`user__tenant`). Trailing lookups are stripped so
+    `created_by__in` binds `created_by`, not `in`.
+    """
+    trimmed = list(parts)
+    while len(trimmed) > 1 and _LOOKUP.match(trimmed[-1]):
+        trimmed.pop()
+    return trimmed[-1]
+
+
+def _keyword_facts(keyword: ast.keyword, params: set[str]) -> _ChainFacts:
+    if not keyword.arg:
+        return _ChainFacts()
+    parts = keyword.arg.split("__")
+    value = keyword.value
+    requester = bool(_REQUESTER.search(_text(value)))
+    selected = bool(_OBJECT_PARAM.match(parts[0])) and not requester
+    return _ChainFacts(
+        object=selected,
+        tied=selected and _mentions(value, params),
+        requester=requester,
+        scope=requester and bool(_OWNERSHIP_FIELD.match(_bound_field(parts))),
+    )
+
+
+def _and_facts(facts: Iterable[_ChainFacts]) -> _ChainFacts:
+    out = _ChainFacts()
+    for fact in facts:
+        out = _ChainFacts(out.object or fact.object, out.tied or fact.tied,
+                          out.requester or fact.requester, out.scope or fact.scope)
+    return out
+
+
+def _predicate_facts(node: ast.AST, params: set[str]) -> _ChainFacts:
+    """A filter argument read with Django's AND/OR/negation structure."""
+    if isinstance(node, ast.keyword):
+        return _keyword_facts(node, params)
+    if isinstance(node, ast.Call):
+        name = _dotted(node.func) or ""
+        if name == "Q" or name.endswith(".Q"):
+            return _and_facts(
+                _predicate_facts(child, params)
+                for child in (*node.args, *node.keywords))
+    elif isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitAnd):
+        return _and_facts((_predicate_facts(node.left, params),
+                           _predicate_facts(node.right, params)))
+    elif isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
+        left = _predicate_facts(node.left, params)
+        right = _predicate_facts(node.right, params)
+        merged = _and_facts((left, right))
+        # An OR branch that selects by object id bypasses the ownership
+        # branch: the object is reachable without the requester filter.
+        if merged.object and merged.requester:
+            merged = _ChainFacts(merged.object, merged.tied,
+                                 merged.requester, False)
+        return merged
+    elif isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.Invert):
+        inner = _predicate_facts(node.operand, params)
+        return _ChainFacts(False, False, inner.requester, False)
+    return _ChainFacts()
+
+
+def _chain_guard(func: ast.AST, node: ast.Call, origin: str,
+                 params: set[str]) -> Guard | None:
     """A fetch chain judged as one guard: object id + requester filter (#253).
 
     The chain is the unit a developer writes and reads. Its links are split
@@ -396,44 +493,39 @@ def _chain_guard(func: ast.AST, node: ast.Call, origin: str) -> Guard | None:
     sub-expression alone loses the pairing: a requester filter in one clause
     and an object identifier in another. A requester filter scopes only when
     it binds an ownership field; binding a tenant field passes every member of
-    the tenant and is the class-(ii) shape this slice targets.
+    the tenant and is the class-(ii) shape this slice targets. `exclude(...)`
+    and `~Q(...)` negate, and an OR with the object identifier lets that branch
+    bypass the requester, so neither scopes (#263 review).
     """
-    selects_object = False
-    fields: set[str] = set()
-    for call in ast.walk(node):
-        if not isinstance(call, ast.Call):
-            continue
-        for keyword in call.keywords:
-            if not keyword.arg:
-                continue
-            # `field__lookup` / `relation__field`: the identifier is the head,
-            # an ownership/tenant binding can be any segment before the lookup
-            # operator (which never names a column).
-            parts = keyword.arg.split("__")
-            value = _text(keyword.value)
-            if _OBJECT_PARAM.match(parts[0]) and not _REQUESTER.search(value):
-                selects_object = True
-            elif _REQUESTER.search(value):
-                fields.update(
-                    part for part in parts
-                    if _OWNERSHIP_FIELD.match(part) or _TENANT_FIELD.match(part))
-    if not (selects_object and fields):
+    facts = _ChainFacts()
+    for call in _fetch_calls(node):
+        inner = _and_facts(
+            _predicate_facts(arg, params)
+            for arg in (*call.args, *call.keywords))
+        if _call_attr(call) == "exclude":
+            # Excluded conditions hold everywhere except the excluded set.
+            inner = _ChainFacts(False, False, inner.requester, False)
+        facts = _and_facts((facts, inner))
+    if not (facts.object and facts.requester):
         return None
     conditional = _conditional_guard(func, node)
+    # A chain scopes the handler's own object. With route object parameters
+    # present the identifier must name one; without them there is nothing to
+    # tie the chain to (#263 review).
+    tied = facts.tied or not params
     return Guard(
         symbol=origin,
         predicate=_text(node),
-        scopes_object=(any(_OWNERSHIP_FIELD.match(field) for field in fields)
-                       and not conditional),
+        scopes_object=facts.scope and tied and not conditional,
         conditional=conditional,
     )
 
 
-def _chain_guards(func: ast.AST, chain_mid: set[int],
-                  origin: str) -> dict[int, Guard | None]:
+def _chain_guards(func: ast.AST, chain_mid: set[int], origin: str,
+                  params: set[str]) -> dict[int, Guard | None]:
     """The outermost fetch chains of *func*, judged as units."""
     return {
-        id(node): _chain_guard(func, node, origin)
+        id(node): _chain_guard(func, node, origin, params)
         for node in ast.walk(func)
         if isinstance(node, ast.Call) and id(node) not in chain_mid
         and _is_fetch_chain(node)
@@ -457,7 +549,7 @@ def _guards_in(func: ast.AST, origin: str, tokens: set[str], params: set[str],
                  if isinstance(node, ast.Call)
                  and isinstance(parents.get(node), ast.Attribute)
                  and parents[node].value is node}
-    chain_guards = _chain_guards(func, chain_mid, origin)
+    chain_guards = _chain_guards(func, chain_mid, origin, params)
     parts = _chain_parts(func, chain_guards)
     guards: list[Guard] = []
     for node in ast.walk(func):

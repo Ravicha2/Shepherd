@@ -111,10 +111,64 @@ def _single_guard(source: str, handler: str,
         ),
         id="conditional-fetch-chain",
     ),
+    pytest.param(
+        "detail", ("item_id",),
+        """
+        def detail(request, item_id):
+            return Item.objects.filter(Q(pk=item_id) | Q(owner=request.user)).first()
+        """,
+        Guard(
+            symbol="detail",
+            predicate="Item.objects.filter(Q(pk=item_id) | Q(owner=request.user)).first()",
+            scopes_object=False,
+        ),
+        id="or-branch-bypasses-ownership",
+    ),
+    pytest.param(
+        "detail", ("item_id",),
+        """
+        def detail(request, item_id):
+            return Item.objects.filter(pk=item_id).exclude(owner=request.user).first()
+        """,
+        Guard(
+            symbol="detail",
+            predicate="Item.objects.filter(pk=item_id).exclude(owner=request.user).first()",
+            scopes_object=False,
+        ),
+        id="exclude-negates-ownership",
+    ),
+    pytest.param(
+        "detail", ("item_id",),
+        """
+        def detail(request, item_id):
+            return Item.objects.filter(pk=item_id, user__tenant=request.user.tenant).first()
+        """,
+        Guard(
+            symbol="detail",
+            predicate="Item.objects.filter(pk=item_id, user__tenant=request.user.tenant).first()",
+            scopes_object=False,
+        ),
+        id="tenant-bound-field-does-not-scope",
+    ),
 ])
 def test_a_scoping_guard_is_judged_by_where_and_how_it_runs(
         handler: str, params: tuple[str, ...], source: str, expected: Guard) -> None:
     assert _single_guard(source, handler, params) == expected
+
+
+def test_an_unrelated_ownership_fetch_does_not_clear_the_handler() -> None:
+    guards = extract_guards(
+        dedent(
+            """
+            def detail(request, item_id):
+                if AuditLog.objects.filter(id=log_id, user=request.user).exists():
+                    return Item.objects.get(pk=item_id)
+            """
+        ),
+        "detail", ("item_id",))
+
+    assert guards
+    assert not any(guard.scopes_object for guard in guards)
 
 
 def test_django_re_path_named_group_yields_the_parameter_name() -> None:
