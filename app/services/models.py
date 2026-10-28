@@ -37,6 +37,25 @@ class ConstraintScope(Enum):
     TOOLING = "tooling"
 
 
+@dataclass(frozen=True)
+class Guard:
+    """One guard a handler applies (#246).
+
+    `symbol` is the guard callable (decorator or call), or for a bare
+    comparison the function that applies it. `scopes_object` is the verdict:
+    the predicate names the loaded object and the requester and is neither
+    dead nor conditionally applied. The remaining fields are the soundness
+    checks ported from the object-scope pre-gate.
+    """
+
+    symbol: str
+    predicate: str
+    scopes_object: bool
+    conditional: bool = False
+    dead: bool = False
+    bypass: bool = False
+
+
 @dataclass
 class FQNNode:
     fqn: FQN
@@ -54,6 +73,9 @@ class FQNNode:
     # Object parameter names this handler loads from its routes (#245). Empty
     # for non-handlers; populated by the ingestion back-fill pass.
     object_parameters: tuple[str, ...] = ()
+    # The guards this handler applies (#246). Empty for non-handlers; populated
+    # by the same ingestion back-fill pass as object_parameters.
+    guards: tuple[Guard, ...] = ()
 
     @classmethod
     def external(cls, fqn: str, role: DependencyRole = DependencyRole.UNKNOWN) -> FQNNode:

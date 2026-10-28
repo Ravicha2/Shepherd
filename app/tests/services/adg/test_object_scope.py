@@ -15,7 +15,7 @@ from textwrap import dedent
 import pytest
 
 from services.adg import parse_repo
-from services.adg.object_scope import backfill_object_parameters, object_parameters
+from services.adg.object_scope import backfill_handler_facts, object_parameters
 from services.adg.route_inventory import repo_at_sha
 from services.models import FQNNode
 
@@ -84,7 +84,7 @@ class TestBackfill:
         })
         adg = parse_repo(repo)
 
-        filled = backfill_object_parameters(adg, repo)
+        filled = backfill_handler_facts(adg, repo)
 
         assert filled.node_of["app.views.item"].object_parameters == ("item_id",)
         assert filled.node_of["app.views.detail"].object_parameters == ("thing_id",)
@@ -101,7 +101,7 @@ class TestPinnedDjangoFixture:
             pytest.skip(f"{DJANGO_FIXTURE} is not present")
 
         with repo_at_sha(DJANGO_FIXTURE, DJANGO_PIN) as work_tree:
-            filled = backfill_object_parameters(parse_repo(work_tree), work_tree)
+            filled = backfill_handler_facts(parse_repo(work_tree), work_tree)
 
         assert filled.node_of["users.views.user_detail"].object_parameters == ("user_id",)
         assert filled.node_of["users.views.user_list"].object_parameters == ()

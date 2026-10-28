@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import json
 import logging
+from dataclasses import asdict
 
 from neo4j import GraphDatabase
 
 from services.cpt.dismissal import Dismissal
 from services.fqn import FQN
-from services.models import ADG, ConstraintEdge, ConstraintScope, DependencyRole, Edge, FQNKind, FQNNode, PredicateType
+from services.models import ADG, ConstraintEdge, ConstraintScope, DependencyRole, Edge, FQNKind, FQNNode, Guard, PredicateType
 
 log = logging.getLogger(__name__)
 
@@ -79,6 +81,7 @@ class GraphStore:
             code_hash=props.get("code_hash", ""),
             role=role,
             object_parameters=tuple(props.get("object_parameters") or ()),
+            guards=tuple(Guard(**row) for row in json.loads(props.get("guards") or "[]")),
         )
 
     def create_schema(self) -> None:
@@ -109,7 +112,8 @@ class GraphStore:
                 "n.line_start = $line_start, n.line_end = $line_end, "
                 "n.start_byte = $start_byte, n.end_byte = $end_byte, "
                 "n.role = $role, n.code_hash = $code_hash, "
-                "n.object_parameters = $object_parameters",
+                "n.object_parameters = $object_parameters, "
+                "n.guards = $guards",
                 fqn=str(node.fqn), kind=node.kind.value,
                 file_path=node.file_path,
                 line_start=node.line_start, line_end=node.line_end,
@@ -117,6 +121,8 @@ class GraphStore:
                 role=node.role.value,
                 code_hash=node.code_hash,
                 object_parameters=list(node.object_parameters),
+                guards=json.dumps([asdict(guard) for guard in node.guards],
+                                  sort_keys=True, separators=(",", ":")),
             )
 
     # --- Edge CRUD ---
