@@ -303,8 +303,9 @@ object. An edge without a `scope` key is treated as `runtime`.
   - `requires_object_scope`: object is the project's authorisation mechanism as a
     module or package FQN — the module that defines the scoping check. Name the
     module, not a bare decorator, function, or method: the object must resolve in
-    the graph as a module or package node. Object values that match no graph node
-    are dropped with the edge.
+    the graph as a module or package node. Use the project's own module, not an
+    external package: a name that matches no internal graph node does not ground
+    the constraint.
 
 Example: ADR requires Elasticsearch for fulltext search.
   subject: openlobby.core.*  (internal, from module list)

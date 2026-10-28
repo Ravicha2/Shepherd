@@ -534,7 +534,7 @@ class TestParseEdges:
         assert "instead of" in prompt  # replacement, not side-by-side
         corpus = (
             "askbot", "langflow", "open-webui", "pretix", "tandoor", "weblate",
-            "ghsa", "bac-bench", "cwe-639", "owasp",
+            "recipes", "ghsa", "bac-bench", "cwe-639", "owasp",
         )
         assert [name for name in corpus if name in prompt] == []
 
