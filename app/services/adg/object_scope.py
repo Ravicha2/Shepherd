@@ -40,6 +40,13 @@ _REQUESTER = re.compile(
     r"(?i)(?:request\.user|request\.session|request\.auth|self\.request|"
     r"current_user)"
 )
+# A filter value that is the requester's identity, not merely derived from it:
+# `request.user` / `request.user.id` scope, `request.user.teammate_ids` does
+# not. A list/tuple must be made only of identities.
+_REQUESTER_IDENTITY = re.compile(
+    r"(?i)^(?:request\.user|self\.request\.user|request\.auth|"
+    r"self\.request\.auth|current_user)(?:\.(?:id|pk))?$"
+)
 _SCOPE_CALL = re.compile(
     r"(?i)(?:has_perm|has_permission|permission_denied|perm_check|check_access|"
     r"allowed_for|object_permission|is_owner|owner_required|filter_access|"
@@ -57,11 +64,12 @@ _FETCH_CALL = re.compile(
     r"(?i)(?:get_object_or_404|get_object|\.get$|\.first$|_by_id$|"
     r"\.filter|\.objects$|^select$)")
 
-# Ownership versus tenancy (#253). A requester filter scopes only when it
-# touches a user-identity field. A tenant field passes every member of the
-# tenant, which is exactly the class-(ii) shape: the guard is present and
-# wrong. Generic BOLA/CWE-639 idiom only -- no case, repo, route or advisory
-# name appears here (#240).
+# Ownership versus tenancy (#253). Only an ownership field scopes; every other
+# binding (tenant, organisation, workspace, ...) passes all members of that
+# scope and is exactly the class-(ii) shape: the guard is present and wrong.
+# The tenant names below are the vocabulary that shape uses, documented as a
+# generic BOLA/CWE-639 idiom -- no case, repo, route or advisory name appears
+# here (#240).
 _OWNERSHIP_FIELD = re.compile(
     r"(?i)^(?:user|user_id|created_by|created_by_id|owner|owner_id|"
     r"shared|shared_with)$")
@@ -432,18 +440,66 @@ def _bound_field(parts: list[str]) -> str:
     return trimmed[-1]
 
 
-def _keyword_facts(keyword: ast.keyword, params: set[str]) -> _ChainFacts:
+def _references(node: ast.AST, tokens: set[str]) -> bool:
+    """The expression names a route param itself, not a segment of a name.
+
+    `item_id`, `kwargs['item_id']`, `int(item_id)` and `oid` (an alias) refer
+    to the parameter; `other.id` does not, even when a parameter is called
+    `id`. String constants count so `kwargs.get('item_id')` is seen too.
+    """
+    if isinstance(node, ast.Name):
+        return node.id in tokens
+    if isinstance(node, ast.Constant):
+        return node.value in tokens
+    if isinstance(node, ast.Attribute):
+        return _dotted(node) in tokens or _references(node.value, tokens)
+    if isinstance(node, ast.Subscript):
+        return _references(node.slice, tokens) or _references(node.value, tokens)
+    if isinstance(node, (ast.List, ast.Tuple)):
+        return any(_references(element, tokens) for element in node.elts)
+    return any(_references(child, tokens) for child in ast.iter_child_nodes(node))
+
+
+def _param_aliases(func: ast.AST, params: set[str]) -> set[str]:
+    """Local names that carry a route object parameter (`oid = int(item_id)`)."""
+    aliases: set[str] = set()
+    # Two hops covers the usual `raw = kwargs['id']; oid = int(raw)`. A longer
+    # chain fails safe: the chain does not tie and the handler fires.
+    for _ in range(2):
+        known = params | aliases
+        for node in ast.walk(func):
+            if isinstance(node, ast.Assign):
+                targets, value = node.targets, node.value
+            elif isinstance(node, ast.AnnAssign) and node.value is not None:
+                targets, value = (node.target,), node.value
+            else:
+                continue
+            if (len(targets) == 1 and isinstance(targets[0], ast.Name)
+                    and _references(value, known)):
+                aliases.add(targets[0].id)
+    return aliases
+
+
+def _is_requester_identity(node: ast.AST) -> bool:
+    """The value is the requester's identity, not just derived from it."""
+    if isinstance(node, (ast.List, ast.Tuple)):
+        return bool(node.elts) and all(_is_requester_identity(e) for e in node.elts)
+    return bool(_REQUESTER_IDENTITY.match(_text(node)))
+
+
+def _keyword_facts(keyword: ast.keyword, tokens: set[str]) -> _ChainFacts:
     if not keyword.arg:
         return _ChainFacts()
     parts = keyword.arg.split("__")
     value = keyword.value
-    requester = bool(_REQUESTER.search(_text(value)))
-    selected = bool(_OBJECT_PARAM.match(parts[0])) and not requester
+    mentions_requester = bool(_REQUESTER.search(_text(value)))
+    selected = bool(_OBJECT_PARAM.match(parts[0])) and not mentions_requester
     return _ChainFacts(
         object=selected,
-        tied=selected and _mentions(value, params),
-        requester=requester,
-        scope=requester and bool(_OWNERSHIP_FIELD.match(_bound_field(parts))),
+        tied=selected and _references(value, tokens),
+        requester=mentions_requester,
+        scope=(_is_requester_identity(value)
+               and bool(_OWNERSHIP_FIELD.match(_bound_field(parts)))),
     )
 
 
@@ -455,22 +511,28 @@ def _and_facts(facts: Iterable[_ChainFacts]) -> _ChainFacts:
     return out
 
 
-def _predicate_facts(node: ast.AST, params: set[str]) -> _ChainFacts:
+def _predicate_facts(node: ast.AST, tokens: set[str]) -> _ChainFacts:
     """A filter argument read with Django's AND/OR/negation structure."""
     if isinstance(node, ast.keyword):
-        return _keyword_facts(node, params)
+        return _keyword_facts(node, tokens)
     if isinstance(node, ast.Call):
         name = _dotted(node.func) or ""
         if name == "Q" or name.endswith(".Q"):
             return _and_facts(
-                _predicate_facts(child, params)
+                _predicate_facts(child, tokens)
+                for child in (*node.args, *node.keywords))
+        # A queryset passed inline (`get_object_or_404(Model.objects.filter(
+        # ...), pk=...)`) carries the requester filter in its own arguments.
+        if _is_fetch_chain(node):
+            return _and_facts(
+                _predicate_facts(child, tokens)
                 for child in (*node.args, *node.keywords))
     elif isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitAnd):
-        return _and_facts((_predicate_facts(node.left, params),
-                           _predicate_facts(node.right, params)))
+        return _and_facts((_predicate_facts(node.left, tokens),
+                           _predicate_facts(node.right, tokens)))
     elif isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
-        left = _predicate_facts(node.left, params)
-        right = _predicate_facts(node.right, params)
+        left = _predicate_facts(node.left, tokens)
+        right = _predicate_facts(node.right, tokens)
         merged = _and_facts((left, right))
         # An OR branch that selects by object id bypasses the ownership
         # branch: the object is reachable without the requester filter.
@@ -479,13 +541,13 @@ def _predicate_facts(node: ast.AST, params: set[str]) -> _ChainFacts:
                                  merged.requester, False)
         return merged
     elif isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.Invert):
-        inner = _predicate_facts(node.operand, params)
+        inner = _predicate_facts(node.operand, tokens)
         return _ChainFacts(False, False, inner.requester, False)
     return _ChainFacts()
 
 
 def _chain_guard(func: ast.AST, node: ast.Call, origin: str,
-                 params: set[str]) -> Guard | None:
+                 params: set[str], aliases: set[str]) -> Guard | None:
     """A fetch chain judged as one guard: object id + requester filter (#253).
 
     The chain is the unit a developer writes and reads. Its links are split
@@ -497,14 +559,17 @@ def _chain_guard(func: ast.AST, node: ast.Call, origin: str,
     and `~Q(...)` negate, and an OR with the object identifier lets that branch
     bypass the requester, so neither scopes (#263 review).
     """
+    tokens = params | aliases
     facts = _ChainFacts()
     for call in _fetch_calls(node):
         inner = _and_facts(
-            _predicate_facts(arg, params)
+            _predicate_facts(arg, tokens)
             for arg in (*call.args, *call.keywords))
         if _call_attr(call) == "exclude":
-            # Excluded conditions hold everywhere except the excluded set.
-            inner = _ChainFacts(False, False, inner.requester, False)
+            # Excluded conditions hold everywhere except the excluded set, so
+            # they never scope. The chain still touches the object it names:
+            # `filter(owner=request.user).exclude(pk=item_id)` scopes.
+            inner = _ChainFacts(inner.object, inner.tied, inner.requester, False)
         facts = _and_facts((facts, inner))
     if not (facts.object and facts.requester):
         return None
@@ -522,10 +587,10 @@ def _chain_guard(func: ast.AST, node: ast.Call, origin: str,
 
 
 def _chain_guards(func: ast.AST, chain_mid: set[int], origin: str,
-                  params: set[str]) -> dict[int, Guard | None]:
+                  params: set[str], aliases: set[str]) -> dict[int, Guard | None]:
     """The outermost fetch chains of *func*, judged as units."""
     return {
-        id(node): _chain_guard(func, node, origin, params)
+        id(node): _chain_guard(func, node, origin, params, aliases)
         for node in ast.walk(func)
         if isinstance(node, ast.Call) and id(node) not in chain_mid
         and _is_fetch_chain(node)
@@ -549,7 +614,8 @@ def _guards_in(func: ast.AST, origin: str, tokens: set[str], params: set[str],
                  if isinstance(node, ast.Call)
                  and isinstance(parents.get(node), ast.Attribute)
                  and parents[node].value is node}
-    chain_guards = _chain_guards(func, chain_mid, origin, params)
+    chain_guards = _chain_guards(
+        func, chain_mid, origin, params, _param_aliases(func, params))
     parts = _chain_parts(func, chain_guards)
     guards: list[Guard] = []
     for node in ast.walk(func):

@@ -150,6 +150,85 @@ def _single_guard(source: str, handler: str,
         ),
         id="tenant-bound-field-does-not-scope",
     ),
+    pytest.param(
+        "detail", ("id",),
+        """
+        def detail(self, request, id):
+            return get_object_or_404(StaffSession, pk=self.kwargs['id'], user=self.request.user)
+        """,
+        Guard(
+            symbol="detail",
+            predicate="get_object_or_404(StaffSession, pk=self.kwargs['id'], user=self.request.user)",
+            scopes_object=True,
+        ),
+        id="kwarg-subscript-ties-to-route-param",
+    ),
+    pytest.param(
+        "detail", ("item_id",),
+        """
+        def detail(request, item_id):
+            oid = int(item_id)
+            return Item.objects.filter(pk=oid, owner=request.user).first()
+        """,
+        Guard(
+            symbol="detail",
+            predicate="Item.objects.filter(pk=oid, owner=request.user).first()",
+            scopes_object=True,
+        ),
+        id="local-alias-ties-to-route-param",
+    ),
+    pytest.param(
+        "detail", ("item_id",),
+        """
+        def detail(request, item_id):
+            return get_object_or_404(Item.objects.filter(owner=request.user), pk=item_id)
+        """,
+        Guard(
+            symbol="detail",
+            predicate="get_object_or_404(Item.objects.filter(owner=request.user), pk=item_id)",
+            scopes_object=True,
+        ),
+        id="inline-queryset-carries-the-requester-filter",
+    ),
+    pytest.param(
+        "detail", ("item_id",),
+        """
+        def detail(request, item_id):
+            return Item.objects.filter(owner=request.user).exclude(pk=item_id).first()
+        """,
+        Guard(
+            symbol="detail",
+            predicate="Item.objects.filter(owner=request.user).exclude(pk=item_id).first()",
+            scopes_object=True,
+        ),
+        id="exclude-narrowing-a-scoped-queryset-still-scopes",
+    ),
+    pytest.param(
+        "detail", ("id",),
+        """
+        def detail(request, id):
+            return Item.objects.filter(pk=other.id, owner=request.user).first()
+        """,
+        Guard(
+            symbol="detail",
+            predicate="Item.objects.filter(pk=other.id, owner=request.user).first()",
+            scopes_object=False,
+        ),
+        id="param-name-inside-another-name-does-not-tie",
+    ),
+    pytest.param(
+        "detail", ("item_id",),
+        """
+        def detail(request, item_id):
+            return Item.objects.filter(pk=item_id, owner__in=request.user.teammate_ids).first()
+        """,
+        Guard(
+            symbol="detail",
+            predicate="Item.objects.filter(pk=item_id, owner__in=request.user.teammate_ids).first()",
+            scopes_object=False,
+        ),
+        id="requester-derived-value-is-not-the-requester",
+    ),
 ])
 def test_a_scoping_guard_is_judged_by_where_and_how_it_runs(
         handler: str, params: tuple[str, ...], source: str, expected: Guard) -> None:
