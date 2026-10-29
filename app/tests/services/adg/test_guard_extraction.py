@@ -399,6 +399,26 @@ def test_a_callee_parameter_bound_to_the_requester_by_keyword_scopes() -> None:
     )
 
 
+def test_a_callee_parameter_bound_to_the_requester_object_scopes_through_its_id() -> None:
+    source = dedent(
+        """
+        def _read_flow(session, flow_id, user):
+            stmt = select(Flow).where(Flow.id == flow_id).where(Flow.user_id == user.id)
+            return stmt
+
+        def read_flow(session, flow_id, current_user):
+            return _read_flow(session, flow_id, current_user)
+        """
+    )
+
+    assert _single_guard(source, "read_flow", ("flow_id",)) == Guard(
+        symbol="_read_flow",
+        predicate="select(Flow).where(Flow.id == flow_id).where(Flow.user_id == user.id)",
+        scopes_object=True,
+        covers=("flow_id",),
+    )
+
+
 def test_a_callee_parameter_only_named_for_the_requester_does_not_scope() -> None:
     source = dedent(
         """
@@ -412,6 +432,211 @@ def test_a_callee_parameter_only_named_for_the_requester_does_not_scope() -> Non
     )
 
     assert extract_guards(source, "read_flow", ("flow_id",)) == ()
+
+
+def test_a_requester_bound_through_two_helpers_still_scopes() -> None:
+    source = dedent(
+        """
+        async def _read_flow(session, flow_id, user_id):
+            stmt = select(Flow).where(Flow.id == flow_id).where(Flow.user_id == user_id)
+            return (await session.exec(stmt)).first()
+
+        async def _scoped_read(session, flow_id, uid):
+            return await _read_flow(session, flow_id, uid)
+
+        async def read_flow(session, flow_id, current_user):
+            return await _scoped_read(session, flow_id, current_user.id)
+        """
+    )
+
+    assert _single_guard(source, "read_flow", ("flow_id",)) == Guard(
+        symbol="_read_flow",
+        predicate="select(Flow).where(Flow.id == flow_id).where(Flow.user_id == user_id)",
+        scopes_object=True,
+        covers=("flow_id",),
+    )
+
+
+def test_one_unscoped_call_site_keeps_the_callee_unscoped() -> None:
+    source = dedent(
+        """
+        async def _read_flow(session, flow_id, user_id):
+            stmt = select(Flow).where(Flow.id == flow_id).where(Flow.user_id == user_id)
+            return (await session.exec(stmt)).first()
+
+        async def read_flow(session, flow_id, current_user):
+            await _read_flow(session, flow_id, None)
+            return await _read_flow(session, flow_id, current_user.id)
+        """
+    )
+
+    assert extract_guards(source, "read_flow", ("flow_id",)) == ()
+
+
+def test_a_callee_parameter_bound_to_a_requester_derived_value_does_not_scope() -> None:
+    source = dedent(
+        """
+        async def _read_flow(session, flow_id, user_id):
+            stmt = select(Flow).where(Flow.id == flow_id).where(Flow.user_id == user_id)
+            return (await session.exec(stmt)).first()
+
+        async def read_flow(session, flow_id, current_user):
+            return await _read_flow(session, flow_id, current_user.teammate_ids)
+        """
+    )
+
+    assert extract_guards(source, "read_flow", ("flow_id",)) == ()
+
+
+@pytest.mark.parametrize("statement", [
+    pytest.param(
+        "stmt = select(Flow).where(Flow.id == flow_id)"
+        ".exclude(own.user_id == request.user.id)",
+        id="exclude"),
+    pytest.param(
+        "stmt = select(Flow).where("
+        "(Flow.id == flow_id) | (own.user_id == request.user.id))",
+        id="or"),
+])
+def test_a_comparison_in_a_non_scoping_chain_keeps_the_chain_verdict(
+        statement: str) -> None:
+    source = dedent(
+        f"""
+        def detail(request, flow_id):
+            own = get_object_or_404(Other, pk=flow_id)
+            {statement}
+            return stmt
+        """
+    )
+
+    guards = extract_guards(source, "detail", ("flow_id",))
+
+    assert not any(guard.scopes_object for guard in guards)
+
+
+def test_an_identically_named_column_of_another_object_is_not_the_requester() -> None:
+    source = dedent(
+        """
+        def _load(session, flow_id, user_id):
+            other = get_object_or_404(Other, pk=flow_id)
+            stmt = select(Flow).where(Flow.id == flow_id).where(Flow.user_id == other.user_id)
+            return stmt
+
+        def read(session, flow_id, current_user):
+            return _load(session, flow_id, current_user.id)
+        """
+    )
+
+    assert extract_guards(source, "read", ("flow_id",)) == ()
+
+
+def test_a_root_handler_parameter_is_not_bound_by_an_internal_caller() -> None:
+    source = dedent(
+        """
+        def handler(request, user_id):
+            item = get_object_or_404(Item, pk=user_id)
+            if item.owner_id != user_id:
+                raise Http404()
+            _retry(request, user_id)
+            return item
+
+        def _retry(request, uid):
+            return handler(request, request.user.id)
+        """
+    )
+
+    assert extract_guards(source, "handler", ("user_id",)) == ()
+
+
+def test_a_call_site_inside_the_last_linked_helper_still_counts() -> None:
+    source = dedent(
+        """
+        def _load(session, flow_id, user_id):
+            stmt = select(Flow).where(Flow.id == flow_id).where(Flow.user_id == user_id)
+            return stmt
+
+        def _a(session, flow_id, uid):
+            _c(session, flow_id)
+            return _load(session, flow_id, uid)
+
+        def _c(session, flow_id):
+            return _load(session, flow_id, flow_id)
+
+        def read(session, flow_id, current_user):
+            return _a(session, flow_id, current_user.id)
+        """
+    )
+
+    assert extract_guards(source, "read", ("flow_id",)) == ()
+
+
+def test_an_ownership_column_of_another_model_does_not_scope() -> None:
+    source = dedent(
+        """
+        def detail(request, flow_id):
+            stmt = select(Flow).where(Flow.id == flow_id).where(Other.user_id == request.user.id)
+            return stmt
+        """
+    )
+
+    guards = extract_guards(source, "detail", ("flow_id",))
+
+    assert not any(guard.scopes_object for guard in guards)
+
+
+@pytest.mark.parametrize("select,prefix", [
+    pytest.param("select(Flow.id)", "Flow", id="column"),
+    pytest.param("select(models.Flow)", "models.Flow", id="module-qualified"),
+])
+def test_a_column_or_module_qualified_query_still_scopes(
+        select: str, prefix: str) -> None:
+    source = dedent(
+        f"""
+        def _load(session, flow_id, user_id):
+            stmt = {select}.where({prefix}.id == flow_id).where({prefix}.user_id == user_id)
+            return stmt
+
+        def read(session, flow_id, current_user):
+            return _load(session, flow_id, current_user.id)
+        """
+    )
+
+    guards = extract_guards(source, "read", ("flow_id",))
+
+    assert any(guard.symbol == "_load" and guard.scopes_object
+               for guard in guards)
+
+
+def test_a_starred_argument_at_the_call_site_binds_nothing() -> None:
+    source = dedent(
+        """
+        def _load(session, flow_id, user_id):
+            stmt = select(Flow).where(Flow.id == flow_id).where(Flow.user_id == user_id)
+            return stmt
+
+        def read(session, flow_id, current_user):
+            rest = ()
+            return _load(*rest, current_user.id)
+        """
+    )
+
+    assert extract_guards(source, "read", ("flow_id",)) == ()
+
+
+def test_a_parameter_reassigned_inside_the_callee_is_not_the_requester() -> None:
+    source = dedent(
+        """
+        def _load(session, flow_id, user_id):
+            user_id = flow_id
+            stmt = select(Flow).where(Flow.id == flow_id).where(Flow.user_id == user_id)
+            return stmt
+
+        def read(session, flow_id, current_user):
+            return _load(session, flow_id, current_user.id)
+        """
+    )
+
+    assert extract_guards(source, "read", ("flow_id",)) == ()
 
 
 def test_route_converter_clears_the_dead_guard(tmp_path: Path) -> None:
