@@ -359,6 +359,61 @@ def test_a_local_named_user_is_not_the_requester() -> None:
     assert extract_guards(source, "detail", ("item_id", "other_id")) == ()
 
 
+def test_a_callee_parameter_bound_to_the_requester_positionally_scopes() -> None:
+    source = dedent(
+        """
+        async def _read_flow(session, flow_id, user_id):
+            stmt = select(Flow).where(Flow.id == flow_id).where(Flow.user_id == user_id)
+            return (await session.exec(stmt)).first()
+
+        async def read_flow(session, flow_id, current_user):
+            return await _read_flow(session, flow_id, current_user.id)
+        """
+    )
+
+    assert _single_guard(source, "read_flow", ("flow_id",)) == Guard(
+        symbol="_read_flow",
+        predicate="select(Flow).where(Flow.id == flow_id).where(Flow.user_id == user_id)",
+        scopes_object=True,
+        covers=("flow_id",),
+    )
+
+
+def test_a_callee_parameter_bound_to_the_requester_by_keyword_scopes() -> None:
+    source = dedent(
+        """
+        async def _read_flow(session, flow_id, user_id):
+            stmt = select(Flow).where(Flow.id == flow_id).where(Flow.user_id == user_id)
+            return (await session.exec(stmt)).first()
+
+        async def read_flow(session, flow_id, current_user):
+            return await _read_flow(session=session, flow_id=flow_id, user_id=current_user.id)
+        """
+    )
+
+    assert _single_guard(source, "read_flow", ("flow_id",)) == Guard(
+        symbol="_read_flow",
+        predicate="select(Flow).where(Flow.id == flow_id).where(Flow.user_id == user_id)",
+        scopes_object=True,
+        covers=("flow_id",),
+    )
+
+
+def test_a_callee_parameter_only_named_for_the_requester_does_not_scope() -> None:
+    source = dedent(
+        """
+        async def _read_flow(session, flow_id, user_id):
+            stmt = select(Flow).where(Flow.id == flow_id).where(Flow.user_id == user_id)
+            return (await session.exec(stmt)).first()
+
+        async def read_flow(session, flow_id, user_id):
+            return await _read_flow(session, flow_id, user_id)
+        """
+    )
+
+    assert extract_guards(source, "read_flow", ("flow_id",)) == ()
+
+
 def test_route_converter_clears_the_dead_guard(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     (repo / "app").mkdir(parents=True)
@@ -527,3 +582,21 @@ class TestPinnedGuardFixtures:
         assert not any(guard.scopes_object for guard in vulnerable)
         assert any("created_by=self.request.user" in guard.predicate
                    and guard.scopes_object for guard in fixed)
+
+    def test_langflow_callee_parameter_binding_flips_across_the_fix(self) -> None:
+        # The requester reaches the query as a plain callee parameter
+        # (`user_id=current_user.id`), so the scope lives inside `_read_flow`.
+        handlers = (
+            "src.backend.base.langflow.api.v1.flows.read_flow",
+            "src.backend.base.langflow.api.v1.flows.update_flow",
+            "src.backend.base.langflow.api.v1.flows.delete_flow",
+        )
+        for handler in handlers:
+            vulnerable = _guards_at(
+                "langflow", "73c1f203b0205d00928a0af7fa0e0fc93170f03e", handler)
+            fixed = _guards_at(
+                "langflow", "d437d018ceba95242fcf4c1279df214d96314f2e", handler)
+
+            assert not any(guard.scopes_object for guard in vulnerable), handler
+            assert any(guard.symbol == "_read_flow" and guard.scopes_object
+                       for guard in fixed), handler

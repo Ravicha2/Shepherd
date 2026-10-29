@@ -4,8 +4,9 @@ and the guards it applies.
 Framework idioms only — no case, repo, route or advisory names. Guard
 extraction is the deterministic extraction core of the POC-A pre-gate, ported
 file-scoped: a handler's decorators and callees are resolved within its own
-module. A fetch chain is judged as one unit, and a requester filter scopes
-only on an ownership field, never a tenant field (#253).
+module. A fetch chain is judged as one unit, a requester filter scopes only on
+an ownership field (#253), and a callee parameter bound to a requester
+expression at the call site is the requester inside that callee (#257).
 """
 
 from __future__ import annotations
@@ -165,6 +166,16 @@ def _mentions(node: ast.AST, tokens: set[str]) -> bool:
     return False
 
 
+def _mentions_requester(node: ast.AST, requester_tokens: set[str] = frozenset()) -> bool:
+    """The expression denotes the requester, directly or through a bound parameter.
+
+    A helper receives the requester as a plain parameter (`_read_flow(...,
+    current_user.id)` -> `user_id`), so inside that callee the parameter name is
+    the requester even though it is not in the vocabulary (#257).
+    """
+    return bool(_REQUESTER.search(_text(node))) or _mentions(node, requester_tokens)
+
+
 def _args(func: ast.AST) -> list[ast.arg]:
     return list(getattr(getattr(func, "args", None), "args", []))
 
@@ -303,14 +314,14 @@ def _inside_anonymous_branch(func: ast.AST, node: ast.AST) -> bool:
     return False
 
 
-def _linked(tree: ast.Module,
-            funcs: list[ast.AST],
-            depth: int = 2) -> list[tuple[ast.AST, str]]:
+def _linked_edges(tree: ast.Module,
+                  funcs: list[ast.AST],
+                  depth: int = 2) -> list[tuple[ast.AST, ast.AST, str, ast.Call | None]]:
     """Handler functions plus decorator/callee functions defined in this module.
 
-    Yields (function, origin symbol): the decorator or call name through which
-    the function was reached, so a predicate inside a decorator body is named
-    by the decorator the developer applied.
+    Each entry is (caller, callee, origin symbol, call node): the call node is
+    what the caller used, so the requester a callee receives can be read off
+    the call site; it is None for a handler and a decorator applied by name.
     """
     defs = {node.name: node for node in tree.body
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))}
@@ -323,19 +334,21 @@ def _linked(tree: ast.Module,
             return [node]
         return []
 
-    out = [(func, func.name) for func in funcs]
+    out = [(func, func, func.name, None) for func in funcs]
     seen = {id(func) for func in funcs}
     frontier = list(out)
     for _ in range(depth):
-        nxt: list[tuple[ast.AST, str]] = []
-        for func, _origin in frontier:
-            targets: list[ast.AST] = []
+        nxt: list[tuple[ast.AST, ast.AST, str, ast.Call | None]] = []
+        for caller, func, _origin, _call in frontier:
+            targets: list[tuple[ast.AST, ast.Call | None]] = []
             if isinstance(func, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                targets.extend(d.func if isinstance(d, ast.Call) else d
-                               for d in func.decorator_list)
-            targets.extend(node.func for node in ast.walk(func)
+                targets.extend(
+                    (d.func if isinstance(d, ast.Call) else d,
+                     d if isinstance(d, ast.Call) else None)
+                    for d in func.decorator_list)
+            targets.extend((node.func, node) for node in ast.walk(func)
                            if isinstance(node, ast.Call))
-            for target in targets:
+            for target, call in targets:
                 name = _dotted(target)
                 if not name or "." in name:
                     continue
@@ -346,12 +359,57 @@ def _linked(tree: ast.Module,
                     if id(callee) in seen:
                         continue
                     seen.add(id(callee))
-                    nxt.append((callee, name))
+                    nxt.append((caller, callee, name, call))
         out.extend(nxt)
         frontier = nxt
         if not nxt:
             break
     return out
+
+
+def _linked(tree: ast.Module,
+            funcs: list[ast.AST],
+            depth: int = 2) -> list[tuple[ast.AST, str]]:
+    """Handler functions plus decorator/callee functions defined in this module.
+
+    Yields (function, origin symbol): the decorator or call name through which
+    the function was reached, so a predicate inside a decorator body is named
+    by the decorator the developer applied.
+    """
+    return [(callee, origin)
+            for _caller, callee, origin, _call in _linked_edges(tree, funcs, depth)]
+
+
+def _requester_bindings(
+        edges: list[tuple[ast.AST, ast.AST, str, ast.Call | None]],
+) -> dict[int, frozenset[str]]:
+    """Per linked function, the parameters a requester expression was passed as.
+
+    The requester is a plain value at the call site (`current_user.id`); inside
+    the callee its only name is the parameter that received it. Binding is
+    propagated in link order, so a requester passed through one helper reaches
+    the next.
+    """
+    bindings: dict[int, set[str]] = defaultdict(set)
+    for caller, callee, _origin, call in edges:
+        if call is None:
+            continue
+        bindings[id(callee)] |= _bound_requester_params(
+            callee, call, bindings[id(caller)])
+    return {func_id: frozenset(names) for func_id, names in bindings.items()}
+
+
+def _bound_requester_params(func: ast.AST, call: ast.Call,
+                            requester_tokens: set[str]) -> set[str]:
+    """The callee parameters the call binds to a requester expression."""
+    bound: set[str] = set()
+    for arg_node, param in zip(call.args, _args(func)):
+        if _mentions_requester(arg_node, requester_tokens):
+            bound.add(param.arg)
+    for keyword in call.keywords:
+        if keyword.arg and _mentions_requester(keyword.value, requester_tokens):
+            bound.add(keyword.arg)
+    return bound
 
 
 def _conditional_guard(func: ast.AST, compare: ast.AST) -> bool:
@@ -384,9 +442,10 @@ def extract_guards(source: str, handler_fqn: str,
 
 def _comparison_guard(func: ast.AST, node: ast.Compare, origin: str,
                       tokens: set[str], params: set[str],
-                      converted: set[str], typed: set[str]) -> Guard | None:
+                      converted: set[str], typed: set[str],
+                      requester_tokens: set[str]) -> Guard | None:
     text = _text(node)
-    if not (_REQUESTER.search(text) and _mentions(node, tokens)):
+    if not (_mentions_requester(node, requester_tokens) and _mentions(node, tokens)):
         return None
     conditional = _conditional_guard(func, node)
     sides = [node.left, *node.comparators]
@@ -394,7 +453,8 @@ def _comparison_guard(func: ast.AST, node: ast.Compare, origin: str,
     # unknown column is not provably an int.
     int_side = next(
         (s for s in sides
-         if _INT_ATTR.search(_text(s)) and _REQUESTER.search(_text(s))), None)
+         if _INT_ATTR.search(_text(s))
+         and _mentions_requester(s, requester_tokens)), None)
     raw_side = next(
         (s for s in sides
          if isinstance(s, ast.Name) and s.id in params
@@ -409,7 +469,8 @@ def _comparison_guard(func: ast.AST, node: ast.Compare, origin: str,
     )
 
 
-def _call_guard(func: ast.AST, node: ast.Call, tokens: set[str]) -> Guard | None:
+def _call_guard(func: ast.AST, node: ast.Call, tokens: set[str],
+                requester_tokens: set[str]) -> Guard | None:
     text = _text(node)
     inner = _dotted(node.func.func) if isinstance(node.func, ast.Call) else None
     if (inner
@@ -421,7 +482,7 @@ def _call_guard(func: ast.AST, node: ast.Call, tokens: set[str]) -> Guard | None
         return Guard(symbol=inner, predicate=text, scopes_object=False, bypass=True)
     name = _dotted(node.func) or ""
     if _SCOPE_CALL.search(name) and (
-            _mentions(node, tokens) or _REQUESTER.search(text)):
+            _mentions(node, tokens) or _mentions_requester(node, requester_tokens)):
         conditional = _conditional_guard(func, node)
         return Guard(
             symbol=name,
@@ -550,26 +611,29 @@ def _param_sources(func: ast.AST,
     return sources
 
 
-def _is_requester_identity(node: ast.AST) -> bool:
+def _is_requester_identity(node: ast.AST, requester_tokens: set[str]) -> bool:
     """The value is the requester's identity, not just derived from it."""
     if isinstance(node, (ast.List, ast.Tuple)):
-        return bool(node.elts) and all(_is_requester_identity(e) for e in node.elts)
+        return bool(node.elts) and all(
+            _is_requester_identity(e, requester_tokens) for e in node.elts)
+    if isinstance(node, ast.Name) and node.id in requester_tokens:
+        return True
     return bool(_REQUESTER_IDENTITY.match(_text(node)))
 
 
-def _keyword_facts(keyword: ast.keyword,
-                   sources: dict[str, frozenset[str]]) -> _ChainFacts:
+def _keyword_facts(keyword: ast.keyword, sources: dict[str, frozenset[str]],
+                   requester_tokens: set[str]) -> _ChainFacts:
     if not keyword.arg:
         return _ChainFacts()
     parts = keyword.arg.split("__")
     value = keyword.value
-    mentions_requester = bool(_REQUESTER.search(_text(value)))
+    mentions_requester = _mentions_requester(value, requester_tokens)
     selected = bool(_OBJECT_PARAM.match(parts[0])) and not mentions_requester
     return _ChainFacts(
         object=selected,
         covers=_referenced_params(value, sources) if selected else frozenset(),
         requester=mentions_requester,
-        scope=(_is_requester_identity(value)
+        scope=(_is_requester_identity(value, requester_tokens)
                and bool(_OWNERSHIP_FIELD.match(_bound_field(parts)))),
     )
 
@@ -582,29 +646,54 @@ def _and_facts(facts: Iterable[_ChainFacts]) -> _ChainFacts:
     return out
 
 
-def _predicate_facts(node: ast.AST,
-                     sources: dict[str, frozenset[str]]) -> _ChainFacts:
+def _binds_ownership_field(node: ast.AST) -> bool:
+    """The comparison side names an ownership column (`Flow.user_id`)."""
+    return bool(_OWNERSHIP_FIELD.match((_dotted(node) or "").rpartition(".")[2]))
+
+
+def _compare_facts(node: ast.Compare, sources: dict[str, frozenset[str]],
+                   requester_tokens: set[str]) -> _ChainFacts:
+    """A comparison read as a chain part (SQLAlchemy `where(Model.col == x)`)."""
+    sides = [node.left, *node.comparators]
+    covers = frozenset()
+    for side in sides:
+        covers |= _referenced_params(side, sources)
+    requester = any(_mentions_requester(side, requester_tokens) for side in sides)
+    scopes = (
+        len(sides) == 2 and isinstance(node.ops[0], ast.Eq)
+        and any(_binds_ownership_field(field)
+                and _is_requester_identity(value, requester_tokens)
+                for field, value in (sides, list(reversed(sides))))
+    )
+    return _ChainFacts(
+        object=bool(covers), covers=covers, requester=requester, scope=scopes)
+
+
+def _predicate_facts(node: ast.AST, sources: dict[str, frozenset[str]],
+                     requester_tokens: set[str]) -> _ChainFacts:
     """A filter argument read with Django's AND/OR/negation structure."""
     if isinstance(node, ast.keyword):
-        return _keyword_facts(node, sources)
+        return _keyword_facts(node, sources, requester_tokens)
+    if isinstance(node, ast.Compare):
+        return _compare_facts(node, sources, requester_tokens)
     if isinstance(node, ast.Call):
         name = _dotted(node.func) or ""
         if name == "Q" or name.endswith(".Q"):
             return _and_facts(
-                _predicate_facts(child, sources)
+                _predicate_facts(child, sources, requester_tokens)
                 for child in (*node.args, *node.keywords))
         # A queryset passed inline (`get_object_or_404(Model.objects.filter(
         # ...), pk=...)`) carries the requester filter in its own arguments.
         if _is_fetch_chain(node):
             return _and_facts(
-                _predicate_facts(child, sources)
+                _predicate_facts(child, sources, requester_tokens)
                 for child in (*node.args, *node.keywords))
     elif isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitAnd):
-        return _and_facts((_predicate_facts(node.left, sources),
-                           _predicate_facts(node.right, sources)))
+        return _and_facts((_predicate_facts(node.left, sources, requester_tokens),
+                           _predicate_facts(node.right, sources, requester_tokens)))
     elif isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
-        left = _predicate_facts(node.left, sources)
-        right = _predicate_facts(node.right, sources)
+        left = _predicate_facts(node.left, sources, requester_tokens)
+        right = _predicate_facts(node.right, sources, requester_tokens)
         merged = _and_facts((left, right))
         # An OR branch that selects by object id bypasses the ownership
         # branch: the object is reachable without the requester filter.
@@ -613,14 +702,15 @@ def _predicate_facts(node: ast.AST,
                                  merged.requester, False)
         return merged
     elif isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.Invert):
-        inner = _predicate_facts(node.operand, sources)
+        inner = _predicate_facts(node.operand, sources, requester_tokens)
         return _ChainFacts(False, frozenset(), inner.requester, False)
     return _ChainFacts()
 
 
 def _chain_guard(func: ast.AST, node: ast.Call, origin: str,
                  params: set[str],
-                 sources: dict[str, frozenset[str]]) -> Guard | None:
+                 sources: dict[str, frozenset[str]],
+                 requester_tokens: set[str]) -> Guard | None:
     """A fetch chain judged as one guard: object id + requester filter (#253).
 
     The chain is the unit a developer writes and reads. Its links are split
@@ -635,7 +725,7 @@ def _chain_guard(func: ast.AST, node: ast.Call, origin: str,
     facts = _ChainFacts()
     for call in _fetch_calls(node):
         inner = _and_facts(
-            _predicate_facts(arg, sources)
+            _predicate_facts(arg, sources, requester_tokens)
             for arg in (*call.args, *call.keywords))
         if _call_attr(call) == "exclude":
             # Excluded conditions hold everywhere except the excluded set, so
@@ -664,10 +754,12 @@ def _chain_guard(func: ast.AST, node: ast.Call, origin: str,
 
 def _chain_guards(func: ast.AST, chain_mid: set[int], origin: str,
                   params: set[str],
-                  sources: dict[str, frozenset[str]]) -> dict[int, Guard | None]:
+                  sources: dict[str, frozenset[str]],
+                  requester_tokens: set[str]) -> dict[int, Guard | None]:
     """The outermost fetch chains of *func*, judged as units."""
     return {
-        id(node): _chain_guard(func, node, origin, params, sources)
+        id(node): _chain_guard(func, node, origin, params, sources,
+                               requester_tokens)
         for node in ast.walk(func)
         if isinstance(node, ast.Call) and id(node) not in chain_mid
         and _is_fetch_chain(node)
@@ -684,7 +776,8 @@ def _chain_parts(func: ast.AST, chain_guards: dict[int, Guard | None]) -> set[in
 
 
 def _guards_in(func: ast.AST, origin: str, tokens: set[str], params: set[str],
-               converted: set[str], typed: set[str]) -> list[Guard]:
+               converted: set[str], typed: set[str],
+               requester_tokens: set[str]) -> list[Guard]:
     parents = _parents(func)
     # Only the outermost call of a chain carries the whole query text.
     chain_mid = {id(node) for node in ast.walk(func)
@@ -692,16 +785,19 @@ def _guards_in(func: ast.AST, origin: str, tokens: set[str], params: set[str],
                  and isinstance(parents.get(node), ast.Attribute)
                  and parents[node].value is node}
     chain_guards = _chain_guards(
-        func, chain_mid, origin, params, _param_sources(func, params))
+        func, chain_mid, origin, params, _param_sources(func, params),
+        requester_tokens)
     parts = _chain_parts(func, chain_guards)
     guards: list[Guard] = []
     for node in ast.walk(func):
         if isinstance(node, ast.Compare):
             if id(node) in parts:
                 continue
-            guard = _comparison_guard(func, node, origin, tokens, params, converted, typed)
+            guard = _comparison_guard(func, node, origin, tokens, params,
+                                      converted, typed, requester_tokens)
         elif isinstance(node, ast.Call) and id(node) not in chain_mid:
-            guard = chain_guards.get(id(node)) or _call_guard(func, node, tokens)
+            guard = chain_guards.get(id(node)) or _call_guard(
+                func, node, tokens, requester_tokens)
         else:
             continue
         if guard is not None:
@@ -712,8 +808,9 @@ def _guards_in(func: ast.AST, origin: str, tokens: set[str], params: set[str],
 def _extract_guards(tree: ast.Module, handler_fqn: str,
                     object_parameters: Iterable[str],
                     typed_parameters: Iterable[str] = ()) -> tuple[Guard, ...]:
-    linked = _linked(tree, _resolve_handler(tree, handler_fqn))
-    funcs = [func for func, _origin in linked]
+    edges = _linked_edges(tree, _resolve_handler(tree, handler_fqn))
+    bindings = _requester_bindings(edges)
+    funcs = [callee for _caller, callee, _origin, _call in edges]
     params = set(object_parameters) | set(_kwargs_object_ids(funcs))
     objects = {name for func in funcs for name in _assigned_objects(func)}
     tokens = params | objects
@@ -721,8 +818,10 @@ def _extract_guards(tree: ast.Module, handler_fqn: str,
     typed = _typed_params(funcs, params) | set(typed_parameters)
     guards = [
         guard
-        for func, origin in linked
-        for guard in _guards_in(func, origin, tokens, params, converted, typed)
+        for _caller, func, origin, _call in edges
+        for guard in _guards_in(
+            func, origin, tokens, params, converted, typed,
+            set(bindings.get(id(func), ())))
     ]
     return tuple(dict.fromkeys(guards))
 
