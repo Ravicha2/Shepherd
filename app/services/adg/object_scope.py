@@ -18,6 +18,7 @@ from pathlib import Path
 
 from services.adg.route_inventory import build_route_inventory
 from services.models import ADG, Guard
+from services.resolver import MatchStatus, fqn_matches_pattern
 
 _FLASK_PARAM = re.compile(r"<(?:(?P<converter>\w+):)?(?P<name>\w+)>")
 _FASTAPI_PARAM = re.compile(r"\{(?P<name>\w+)(?::(?P<converter>[^}]*))?\}")
@@ -74,6 +75,33 @@ def typed_object_parameters(raw_paths: Iterable[str]) -> tuple[str, ...]:
     return tuple(dict.fromkeys(
         match.group("name") for match in _object_path_params(raw_paths)
         if _TYPED_CONVERTER.match(match.group("converter") or "")))
+
+
+def object_scope_candidates(
+    subject: str,
+    adg: ADG,
+    surface_files: Iterable[str] | None = None,
+) -> int:
+    """How many handler nodes with object facts *subject* matches (#255).
+
+    A `requires_object_scope` subject that matches none cannot produce a
+    violation at any revision. A row aimed that way reports nothing, so a
+    lowering that emits it is a miss, not a clean pass. Pass *surface_files*
+    to count only the handlers on the advisory's surface: a subject can match
+    handlers elsewhere in the repo and still be aimed where the advisory has
+    nothing to find.
+    """
+    if surface_files is not None:
+        # Membership tests run per node; a one-shot iterable would be
+        # exhausted by the first one.
+        surface_files = set(surface_files)
+    return sum(
+        1
+        for node in adg.nodes
+        if node.object_parameters
+        and (surface_files is None or node.file_path in surface_files)
+        and fqn_matches_pattern(node.fqn, subject) is not MatchStatus.NO_MATCH
+    )
 
 
 # --- guard extraction -------------------------------------------------------

@@ -284,6 +284,13 @@ object. An edge without a `scope` key is treated as `runtime`.
   A wildcard subject must extend a real prefix the tools returned; never emit a wildcard
   whose base contains an empty or `*` segment. This is the subject-side analog of the
   object-grounding rule.
+- `requires_object_scope` subject coverage: this rule asks whether every request handler
+  scopes the object it loads, so its subject must cover the repo's HTTP API surfaces —
+  the modules that register request handlers or routes. When those surfaces span several
+  subtrees, take the repo-root subject (the root package) so one row covers them all, or
+  emit one row per API-surface subtree. Do not anchor this subject at a namespace that
+  only shares a name with the web layer: a subject matching no request handler can never
+  fire, so it reports nothing and is a lowering miss, not a clean pass.
 - Policy, tooling, and whole-codebase constraints (linters, formatters, test runners, build
   tooling, language versions, frameworks) take the ROOT PACKAGE as subject. NEVER use
   file-entry-point modules (`manage`, `noxfile`, `setup`, `conftest`) as subjects, even
