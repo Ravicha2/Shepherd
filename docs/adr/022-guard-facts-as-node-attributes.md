@@ -8,6 +8,11 @@ Accepted — representation choice for the #240 A6 ingestion PoC (predicate + pe
 The ontology supersede of [ADR 004](./004-predicate-ontology-expansion.md) lands only if the
 PoC passes its detect-side gate; this ADR records the *placement* decision, which holds either way.
 
+Landed 2026-10-30: the gate passed on the amended check with owner sign-off (Shepherd#250), and
+[ADR 023](./023-requires-object-scope-predicate.md) supersedes ADR 004 for the authorization
+clause. The predicate's final name is `requires_object_scope`; the placement decided here is
+unchanged.
+
 ## Context
 
 The A6 diagnosis (Shepherd#240) is that `requires_dependency` is a presence rule over import
