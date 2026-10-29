@@ -172,6 +172,31 @@ class TestObjectScopeCandidates:
             "app.trans.views.*", graph, surface_files=surface) == 0
         assert object_scope_candidates("app.*", graph, surface_files=surface) == 1
 
+    def test_a_one_shot_surface_iterable_is_not_exhausted(self) -> None:
+        """Membership is tested per node, so every handler on the surface counts.
+
+        With a generator, a per-node `in` would see it empty after the first
+        handler and undercount.
+        """
+        graph = ADG(
+            nodes=tuple(
+                FQNNode(
+                    fqn=FQN.from_dotted(name), kind=FQNKind.FUNCTION,
+                    file_path="app/api/views.py", line_start=1, line_end=1,
+                    object_parameters=("pk",),
+                )
+                for name in (
+                    "app.api.views.UserViewSet.detail",
+                    "app.api.views.UserViewSet.list",
+                    "app.api.views.UserViewSet.update",
+                )
+            ),
+            edges=(),
+        )
+        surface = (path for path in ("app/api/views.py",))
+
+        assert object_scope_candidates("app.api.*", graph, surface_files=surface) == 3
+
 
 class TestPinnedDjangoFixture:
     """The URLconf join works on the real pinned Django fixture."""

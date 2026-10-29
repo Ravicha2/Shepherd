@@ -91,6 +91,10 @@ def object_scope_candidates(
     handlers elsewhere in the repo and still be aimed where the advisory has
     nothing to find.
     """
+    if surface_files is not None:
+        # Membership tests run per node; a one-shot iterable would be
+        # exhausted by the first one.
+        surface_files = set(surface_files)
     return sum(
         1
         for node in adg.nodes
