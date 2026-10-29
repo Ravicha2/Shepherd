@@ -62,6 +62,13 @@ _COARSE_AUTH = re.compile(
     r"get_current_user|get_verified_user|get_user|CurrentUser|"
     r"PermissionRequired|AuthenticationRequired|LoginRequired)"
 )
+# Only a dependency that returns the requester binds an identity. A permission
+# marker (`IsAuthenticated`, `PermissionRequired`) returns a boolean and never
+# names a requester; matching it would launder a non-identity value (#258).
+_REQUESTER_DEPENDENCY = re.compile(
+    r"(?i)^(?:get_current_user|get_verified_user|get_authenticated_user|"
+    r"get_user|current_user)$"
+)
 _TYPED_PARAM = re.compile(r"(?i)\b(?:int|UUID|PositiveInt)\b")
 _INT_ATTR = re.compile(r"(?i)\.(?:id|pk|[a-z][a-z0-9_]*_id)$")
 # The fetch-chain shape `_assigned_objects` matches (kept in one place).
@@ -262,24 +269,52 @@ def _absolute_module(current: str, module: str | None, level: int,
     return ".".join(parts) or None
 
 
+def _imports_at_module_level(tree: ast.Module) -> Iterable[ast.stmt]:
+    """Imports that bind a module-level name, including `if TYPE_CHECKING`."""
+    stack = list(tree.body)
+    while stack:
+        node = stack.pop()
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            yield node
+        elif isinstance(node, (ast.If, ast.Try)):
+            stack.extend(node.body)
+            stack.extend(getattr(node, "orelse", []))
+            stack.extend(getattr(node, "finalbody", []))
+            for handler in getattr(node, "handlers", []):
+                stack.extend(handler.body)
+
+
 def _imported_names(tree: ast.Module,
                     module_fqn: str,
                     is_package: bool = False) -> dict[str, tuple[str, str | None]]:
-    """Local name -> (module it came from, symbol), for bare-name calls."""
+    """Local name -> (module it came from, symbol), for bare-name calls.
+
+    Only module-level imports count: a function-local import binds that
+    function's namespace, and following it for a call elsewhere would invent
+    a definition. A name imported from two different places is ambiguous and
+    is dropped, so it resolves to unverified rather than one arbitrary target.
+    """
     out: dict[str, tuple[str, str | None]] = {}
-    for node in ast.walk(tree):
+    ambiguous: set[str] = set()
+    for node in _imports_at_module_level(tree):
         if isinstance(node, ast.ImportFrom):
             base = _absolute_module(module_fqn, node.module, node.level, is_package)
             if base is None:
                 continue
-            for alias in node.names:
-                out[alias.asname or alias.name] = (base, alias.name)
-        elif isinstance(node, ast.Import):
-            for alias in node.names:
-                if alias.asname:
-                    out[alias.asname] = (alias.name, None)
-                else:
-                    out[alias.name.split(".")[0]] = (alias.name, None)
+            entries = [(alias.asname or alias.name, (base, alias.name))
+                       for alias in node.names]
+        else:
+            entries = [
+                (alias.asname or alias.name.split(".")[0],
+                 (alias.name, None))
+                for alias in node.names
+            ]
+        for local, target in entries:
+            if local in out and out[local] != target:
+                ambiguous.add(local)
+            out[local] = target
+    for local in ambiguous:
+        out.pop(local, None)
     return out
 
 
@@ -586,12 +621,31 @@ def _bound_requester_params(func: ast.AST, call: ast.Call,
     return {name for name in bound if not _is_rebound(func, name)}
 
 
+def _dependency_call(node: ast.AST | None) -> ast.Call | None:
+    """The `Depends(...)`/`Security(...)` call in a default or annotation."""
+    for child in ast.walk(node) if node is not None else ():
+        if isinstance(child, ast.Call) and _dotted(child.func) in {"Depends", "Security"}:
+            return child
+    return None
+
+
+def _dependency_is_requester(call: ast.Call) -> bool:
+    """The dependency's callable returns the requester, not a permission flag."""
+    if not call.args:
+        return False
+    dependency = call.args[0]
+    if isinstance(dependency, ast.Call):
+        dependency = dependency.func
+    name = _dotted(dependency) or ""
+    return bool(_REQUESTER_DEPENDENCY.fullmatch(name.rsplit(".", 1)[-1]))
+
+
 def _di_requester_params(func: ast.AST) -> frozenset[str]:
     """Parameters the framework injects as the authenticated requester.
 
-    FastAPI's `user=Depends(get_verified_user)` (and the `Security` form) hands
-    the handler the requester under a plain name, which the vocabulary cannot
-    know from the name alone. Reading the dependency default is the idiom.
+    FastAPI's `user=Depends(get_verified_user)` (and the `Security` form, in a
+    default or an `Annotated[...]` annotation) hands the handler the requester
+    under a plain name, which the vocabulary cannot know from the name alone.
     """
     spec = getattr(func, "args", None)
     if spec is None:
@@ -600,40 +654,43 @@ def _di_requester_params(func: ast.AST) -> frozenset[str]:
     defaults = list(spec.defaults)
     pairs = list(zip(positional[len(positional) - len(defaults):], defaults))
     pairs += list(zip(spec.kwonlyargs, spec.kw_defaults))
-    return frozenset(
-        arg.arg for arg, default in pairs
-        if isinstance(default, ast.Call)
-        and _dotted(default.func) in {"Depends", "Security"}
-        and _COARSE_AUTH.search(_text(default))
-    )
+    requester: set[str] = set()
+    for arg, default in pairs:
+        call = _dependency_call(default) or _dependency_call(arg.annotation)
+        if call is not None and _dependency_is_requester(call):
+            requester.add(arg.arg)
+    return frozenset(requester)
+
+
+def _is_falsy(value: ast.AST | None) -> bool:
+    """A return of this value denies access (None, False, "", [], {})."""
+    if value is None:
+        return True
+    if isinstance(value, ast.Constant):
+        return not value.value
+    if isinstance(value, (ast.List, ast.Tuple, ast.Set)):
+        return not value.elts
+    if isinstance(value, ast.Dict):
+        return not value.keys
+    return False
 
 
 def _grant_returns(func: ast.AST) -> list[ast.Return]:
     """Returns in the helper's own body that grant, not its nested defs.
 
-    A falsy return (`False`, `None`) denies, and a return inside an `except`
-    handler is an error path, not a grant. Every other return is a path that
-    must be justified (#258).
+    A falsy return (`False`, `None`, empty container) denies. Every other
+    return is a path that must be justified -- including one in an `except`,
+    where a fail-open handler would otherwise hide behind the `try` path
+    (#258).
     """
     grants: list[ast.Return] = []
-    inside_handler = 0
 
     def walk(node: ast.AST) -> None:
-        nonlocal inside_handler
         for child in ast.iter_child_nodes(node):
             if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef,
                                   ast.ClassDef, ast.Lambda)):
                 continue
-            if isinstance(child, ast.ExceptHandler):
-                inside_handler += 1
-                walk(child)
-                inside_handler -= 1
-                continue
-            if isinstance(child, ast.Return) and not inside_handler:
-                value = child.value
-                if (value is None
-                        or (isinstance(value, ast.Constant) and not value.value)):
-                    continue
+            if isinstance(child, ast.Return) and not _is_falsy(child.value):
                 grants.append(child)
             walk(child)
 
@@ -641,26 +698,99 @@ def _grant_returns(func: ast.AST) -> list[ast.Return]:
     return grants
 
 
-def _nearest_assignment(func: ast.AST, name: str,
-                        before: int) -> ast.AST | None:
-    """The value assigned to *name* most recently before line *before*."""
-    best: tuple[int, ast.AST] | None = None
-    for node in ast.walk(func):
-        if isinstance(node, ast.Assign):
-            targets, value = node.targets, node.value
-        elif isinstance(node, ast.AnnAssign) and node.value is not None:
-            targets, value = (node.target,), node.value
-        else:
+# The value of an augmented assignment or a binding we cannot follow; treating
+# it as "no requester" keeps the miss visible instead of falling back to an
+# earlier assignment and inventing a check that does not dominate the grant.
+_UNRESOLVED = object()
+
+
+def _assigned_value(stmt: ast.stmt, name: str) -> tuple[bool, ast.AST | object | None]:
+    """Whether *stmt* assigns *name*, and the value it assigns.
+
+    A bare annotation binds None; an augmented assignment is `_UNRESOLVED`.
+    """
+    if isinstance(stmt, ast.Assign):
+        targets, value = stmt.targets, stmt.value
+    elif isinstance(stmt, ast.AnnAssign):
+        if stmt.value is None:
+            return False, None
+        targets, value = (stmt.target,), stmt.value
+    elif isinstance(stmt, ast.AugAssign):
+        targets, value = (stmt.target,), _UNRESOLVED
+    else:
+        return False, None
+    if not any(isinstance(target, ast.Name) and target.id == name
+               for target in targets):
+        return False, None
+    return True, value
+
+
+def _contains_assignment(node: ast.AST, name: str) -> bool:
+    """A statement anywhere under *node* (outside a nested def) assigns *name*."""
+    for child in ast.iter_child_nodes(node):
+        if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef,
+                              ast.ClassDef, ast.Lambda)):
             continue
-        if not any(isinstance(target, ast.Name) and target.id == name
+        if isinstance(child, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
+            if isinstance(child, ast.Assign):
+                targets = child.targets
+            else:
+                targets = (child.target,)
+            if any(isinstance(target, ast.Name) and target.id == name
                    for target in targets):
-            continue
-        if node.lineno <= before and (best is None or node.lineno > best[0]):
-            best = (node.lineno, value)
-    return best[1] if best is not None else None
+                return True
+        if _contains_assignment(child, name):
+            return True
+    return False
 
 
-def _expression_names_requester(func: ast.AST, expr: ast.AST, before: int,
+def _statement_list(parent: ast.AST, child: ast.AST) -> list[ast.stmt] | None:
+    """The statement list of *parent* that directly contains *child*."""
+    for attr in ("body", "orelse", "finalbody"):
+        statements = getattr(parent, attr, None)
+        if isinstance(statements, list) and any(stmt is child for stmt in statements):
+            return statements
+    return None
+
+
+def _statement_parents(func: ast.AST) -> dict[int, ast.AST]:
+    """id(child) -> parent, for parent links used by the assignment walk."""
+    return {id(child): parent for parent in ast.walk(func)
+            for child in ast.iter_child_nodes(parent)}
+
+
+def _nearest_assignment(func: ast.AST, name: str,
+                        use: ast.AST) -> ast.AST | object | None:
+    """The value assigned to *name* that dominates *use*, innermost block first.
+
+    Only an assignment in the same statement list before the statement on the
+    path dominates: an assignment in a sibling branch does not. An augmented
+    assignment yields `_UNRESOLVED`, since its result cannot be traced from the
+    text alone.
+    """
+    parents = _statement_parents(func)
+    node: ast.AST = use
+    while id(node) in parents:
+        parent = parents[id(node)]
+        statements = _statement_list(parent, node)
+        if statements is not None:
+            index = next(i for i, stmt in enumerate(statements) if stmt is node)
+            value: ast.AST | object | None = None
+            for stmt in statements[:index]:
+                assigns, direct = _assigned_value(stmt, name)
+                if assigns:
+                    value = direct
+                elif _contains_assignment(stmt, name):
+                    # A conditional or loop assignment may or may not run;
+                    # assuming the earlier value would invent a check.
+                    value = _UNRESOLVED
+            if value is not None:
+                return value
+        node = parent
+    return None
+
+
+def _expression_names_requester(func: ast.AST, expr: ast.AST, use: ast.AST,
                                 requester_tokens: set[str]) -> bool:
     """The expression names the requester, directly or through an assignment.
 
@@ -673,54 +803,76 @@ def _expression_names_requester(func: ast.AST, expr: ast.AST, before: int,
         local = re.split(r"[.\[]", dotted)[0]
         if local in requester_tokens:
             return True
-        value = _nearest_assignment(func, local, before)
-        if value is not None and _mentions_requester(value, requester_tokens):
+        value = _nearest_assignment(func, local, use)
+        if (value is not None and value is not _UNRESOLVED
+                and _mentions_requester(value, requester_tokens)):
             return True
     return False
 
 
-def _unsound_or(func: ast.AST, expr: ast.AST, before: int,
+def _authorizes(func: ast.AST, expr: ast.AST, truth: bool, use: ast.AST,
                 requester_tokens: set[str]) -> bool:
-    """An OR in the condition lets a branch grant without the requester.
+    """*expr* evaluated to *truth* requires the requester to be this requester.
 
-    For `A or B` to scope, every disjunct must name the requester; one
-    requester-less disjunct is a grant path that bypasses the check.
+    Polarity matters: `x == user` authorizes when true, `x != user` authorizes
+    when false, and an `or` authorizes only when every disjunct does, since any
+    one disjunct can grant on its own.
     """
-    return any(
-        isinstance(node, ast.BoolOp) and isinstance(node.op, ast.Or)
-        and not all(_expression_names_requester(func, value, before,
-                                                 requester_tokens)
-                    for value in node.values)
-        for node in ast.walk(expr))
+    if isinstance(expr, ast.UnaryOp) and isinstance(expr.op, ast.Not):
+        return _authorizes(func, expr.operand, not truth, use, requester_tokens)
+    if isinstance(expr, ast.BoolOp):
+        if not truth:
+            return False
+        if isinstance(expr.op, ast.And):
+            return any(_authorizes(func, value, True, use, requester_tokens)
+                       for value in expr.values)
+        return all(_authorizes(func, value, True, use, requester_tokens)
+                   for value in expr.values)
+    if isinstance(expr, ast.IfExp):
+        return (_authorizes(func, expr.body, truth, use, requester_tokens)
+                and _authorizes(func, expr.orelse, truth, use, requester_tokens))
+    if isinstance(expr, ast.Compare):
+        if len(expr.ops) != 1 or len(expr.comparators) != 1:
+            return False
+        names = _expression_names_requester(func, expr, use, requester_tokens)
+        if isinstance(expr.ops[0], (ast.Eq, ast.Is)):
+            return truth and names
+        if isinstance(expr.ops[0], (ast.NotEq, ast.IsNot)):
+            return not truth and names
+        return False
+    return truth and _expression_names_requester(
+        func, expr, use, requester_tokens)
 
 
 def _grant_path_names_requester(func: ast.AST, ret: ast.Return,
                                 requester_tokens: set[str]) -> bool:
-    """The path to *ret* names the requester in its condition or in a value.
+    """The path to *ret* is gated by the requester in a condition or a value.
 
-    The path is the chain of enclosing conditions and loop iterables plus the
-    returned value. An OR in that chain is only sound when every disjunct
-    names the requester, since any disjunct alone can grant the return.
+    The path is the chain of enclosing conditions (with the polarity of the
+    branch the return sits in) and loop iterables, plus the returned value.
+    Any one condition that requires the requester gates every execution that
+    reaches the return; an OR is only sound when every disjunct does.
     """
     parents = _parents(func)
-    conditions: list[ast.AST] = []
+    conditions: list[tuple[ast.AST, bool]] = []
     node: ast.AST = ret
     while node in parents:
         parent = parents[node]
-        if isinstance(parent, (ast.If, ast.While)):
-            conditions.append(parent.test)
-        elif isinstance(parent, (ast.For, ast.AsyncFor)):
-            conditions.append(parent.iter)
+        if isinstance(parent, ast.If):
+            # A return in the else branch runs when the test is false.
+            conditions.append((parent.test, node in parent.body))
+        elif isinstance(parent, (ast.While, ast.For, ast.AsyncFor)):
+            # Only the body is gated: an `else` runs after the loop ends, which
+            # a break can cause, so the test/iterable being false proves nothing.
+            if node in parent.body:
+                test = parent.test if isinstance(parent, ast.While) else parent.iter
+                conditions.append((test, True))
         node = parent
-    if any(_unsound_or(func, cond, ret.lineno, requester_tokens)
-           for cond in conditions):
-        return False
-    expressions = list(conditions)
-    if ret.value is not None:
-        expressions.append(ret.value)
-    return any(_expression_names_requester(func, expr, ret.lineno,
-                                            requester_tokens)
-               for expr in expressions)
+    if any(_authorizes(func, cond, truth, ret, requester_tokens)
+           for cond, truth in conditions):
+        return True
+    return ret.value is not None and _authorizes(
+        func, ret.value, True, ret, requester_tokens)
 
 
 def _every_grant_names_requester(func: ast.AST,
@@ -1292,6 +1444,7 @@ def backfill_handler_facts(adg: ADG, repo_path: Path) -> ADG:
 
     trees: dict[str, ast.Module | None] = {}
     resolvers: dict[str, ImportedDefinitions] = {}
+    module_files: dict[str, str | None] = {}
 
     def tree_at(file_path: str) -> ast.Module | None:
         if file_path not in trees:
@@ -1308,7 +1461,9 @@ def backfill_handler_facts(adg: ADG, repo_path: Path) -> ADG:
                  if node.kind is FQNKind.MODULE and node.file_path == file_path),
                 "")
             def module_source(module: str) -> ast.Module | None:
-                path = _module_source_file(adg, module)
+                if module not in module_files:
+                    module_files[module] = _module_source_file(adg, module)
+                path = module_files[module]
                 return tree_at(path) if path is not None else None
 
             resolvers[file_path] = ImportedDefinitions(
