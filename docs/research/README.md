@@ -19,6 +19,7 @@ The security eval does **not** use the durability vocabulary, DVs or artifacts. 
 | `longitudinal-replay-census.md` | longitudinal | **parked** | replay viability and run cost of the pinned 5 (#179) |
 | `issue-207-decision-log.md` | longitudinal | **parked** | the 2026-10-10 grill session behind the plan's §5 dated notes |
 | `node_search_lit_review_plan.md` | tool | delivered (ADR 017) | lit-review plan for the `node_search` response contracts |
+| `issue-259-gate-write-up.md` | security eval (A6) | delivered (#259 closed) | the #249 gate verdict from the #267 record: tandoor limitation, the 14-case attribution, recall arithmetic |
 
 Paths were not moved when the study was parked. Closed issues, the RFC bundle in `lit-rev/`, the
 frozen plan and `research-exp-setup/docs/` all quote them; each parked doc carries a scope banner
