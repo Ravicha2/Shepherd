@@ -667,7 +667,9 @@ def _di_requester_params(func: ast.AST) -> frozenset[str]:
         return frozenset()
     positional = list(getattr(spec, "posonlyargs", [])) + list(spec.args)
     defaults = list(spec.defaults)
-    pairs = list(zip(positional[len(positional) - len(defaults):], defaults))
+    offset = len(positional) - len(defaults)
+    pairs = [(arg, defaults[index - offset] if index >= offset else None)
+             for index, arg in enumerate(positional)]
     pairs += list(zip(spec.kwonlyargs, spec.kw_defaults))
     requester: set[str] = set()
     for arg, default in pairs:
@@ -687,6 +689,9 @@ def _is_falsy(value: ast.AST | None) -> bool:
         return not value.elts
     if isinstance(value, ast.Dict):
         return not value.keys
+    if isinstance(value, ast.Call) and not value.args and not value.keywords:
+        return _dotted(value.func) in {"set", "frozenset", "dict", "list",
+                                       "tuple", "bool"}
     return False
 
 
@@ -719,10 +724,25 @@ def _grant_returns(func: ast.AST) -> list[ast.Return]:
 _UNRESOLVED = object()
 
 
+def _target_names(target: ast.AST) -> Iterable[str]:
+    """Names a binding target assigns: `a`, `(a, b)`, `[a, *rest]`."""
+    if isinstance(target, ast.Name):
+        yield target.id
+    elif isinstance(target, (ast.Tuple, ast.List)):
+        for element in target.elts:
+            yield from _target_names(element)
+    elif isinstance(target, ast.Starred):
+        yield from _target_names(target.value)
+
+
+def _target_binds(targets: Iterable[ast.AST], name: str) -> bool:
+    return any(name in _target_names(target) for target in targets)
+
+
 def _assigned_value(stmt: ast.stmt, name: str) -> tuple[bool, ast.AST | object | None]:
     """Whether *stmt* assigns *name*, and the value it assigns.
 
-    A bare annotation binds None; an augmented assignment is `_UNRESOLVED`.
+    A bare annotation binds nothing; an augmented assignment is `_UNRESOLVED`.
     """
     if isinstance(stmt, ast.Assign):
         targets, value = stmt.targets, stmt.value
@@ -734,26 +754,38 @@ def _assigned_value(stmt: ast.stmt, name: str) -> tuple[bool, ast.AST | object |
         targets, value = (stmt.target,), _UNRESOLVED
     else:
         return False, None
-    if not any(isinstance(target, ast.Name) and target.id == name
-               for target in targets):
+    if not _target_binds(targets, name):
         return False, None
     return True, value
 
 
 def _contains_assignment(node: ast.AST, name: str) -> bool:
-    """A statement anywhere under *node* (outside a nested def) assigns *name*."""
+    """A statement anywhere under *node* (outside a nested def) binds *name*.
+
+    Loop targets, `with ... as`, and walrus assignments rebind the name too;
+    missing them would let an earlier requester-derived value stand in for a
+    check that no longer runs.
+    """
+    if isinstance(node, (ast.Assign, ast.AugAssign)) or (
+            isinstance(node, ast.AnnAssign) and node.value is not None):
+        targets = node.targets if isinstance(node, ast.Assign) else (node.target,)
+        if _target_binds(targets, name):
+            return True
+    elif isinstance(node, (ast.For, ast.AsyncFor)):
+        if _target_binds((node.target,), name):
+            return True
+    elif isinstance(node, (ast.With, ast.AsyncWith)):
+        if any(item.optional_vars is not None
+               and _target_binds((item.optional_vars,), name)
+               for item in node.items):
+            return True
+    elif isinstance(node, ast.NamedExpr):
+        if isinstance(node.target, ast.Name) and node.target.id == name:
+            return True
     for child in ast.iter_child_nodes(node):
         if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef,
                               ast.ClassDef, ast.Lambda)):
             continue
-        if isinstance(child, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
-            if isinstance(child, ast.Assign):
-                targets = child.targets
-            else:
-                targets = (child.target,)
-            if any(isinstance(target, ast.Name) and target.id == name
-                   for target in targets):
-                return True
         if _contains_assignment(child, name):
             return True
     return False
@@ -883,7 +915,9 @@ def _grant_path_names_requester(func: ast.AST, ret: ast.Return,
                 test = parent.test if isinstance(parent, ast.While) else parent.iter
                 conditions.append((test, True))
         node = parent
-    if any(_authorizes(func, cond, truth, ret, requester_tokens)
+    # Judge each condition at the condition's own position: an assignment made
+    # inside the grant branch is not in force when the condition runs.
+    if any(_authorizes(func, cond, truth, cond, requester_tokens)
            for cond, truth in conditions):
         return True
     return ret.value is not None and _authorizes(

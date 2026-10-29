@@ -726,13 +726,14 @@ def test_an_imported_but_missing_symbol_is_unverified_not_scoping() -> None:
 def _imported_helper_scopes(helper_body: str,
                             call: str = "has_access(item_id, user)",
                             params: str = "user=Depends(get_verified_user)",
+                            return_name: str = "user",
                             ) -> bool:
     handler = f"""
         from app.access import has_access
 
         def get_file(item_id, {params}):
             if {call}:
-                return {params.split('=')[0]}
+                return {return_name}
     """
     resolver = _helper_resolver(handler, **{"app.access": dedent(helper_body)})
     guards = extract_guards(
@@ -828,6 +829,75 @@ def test_a_falsy_container_return_is_not_a_grant_path() -> None:
             if owner_of(item_id) == user.id:
                 return True
             return []
+    """)
+
+
+def test_a_positional_annotated_dependency_binds_the_requester() -> None:
+    assert _imported_helper_scopes("""
+        def has_access(item_id, user):
+            return owner_of(item_id) == user.id
+    """,
+        params="user: Annotated[User, Depends(get_verified_user)]",
+        return_name="user")
+
+
+def test_unpacking_loop_and_with_targets_stop_a_traced_local() -> None:
+    """`allowed` is rebound by a construct that does not name the requester;
+    the earlier requester-derived value must not stand in for it."""
+    assert not _imported_helper_scopes("""
+        def has_access(item_id, user):
+            allowed = allowed_for(user.id)
+            allowed, other = shared_with(item_id), None
+            if allowed:
+                return True
+            return False
+    """)
+    assert not _imported_helper_scopes("""
+        def has_access(item_id, user):
+            allowed = allowed_for(user.id)
+            for allowed in shared_with(item_id):
+                pass
+            if allowed:
+                return True
+            return False
+    """)
+    assert not _imported_helper_scopes("""
+        def has_access(item_id, user):
+            allowed = allowed_for(user.id)
+            with shared_with(item_id) as allowed:
+                pass
+            if allowed:
+                return True
+            return False
+    """)
+    assert not _imported_helper_scopes("""
+        def has_access(item_id, user):
+            allowed = allowed_for(user.id)
+            if (allowed := shared_with(item_id)):
+                pass
+            if allowed:
+                return True
+            return False
+    """)
+
+
+def test_an_assignment_inside_the_grant_branch_does_not_launder_the_condition() -> None:
+    assert not _imported_helper_scopes("""
+        def has_access(item_id, user):
+            allowed = False
+            if allowed:
+                allowed = allowed_for(user.id)
+                return True
+            return False
+    """)
+
+
+def test_an_empty_container_constructor_return_is_not_a_grant_path() -> None:
+    assert _imported_helper_scopes("""
+        def has_access(item_id, user):
+            if owner_of(item_id) == user.id:
+                return True
+            return set()
     """)
 
 
