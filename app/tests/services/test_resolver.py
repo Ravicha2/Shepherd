@@ -200,3 +200,38 @@ class TestMatchStatus:
 
     def test_no_segment(self) -> None:
         assert not hasattr(MatchStatus, "SEGMENT")
+
+
+# ===========================================================================
+# 9. NameResolver.resolve_unique: suffix grounding (#256)
+# ===========================================================================
+
+
+class TestNameResolverResolveUnique:
+    def test_single_suffix_match_resolves(self) -> None:
+        resolver = NameResolver({
+            FQN.from_dotted("src.backend.base.langflow.services.auth.service"),
+            FQN.from_dotted("src.backend.base.langflow.services.auth"),
+        })
+        assert resolver.resolve_unique("langflow.services.auth.service") == FQN.from_dotted(
+            "src.backend.base.langflow.services.auth.service"
+        )
+
+    def test_exact_match_resolves(self) -> None:
+        resolver = NameResolver({FQN.from_dotted("app.api")})
+        assert resolver.resolve_unique("app.api") == FQN.from_dotted("app.api")
+
+    def test_ambiguous_suffix_returns_none(self) -> None:
+        resolver = NameResolver({
+            FQN.from_dotted("one.api.users"),
+            FQN.from_dotted("two.api.users"),
+        })
+        assert resolver.resolve_unique("api.users") is None
+
+    def test_no_match_returns_none(self) -> None:
+        resolver = NameResolver({FQN.from_dotted("app.api")})
+        assert resolver.resolve_unique("missing.module") is None
+
+    def test_builtin_bare_name_returns_none(self) -> None:
+        resolver = NameResolver({FQN.from_dotted("app.attribute.type")})
+        assert resolver.resolve_unique("type") is None
