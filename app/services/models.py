@@ -44,8 +44,11 @@ class Guard:
     `symbol` is the guard callable (decorator or call), or for a bare
     comparison the function that applies it. `scopes_object` is the verdict:
     the predicate names the loaded object and the requester and is neither
-    dead nor conditionally applied. The remaining fields are the soundness
-    checks ported from the object-scope pre-gate.
+    dead nor conditionally applied. `covers` names the route object
+    parameters that verdict actually scopes; empty means "covers every
+    parameter", so guards stored before the field keep their behaviour. The
+    remaining fields are the soundness checks ported from the object-scope
+    pre-gate.
     """
 
     symbol: str
@@ -54,6 +57,7 @@ class Guard:
     conditional: bool = False
     dead: bool = False
     bypass: bool = False
+    covers: tuple[str, ...] = ()
 
 
 @dataclass
