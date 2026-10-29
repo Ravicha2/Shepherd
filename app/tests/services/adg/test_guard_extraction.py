@@ -95,10 +95,176 @@ def _single_guard(source: str, handler: str,
         ),
         id="auth-gate",
     ),
+    pytest.param(
+        "detail", ("item_id",),
+        """
+        def detail(self, request, item_id):
+            if self.restricted:
+                item = Item.objects.filter(pk=item_id, owner=request.user).first()
+            return item
+        """,
+        Guard(
+            symbol="detail",
+            predicate="Item.objects.filter(pk=item_id, owner=request.user).first()",
+            scopes_object=False,
+            conditional=True,
+        ),
+        id="conditional-fetch-chain",
+    ),
+    pytest.param(
+        "detail", ("item_id",),
+        """
+        def detail(request, item_id):
+            return Item.objects.filter(Q(pk=item_id) | Q(owner=request.user)).first()
+        """,
+        Guard(
+            symbol="detail",
+            predicate="Item.objects.filter(Q(pk=item_id) | Q(owner=request.user)).first()",
+            scopes_object=False,
+        ),
+        id="or-branch-bypasses-ownership",
+    ),
+    pytest.param(
+        "detail", ("item_id",),
+        """
+        def detail(request, item_id):
+            return Item.objects.filter(pk=item_id).exclude(owner=request.user).first()
+        """,
+        Guard(
+            symbol="detail",
+            predicate="Item.objects.filter(pk=item_id).exclude(owner=request.user).first()",
+            scopes_object=False,
+        ),
+        id="exclude-negates-ownership",
+    ),
+    pytest.param(
+        "detail", ("item_id",),
+        """
+        def detail(request, item_id):
+            return Item.objects.filter(pk=item_id, user__tenant=request.user.tenant).first()
+        """,
+        Guard(
+            symbol="detail",
+            predicate="Item.objects.filter(pk=item_id, user__tenant=request.user.tenant).first()",
+            scopes_object=False,
+        ),
+        id="tenant-bound-field-does-not-scope",
+    ),
+    pytest.param(
+        "detail", ("id",),
+        """
+        def detail(self, request, id):
+            return get_object_or_404(StaffSession, pk=self.kwargs['id'], user=self.request.user)
+        """,
+        Guard(
+            symbol="detail",
+            predicate="get_object_or_404(StaffSession, pk=self.kwargs['id'], user=self.request.user)",
+            scopes_object=True,
+            covers=("id",),
+        ),
+        id="kwarg-subscript-ties-to-route-param",
+    ),
+    pytest.param(
+        "detail", ("item_id",),
+        """
+        def detail(request, item_id):
+            oid = int(item_id)
+            return Item.objects.filter(pk=oid, owner=request.user).first()
+        """,
+        Guard(
+            symbol="detail",
+            predicate="Item.objects.filter(pk=oid, owner=request.user).first()",
+            scopes_object=True,
+            covers=("item_id",),
+        ),
+        id="local-alias-ties-to-route-param",
+    ),
+    pytest.param(
+        "detail", ("item_id",),
+        """
+        def detail(request, item_id):
+            return get_object_or_404(Item.objects.filter(owner=request.user), pk=item_id)
+        """,
+        Guard(
+            symbol="detail",
+            predicate="get_object_or_404(Item.objects.filter(owner=request.user), pk=item_id)",
+            scopes_object=True,
+            covers=("item_id",),
+        ),
+        id="inline-queryset-carries-the-requester-filter",
+    ),
+    pytest.param(
+        "detail", ("item_id",),
+        """
+        def detail(request, item_id):
+            return Item.objects.filter(owner=request.user).exclude(pk=item_id).first()
+        """,
+        Guard(
+            symbol="detail",
+            predicate="Item.objects.filter(owner=request.user).exclude(pk=item_id).first()",
+            scopes_object=True,
+            covers=("item_id",),
+        ),
+        id="exclude-narrowing-a-scoped-queryset-still-scopes",
+    ),
+    pytest.param(
+        "detail", ("id",),
+        """
+        def detail(request, id):
+            return Item.objects.filter(pk=other.id, owner=request.user).first()
+        """,
+        Guard(
+            symbol="detail",
+            predicate="Item.objects.filter(pk=other.id, owner=request.user).first()",
+            scopes_object=False,
+        ),
+        id="param-name-inside-another-name-does-not-tie",
+    ),
+    pytest.param(
+        "detail", ("item_id",),
+        """
+        def detail(request, item_id):
+            return Item.objects.filter(pk=item_id, owner__in=request.user.teammate_ids).first()
+        """,
+        Guard(
+            symbol="detail",
+            predicate="Item.objects.filter(pk=item_id, owner__in=request.user.teammate_ids).first()",
+            scopes_object=False,
+        ),
+        id="requester-derived-value-is-not-the-requester",
+    ),
 ])
-def test_a_scoping_comparison_is_judged_by_where_and_how_it_runs(
+def test_a_scoping_guard_is_judged_by_where_and_how_it_runs(
         handler: str, params: tuple[str, ...], source: str, expected: Guard) -> None:
     assert _single_guard(source, handler, params) == expected
+
+
+def test_an_unrelated_ownership_fetch_does_not_clear_the_handler() -> None:
+    guards = extract_guards(
+        dedent(
+            """
+            def detail(request, item_id):
+                if AuditLog.objects.filter(id=log_id, user=request.user).exists():
+                    return Item.objects.get(pk=item_id)
+            """
+        ),
+        "detail", ("item_id",))
+
+    assert guards
+    assert not any(guard.scopes_object for guard in guards)
+
+
+def test_a_chain_guard_names_the_route_parameters_it_covers() -> None:
+    guards = extract_guards(
+        dedent(
+            """
+            def detail(request, item_id, owner_id):
+                return Item.objects.filter(pk=item_id, owner=request.user).first()
+            """
+        ),
+        "detail", ("item_id", "owner_id"))
+
+    assert [guard.covers for guard in guards if guard.scopes_object] == [("item_id",)]
 
 
 def test_django_re_path_named_group_yields_the_parameter_name() -> None:
@@ -348,3 +514,16 @@ class TestPinnedGuardFixtures:
         assert not any(guard.scopes_object for guard in vulnerable)
         assert any(guard.symbol == "self.perm_check" and guard.scopes_object
                    for guard in fixed)
+
+    def test_tandoor_tenant_filter_does_not_scope_but_ownership_filter_does(self) -> None:
+        handler = "cookbook.views.api.RecipeViewSet.batch_update"
+        vulnerable = _guards_at(
+            "recipes", "0b363fb6100e0c5d0044f60f64c0c285f86c786b", handler)
+        fixed = _guards_at(
+            "recipes", "84fa837c5412d50758ce32965b49a041517ce28d", handler)
+
+        assert any("space=self.request.space" in guard.predicate
+                   and not guard.scopes_object for guard in vulnerable)
+        assert not any(guard.scopes_object for guard in vulnerable)
+        assert any("created_by=self.request.user" in guard.predicate
+                   and guard.scopes_object for guard in fixed)

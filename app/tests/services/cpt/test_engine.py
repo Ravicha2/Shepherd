@@ -545,6 +545,37 @@ class TestCheckObjectScopePredicates:
 
         assert check_object_scope_predicates(match_constraints(adg), adg.node_of) == []
 
+    def test_a_guard_must_cover_each_route_object_parameter(self) -> None:
+        from services.cpt.engine import check_object_scope_predicates, match_constraints
+
+        adg = _object_scope_adg(
+            guards=(
+                Guard(symbol="fetch",
+                      predicate="Item.objects.filter(pk=item_id, owner=request.user)",
+                      scopes_object=True, covers=("item_id",)),
+            ),
+            object_parameters=("item_id", "owner_id"),
+        )
+
+        violations = check_object_scope_predicates(match_constraints(adg), adg.node_of)
+
+        assert [str(v.matched_fqn) for v in violations] == ["app.routes.detail"]
+
+    def test_guards_covering_every_parameter_are_silent(self) -> None:
+        from services.cpt.engine import check_object_scope_predicates, match_constraints
+
+        adg = _object_scope_adg(
+            guards=(
+                Guard(symbol="fetch", predicate="filter(pk=item_id)",
+                      scopes_object=True, covers=("item_id",)),
+                Guard(symbol="fetch", predicate="filter(owner_id=owner_id)",
+                      scopes_object=True, covers=("owner_id",)),
+            ),
+            object_parameters=("item_id", "owner_id"),
+        )
+
+        assert check_object_scope_predicates(match_constraints(adg), adg.node_of) == []
+
     def test_no_guards_at_all_still_fires(self) -> None:
         """Class (i): absence of a guard is the same failure, not a pass."""
         from services.cpt.engine import check_object_scope_predicates, match_constraints

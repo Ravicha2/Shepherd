@@ -18,10 +18,12 @@ from services.adg import parse_repo
 from services.adg.object_scope import (
     backfill_handler_facts,
     object_parameters,
+    object_scope_candidates,
     typed_object_parameters,
 )
 from services.adg.route_inventory import repo_at_sha
-from services.models import FQNNode
+from services.fqn import FQN
+from services.models import ADG, FQNKind, FQNNode
 
 DJANGO_FIXTURE = Path(__file__).resolve().parents[4] / "repos" / "django"
 DJANGO_PIN = "f35a463d714f261baddf04bc43cc8b5910fe084e"
@@ -170,6 +172,98 @@ class TestKwargsObjectIds:
 
         assert filled.node_of["app.views.download"].object_parameters == ("cfid",)
         assert filled.node_of["app.views.PreviewView"].object_parameters == ("file_id",)
+
+
+def _graph(*nodes: tuple[str, tuple[str, ...]]) -> ADG:
+    return ADG(
+        nodes=tuple(
+            FQNNode(
+                fqn=FQN.from_dotted(name), kind=FQNKind.FUNCTION, file_path="",
+                line_start=1, line_end=1, object_parameters=params,
+            )
+            for name, params in nodes
+        ),
+        edges=(),
+    )
+
+
+class TestObjectScopeCandidates:
+    """The zero-candidate honesty check (#255)."""
+
+    def test_a_subject_matching_handlers_with_object_facts_counts_them(self) -> None:
+        adg = _graph(
+            ("app.api.views.UserViewSet.detail", ("pk",)),
+            ("app.trans.views.index", ("project_id",)),
+        )
+
+        assert object_scope_candidates("app.api.*", adg) == 1
+        assert object_scope_candidates("app.*", adg) == 2
+        assert object_scope_candidates("app.api.views.UserViewSet.detail", adg) == 1
+
+    def test_a_subject_matching_no_handler_with_object_facts_is_zero(self) -> None:
+        """A namespace with no handler under it has nothing to find."""
+        adg = _graph(("app.api.views.UserViewSet.detail", ("pk",)))
+
+        assert object_scope_candidates("app.trans.views.*", adg) == 0
+        assert object_scope_candidates("app.missing.*", adg) == 0
+
+    def test_a_handler_without_object_facts_does_not_count(self) -> None:
+        adg = _graph(("app.views.index", ()))
+
+        assert object_scope_candidates("app.*", adg) == 0
+
+    def test_a_subject_matching_handlers_off_the_advisory_surface_is_zero(self) -> None:
+        """The weblate shape: the subject matches code, but not the surface.
+
+        `app.trans.views.*` has handlers with object facts, yet none of them is
+        the API surface the advisory names, so the row still has nothing to
+        find. Counting repo-wide would read this row as aimed and clean.
+        """
+        graph = ADG(
+            nodes=tuple(
+                FQNNode(
+                    fqn=FQN.from_dotted(name), kind=FQNKind.FUNCTION,
+                    file_path=path, line_start=1, line_end=1,
+                    object_parameters=params,
+                )
+                for name, params, path in (
+                    ("app.trans.views.index", ("project_id",), "app/trans/views.py"),
+                    ("app.api.views.UserViewSet.detail", ("username",), "app/api/views.py"),
+                )
+            ),
+            edges=(),
+        )
+        surface = {"app/api/views.py"}
+
+        assert object_scope_candidates("app.trans.views.*", graph) == 1
+        assert object_scope_candidates(
+            "app.trans.views.*", graph, surface_files=surface) == 0
+        assert object_scope_candidates("app.*", graph, surface_files=surface) == 1
+
+    def test_a_one_shot_surface_iterable_is_not_exhausted(self) -> None:
+        """Membership is tested per node, so every handler on the surface counts.
+
+        With a generator, a per-node `in` would see it empty after the first
+        handler and undercount.
+        """
+        graph = ADG(
+            nodes=tuple(
+                FQNNode(
+                    fqn=FQN.from_dotted(name), kind=FQNKind.FUNCTION,
+                    file_path="app/api/views.py", line_start=1, line_end=1,
+                    object_parameters=("pk",),
+                )
+                for name in (
+                    "app.api.views.UserViewSet.detail",
+                    "app.api.views.UserViewSet.list",
+                    "app.api.views.UserViewSet.update",
+                )
+            ),
+            edges=(),
+        )
+        surface = (path for path in ("app/api/views.py",))
+
+        assert object_scope_candidates("app.api.*", graph, surface_files=surface) == 3
 
 
 class TestPinnedDjangoFixture:

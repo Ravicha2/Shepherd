@@ -284,6 +284,13 @@ object. An edge without a `scope` key is treated as `runtime`.
   A wildcard subject must extend a real prefix the tools returned; never emit a wildcard
   whose base contains an empty or `*` segment. This is the subject-side analog of the
   object-grounding rule.
+- `requires_object_scope` subject coverage: this rule asks whether every request handler
+  scopes the object it loads, so its subject must cover the repo's HTTP API surfaces —
+  the modules that register request handlers or routes. When those surfaces span several
+  subtrees, take the repo-root subject (the root package) so one row covers them all, or
+  emit one row per API-surface subtree. Do not anchor this subject at a namespace that
+  only shares a name with the web layer: a subject matching no request handler can never
+  fire, so it reports nothing and is a lowering miss, not a clean pass.
 - Policy, tooling, and whole-codebase constraints (linters, formatters, test runners, build
   tooling, language versions, frameworks) take the ROOT PACKAGE as subject. NEVER use
   file-entry-point modules (`manage`, `noxfile`, `setup`, `conftest`) as subjects, even
@@ -652,7 +659,67 @@ def _external_packages(adg: ADG) -> set[str]:
     }
 
 
-def _validate_edge(edge: ConstraintEdge, adg: ADG) -> bool:
+@dataclass(frozen=True)
+class ObjectGrounding:
+    """How an emitted object FQN relates to the graph at this revision (#256).
+
+    `exact` and `unique_suffix` are grounded to a real node; `prefix` is an
+    internal namespace that contains nodes; `external` is a genuine third-party
+    package (its own label, never an orphan); only `unknown` is ungrounded.
+    """
+
+    label: str  # exact | unique_suffix | prefix | external | unknown
+    resolved_fqn: str | None = None
+    package: str | None = None
+
+    @property
+    def grounded(self) -> bool:
+        return self.label != "unknown"
+
+    def as_dict(self) -> dict[str, str | None]:
+        return {
+            "label": self.label,
+            "resolved_fqn": self.resolved_fqn,
+            "package": self.package,
+        }
+
+
+def ground_object(fqn_pattern: str, adg: ADG) -> ObjectGrounding:
+    """Classify an emitted object FQN against the graph.
+
+    A wildcard base is compared as its base. Unique-suffix resolution is the
+    honest grounding for an object emitted without the repo's source root
+    (langflow's `langflow.services.auth.service` lives under
+    `src.backend.base...`). Ties are `unknown`: grounding on a coin-flip is
+    worse than reporting the row ungrounded.
+
+    Suffix resolution deliberately precedes the external check: a repo's own
+    package can also be an import root outside the source root (langflow's
+    `langflow` inside `src.backend.base`), so `external` there would be the
+    wrong label. The exact check is cheap, and the suffix index is only
+    constructed on the first object that is not an exact node (#256).
+    """
+    base = fqn_pattern.rstrip(".*")
+    node = adg.node_of.get(base)
+    if node is not None and node.kind is not FQNKind.EXTERNAL:
+        return ObjectGrounding("exact", resolved_fqn=base)
+    resolved = adg.name_resolver.resolve_unique(base)
+    if resolved is not None:
+        return ObjectGrounding("unique_suffix", resolved_fqn=str(resolved))
+    if any(
+        node.kind is not FQNKind.EXTERNAL and str(node.fqn).startswith(base + ".")
+        for node in adg.nodes
+    ):
+        return ObjectGrounding("prefix")
+    first = base.split(".")[0]
+    if first in _external_packages(adg):
+        return ObjectGrounding("external", package=first)
+    return ObjectGrounding("unknown")
+
+
+def _validate_edge(
+    edge: ConstraintEdge, adg: ADG, grounding: ObjectGrounding | None = None,
+) -> bool:
     """Return True if edge passes root-namespace-aware validation.
 
     Subject: internal pattern (first segment in roots) must match an ADG node;
@@ -665,7 +732,9 @@ def _validate_edge(edge: ConstraintEdge, adg: ADG) -> bool:
       - `prohibits_*`: external object passes unvalidated (linter checks absence);
         internal object must match the ADG.
     """
-    all_fqns = {str(n.fqn) for n in adg.nodes}
+    all_fqns = {
+        str(n.fqn) for n in adg.nodes if n.kind is not FQNKind.EXTERNAL
+    }
     roots = _root_segments(adg)
 
     # Subject
@@ -678,12 +747,12 @@ def _validate_edge(edge: ConstraintEdge, adg: ADG) -> bool:
 
     # Object: only validate if it looks internal (first segment in roots).
     # External objects pass for both requires_* (transitive deps) and prohibits_* (absent pkgs).
+    # Grounding accepts an exact node, a unique suffix, or an internal prefix
+    # (#256): an object emitted without the repo root is not a hallucination.
     obj_first = edge.object.split(".")[0].rstrip(".*")
-    if obj_first in roots:
-        obj_base = edge.object.rstrip(".*")
-        if not (obj_base in all_fqns or any(f.startswith(obj_base + ".") for f in all_fqns)):
-            return False
-    return True
+    if obj_first not in roots:
+        return True
+    return (grounding or ground_object(edge.object, adg)).grounded
 
 
 def _log_trace(
@@ -751,14 +820,25 @@ def _process_response_edges(
     edges = _materialize_edges(
         _parse_edges(content, adr_id, adr_path, none_verdict_edges, parse_dropped), adg
     )
-    valid_edges = [e for e in edges if _validate_edge(e, adg)]
+    valid_edges: list[ConstraintEdge] = []
+    pre_validation_edges: list[dict] = []
+    for e in edges:
+        # One classification per edge, shared by validation and the trace.
+        grounding = ground_object(e.object, adg)
+        valid = _validate_edge(e, adg, grounding)
+        if valid:
+            valid_edges.append(e)
+        pre_validation_edges.append({
+            "subject": e.subject,
+            "object": e.object,
+            "predicate": e.predicate.value,
+            "valid": valid,
+            "object_grounding": grounding.as_dict(),
+        })
     if len(valid_edges) < len(edges):
         dropped = [e for e in edges if e not in valid_edges]
         log.warning("unified_resolver: dropped %d edges with nonexistent FQNs for %s", len(dropped), adr_id)
-    trace.pre_validation_edges = [
-        {"subject": e.subject, "object": e.object, "predicate": e.predicate.value, "valid": e in valid_edges}
-        for e in edges
-    ]
+    trace.pre_validation_edges = pre_validation_edges
     trace.none_verdict_edges = none_verdict_edges
     trace.parse_dropped = parse_dropped
     trace.parse_failed = any(d.get("reason") == "invalid_json" for d in parse_dropped)

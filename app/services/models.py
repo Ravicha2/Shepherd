@@ -8,6 +8,7 @@ from functools import cached_property
 from types import MappingProxyType
 
 from services.fqn import FQN
+from services.resolver import NameResolver
 
 
 class FQNKind(Enum):
@@ -44,8 +45,11 @@ class Guard:
     `symbol` is the guard callable (decorator or call), or for a bare
     comparison the function that applies it. `scopes_object` is the verdict:
     the predicate names the loaded object and the requester and is neither
-    dead nor conditionally applied. The remaining fields are the soundness
-    checks ported from the object-scope pre-gate.
+    dead nor conditionally applied. `covers` names the route object
+    parameters that verdict actually scopes; empty means "covers every
+    parameter", so guards stored before the field keep their behaviour. The
+    remaining fields are the soundness checks ported from the object-scope
+    pre-gate.
     """
 
     symbol: str
@@ -54,6 +58,7 @@ class Guard:
     conditional: bool = False
     dead: bool = False
     bypass: bool = False
+    covers: tuple[str, ...] = ()
 
 
 @dataclass
@@ -192,6 +197,20 @@ class ADG:
         """fqn -> node. Last wins on a duplicate FQN, exactly as the dict
         comprehension it replaces did."""
         return MappingProxyType({str(node.fqn): node for node in self.nodes})
+
+    @cached_property
+    def name_resolver(self) -> NameResolver:
+        """Suffix index over every *real* node FQN, built once per graph (#256).
+
+        Object grounding resolves an emitted dotted name to the one real node
+        that ends with it. Synthetic EXTERNAL placeholders are excluded: they
+        are created for ungrounded names, so indexing them would let a
+        placeholder ground itself. Built lazily: only the lowering path needs
+        it, and the index costs O(nodes x depth) to construct.
+        """
+        return NameResolver({
+            node.fqn for node in self.nodes if node.kind is not FQNKind.EXTERNAL
+        })
 
     @cached_property
     def role_of(self) -> Mapping[str, DependencyRole]:
