@@ -667,7 +667,7 @@ class ObjectGrounding:
 
     @property
     def grounded(self) -> bool:
-        return self.label in ("exact", "unique_suffix", "prefix")
+        return self.label != "unknown"
 
     def as_dict(self) -> dict[str, str | None]:
         return {
@@ -685,14 +685,24 @@ def ground_object(fqn_pattern: str, adg: ADG) -> ObjectGrounding:
     (langflow's `langflow.services.auth.service` lives under
     `src.backend.base...`). Ties are `unknown`: grounding on a coin-flip is
     worse than reporting the row ungrounded.
+
+    Suffix resolution deliberately precedes the external check: a repo's own
+    package can also be an import root outside the source root (langflow's
+    `langflow` inside `src.backend.base`), so `external` there would be the
+    wrong label. The exact check is cheap, and the suffix index is only
+    constructed on the first object that is not an exact node (#256).
     """
     base = fqn_pattern.rstrip(".*")
-    if base in adg.node_of:
+    node = adg.node_of.get(base)
+    if node is not None and node.kind is not FQNKind.EXTERNAL:
         return ObjectGrounding("exact", resolved_fqn=base)
     resolved = adg.name_resolver.resolve_unique(base)
     if resolved is not None:
         return ObjectGrounding("unique_suffix", resolved_fqn=str(resolved))
-    if any(str(fqn).startswith(base + ".") for fqn in adg.fqns):
+    if any(
+        node.kind is not FQNKind.EXTERNAL and str(node.fqn).startswith(base + ".")
+        for node in adg.nodes
+    ):
         return ObjectGrounding("prefix")
     first = base.split(".")[0]
     if first in _external_packages(adg):
@@ -700,7 +710,9 @@ def ground_object(fqn_pattern: str, adg: ADG) -> ObjectGrounding:
     return ObjectGrounding("unknown")
 
 
-def _validate_edge(edge: ConstraintEdge, adg: ADG) -> bool:
+def _validate_edge(
+    edge: ConstraintEdge, adg: ADG, grounding: ObjectGrounding | None = None,
+) -> bool:
     """Return True if edge passes root-namespace-aware validation.
 
     Subject: internal pattern (first segment in roots) must match an ADG node;
@@ -729,7 +741,9 @@ def _validate_edge(edge: ConstraintEdge, adg: ADG) -> bool:
     # Grounding accepts an exact node, a unique suffix, or an internal prefix
     # (#256): an object emitted without the repo root is not a hallucination.
     obj_first = edge.object.split(".")[0].rstrip(".*")
-    return not (obj_first in roots and not ground_object(edge.object, adg).grounded)
+    if obj_first not in roots:
+        return True
+    return (grounding or ground_object(edge.object, adg)).grounded
 
 
 def _log_trace(
@@ -797,20 +811,25 @@ def _process_response_edges(
     edges = _materialize_edges(
         _parse_edges(content, adr_id, adr_path, none_verdict_edges, parse_dropped), adg
     )
-    valid_edges = [e for e in edges if _validate_edge(e, adg)]
-    if len(valid_edges) < len(edges):
-        dropped = [e for e in edges if e not in valid_edges]
-        log.warning("unified_resolver: dropped %d edges with nonexistent FQNs for %s", len(dropped), adr_id)
-    trace.pre_validation_edges = [
-        {
+    valid_edges: list[ConstraintEdge] = []
+    pre_validation_edges: list[dict] = []
+    for e in edges:
+        # One classification per edge, shared by validation and the trace.
+        grounding = ground_object(e.object, adg)
+        valid = _validate_edge(e, adg, grounding)
+        if valid:
+            valid_edges.append(e)
+        pre_validation_edges.append({
             "subject": e.subject,
             "object": e.object,
             "predicate": e.predicate.value,
-            "valid": e in valid_edges,
-            "object_grounding": ground_object(e.object, adg).as_dict(),
-        }
-        for e in edges
-    ]
+            "valid": valid,
+            "object_grounding": grounding.as_dict(),
+        })
+    if len(valid_edges) < len(edges):
+        dropped = [e for e in edges if e not in valid_edges]
+        log.warning("unified_resolver: dropped %d edges with nonexistent FQNs for %s", len(dropped), adr_id)
+    trace.pre_validation_edges = pre_validation_edges
     trace.none_verdict_edges = none_verdict_edges
     trace.parse_dropped = parse_dropped
     trace.parse_failed = any(d.get("reason") == "invalid_json" for d in parse_dropped)

@@ -196,13 +196,17 @@ class ADG:
 
     @cached_property
     def name_resolver(self) -> NameResolver:
-        """Suffix index over every node FQN, built once per graph (#256).
+        """Suffix index over every *real* node FQN, built once per graph (#256).
 
         Object grounding resolves an emitted dotted name to the one real node
-        that ends with it. Built lazily: only the lowering path needs it, and
-        the index costs O(nodes x depth) to construct.
+        that ends with it. Synthetic EXTERNAL placeholders are excluded: they
+        are created for ungrounded names, so indexing them would let a
+        placeholder ground itself. Built lazily: only the lowering path needs
+        it, and the index costs O(nodes x depth) to construct.
         """
-        return NameResolver(set(self.fqns))
+        return NameResolver({
+            node.fqn for node in self.nodes if node.kind is not FQNKind.EXTERNAL
+        })
 
     @cached_property
     def role_of(self) -> Mapping[str, DependencyRole]:

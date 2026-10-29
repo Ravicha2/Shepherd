@@ -891,6 +891,30 @@ class TestValidateEdge:
         )
         assert _validate_edge(edge, sample_adg) is False
 
+    def test_internal_prefixed_unique_suffix_object_passes(self) -> None:
+        """The #256 loosening: an object whose first segment is a root can
+        still be a unique suffix of the node that carries the full path."""
+        adg = ADG(
+            nodes=[
+                FQNNode(fqn=FQN.from_dotted("app"), kind=FQNKind.MODULE,
+                        file_path="app/__init__.py", line_start=0, line_end=0),
+                FQNNode(fqn=FQN.from_dotted("app.inner.app.views.handler"),
+                        kind=FQNKind.FUNCTION, file_path="app/inner/app/views.py",
+                        line_start=1, line_end=2),
+            ],
+            edges=[],
+        )
+        edge = ConstraintEdge(
+            subject="app.inner.*",
+            predicate=PredicateType.REQUIRES_OBJECT_SCOPE,
+            object="app.views.handler",
+            justification="emitted without the inner package segment",
+            adr_id="ADR-001",
+            adr_path="docs/adr/001.md",
+        )
+        assert ground_object(edge.object, adg).label == "unique_suffix"
+        assert _validate_edge(edge, adg) is True
+
     def test_both_hallucinated_fails(self, sample_adg: ADG) -> None:
         edge = ConstraintEdge(
             subject="app.api_layer.*",
@@ -1374,7 +1398,15 @@ class TestObjectGrounding:
         assert grounding.label == "external"
         assert grounding.package == "rest_framework"
         assert grounding.resolved_fqn is None
-        assert grounding.grounded is False
+        assert grounding.grounded is True
+
+    def test_external_placeholder_does_not_ground_itself(self) -> None:
+        """detect() adds EXTERNAL nodes for ungrounded names; grounding must
+        not read them back as real nodes (#256)."""
+        adg = ADG(nodes=[FQNNode.external("rest_framework.permissions")], edges=[])
+        assert ground_object("rest_framework.permissions", adg).label == "unknown"
+        assert ground_object("rest_framework", adg).label == "unknown"
+        assert ground_object("rest_framework", adg).grounded is False
 
     def test_unknown_object_is_not_grounded(self, sample_adg: ADG) -> None:
         grounding = ground_object("missing.module.Thing", sample_adg)

@@ -9,9 +9,9 @@ rows were wrong:
   external, not an orphan.
 
 `ground_object` is the shared classifier: exact > unique suffix > internal
-prefix > external package > unknown. Only `unknown` is ungrounded. These tests
-pin the two real shapes; the classifier's unit behaviour is in
-test_unified_resolver.py.
+prefix > external package > unknown. Every label except `unknown` counts as
+grounded (an external package is a label, not an orphan). These tests pin the
+two real shapes; the classifier's unit behaviour is in test_unified_resolver.py.
 """
 
 from __future__ import annotations
@@ -64,7 +64,7 @@ def test_tandoor_object_is_external_not_orphan() -> None:
     assert grounding.label == "external"
     assert grounding.package == "rest_framework"
     assert grounding.resolved_fqn is None
-    assert grounding.grounded is False
+    assert grounding.grounded is True
 
 
 @pytest.mark.integration
