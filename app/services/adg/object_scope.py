@@ -4,9 +4,12 @@ and the guards it applies.
 Framework idioms only — no case, repo, route or advisory names. Guard
 extraction is the deterministic extraction core of the POC-A pre-gate, ported
 file-scoped: a handler's decorators and callees are resolved within its own
-module. A fetch chain is judged as one unit, a requester filter scopes only on
-an ownership field (#253), and a callee parameter bound to a requester
-expression at the call site is the requester inside that callee (#257).
+module, and an imported scope-call helper is resolved through its import to the
+defining module. A fetch chain is judged as one unit, a requester filter scopes
+only on an ownership field (#253), a callee parameter bound to a requester
+expression at the call site is the requester inside that callee (#257), and an
+imported scope-call helper scopes only when every path in its body that grants
+access names a requester (#258).
 """
 
 from __future__ import annotations
@@ -14,12 +17,12 @@ from __future__ import annotations
 import ast
 import re
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, replace
 from pathlib import Path
 
 from services.adg.route_inventory import build_route_inventory
-from services.models import ADG, Guard
+from services.models import ADG, FQNKind, Guard
 from services.resolver import MatchStatus, fqn_matches_pattern
 
 _FLASK_PARAM = re.compile(r"<(?:(?P<converter>\w+):)?(?P<name>\w+)>")
@@ -58,6 +61,13 @@ _COARSE_AUTH = re.compile(
     r"(?i)(?:login_required|permission_required|IsAuthenticated|"
     r"get_current_user|get_verified_user|get_user|CurrentUser|"
     r"PermissionRequired|AuthenticationRequired|LoginRequired)"
+)
+# Only a dependency that returns the requester binds an identity. A permission
+# marker (`IsAuthenticated`, `PermissionRequired`) returns a boolean and never
+# names a requester; matching it would launder a non-identity value (#258).
+_REQUESTER_DEPENDENCY = re.compile(
+    r"(?i)^(?:get_current_user|get_verified_user|get_authenticated_user|"
+    r"get_user|current_user)$"
 )
 _TYPED_PARAM = re.compile(r"(?i)\b(?:int|UUID|PositiveInt)\b")
 _INT_ATTR = re.compile(r"(?i)\.(?:id|pk|[a-z][a-z0-9_]*_id)$")
@@ -131,10 +141,12 @@ def object_scope_candidates(
 
 
 # --- guard extraction -------------------------------------------------------
-# The extraction core of the POC-A pre-gate (scope_pregate.py), file-scoped:
-# handlers and their decorators/callees are resolved within the handler's own
-# module. Guards whose definitions live in another module are not walked.
-# ponytail: same-module linking; add a repo-wide resolver if a case needs it.
+# The extraction core of the POC-A pre-gate (scope_pregate.py): handlers and
+# their decorators/callees are linked within the handler's own module, and a
+# bare-name scope call is followed through its import to the defining module
+# (#258). Guards are not emitted from an imported helper's body — the helper
+# is judged as one unit, so a scoping comparison beside an unscoped grant path
+# cannot clear the handler.
 
 def _dotted(node: ast.AST | None) -> str | None:
     """`a.b.c` for Name/Attribute chains, else None."""
@@ -225,6 +237,154 @@ def _find_symbol(tree: ast.Module,
                    if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
         return node, methods
     return node, [node]
+
+
+def _functions_of(node: ast.AST) -> list[ast.AST]:
+    """The callable bodies a definition name stands for; a class yields its methods."""
+    if isinstance(node, ast.ClassDef):
+        return [n for n in node.body
+                if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        return [node]
+    return []
+
+
+def _absolute_module(current: str, module: str | None, level: int,
+                     is_package: bool = False) -> str | None:
+    """The module a `from` import names, resolving relative levels.
+
+    A relative import inside a package's `__init__` is anchored at that
+    package; inside a plain module it is anchored at the parent package.
+    """
+    if level:
+        parts = [part for part in current.split(".") if part]
+        drop = max(level - 1, 0) if is_package else level
+        if drop >= len(parts) + 1:
+            return None
+        parts = parts[:-drop] if drop else parts
+    else:
+        parts = []
+    if module:
+        parts.extend(module.split("."))
+    return ".".join(parts) or None
+
+
+def _imports_at_module_level(tree: ast.Module) -> Iterable[ast.stmt]:
+    """Imports that bind a module-level name, including `if TYPE_CHECKING`."""
+    stack = list(tree.body)
+    while stack:
+        node = stack.pop()
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            yield node
+        elif isinstance(node, (ast.If, ast.Try)):
+            stack.extend(node.body)
+            stack.extend(getattr(node, "orelse", []))
+            stack.extend(getattr(node, "finalbody", []))
+            for handler in getattr(node, "handlers", []):
+                stack.extend(handler.body)
+
+
+def _imported_names(tree: ast.Module,
+                    module_fqn: str,
+                    is_package: bool = False) -> dict[str, tuple[str, str | None]]:
+    """Local name -> (module it came from, symbol), for bare-name calls.
+
+    Only module-level imports count: a function-local import binds that
+    function's namespace, and following it for a call elsewhere would invent
+    a definition. A name imported from two different places is ambiguous and
+    is dropped, so it resolves to unverified rather than one arbitrary target.
+    """
+    out: dict[str, tuple[str, str | None]] = {}
+    ambiguous: set[str] = set()
+    module_level = {id(node) for node in _imports_at_module_level(tree)}
+    for node in _imports_at_module_level(tree):
+        if isinstance(node, ast.ImportFrom):
+            base = _absolute_module(module_fqn, node.module, node.level, is_package)
+            if base is None:
+                continue
+            entries = [(alias.asname or alias.name, (base, alias.name))
+                       for alias in node.names]
+        else:
+            entries = [
+                (alias.asname or alias.name.split(".")[0],
+                 (alias.name, None))
+                for alias in node.names
+            ]
+        for local, target in entries:
+            if local in out and out[local] != target:
+                ambiguous.add(local)
+            out[local] = target
+    # A function-local import binds that function's namespace, so a call to the
+    # name anywhere in the file may reach a different body than the module-level
+    # import names. The name is unresolved rather than guessed.
+    for node in ast.walk(tree):
+        if id(node) in module_level:
+            continue
+        if isinstance(node, ast.ImportFrom):
+            shadowed = [alias.asname or alias.name for alias in node.names]
+        elif isinstance(node, ast.Import):
+            shadowed = [alias.asname or alias.name.split(".")[0]
+                        for alias in node.names]
+        else:
+            continue
+        ambiguous.update(shadowed)
+    for local in ambiguous:
+        out.pop(local, None)
+    return out
+
+
+class ImportedDefinitions:
+    """Resolve a bare name in a module to the functions that define it.
+
+    Same-module definitions resolve directly; an imported name is followed to
+    its defining module's source (the `module_source` lookup) and parsed with
+    `_find_symbol`. `resolve` returns `(functions, imported)` or None when the
+    name cannot be tied to a body, so the caller can treat it as unverified
+    rather than assuming it scopes (#258).
+    """
+
+    def __init__(self, tree: ast.Module, module_fqn: str,
+                 module_source: Callable[[str], ast.Module | None],
+                 is_package: bool = False) -> None:
+        self._local = {node.name: node for node in tree.body
+                       if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef,
+                                            ast.ClassDef))}
+        self._imports = _imported_names(tree, module_fqn, is_package)
+        self._source = module_source
+
+    def resolve(self, name: str) -> tuple[tuple[ast.AST, ...], bool] | None:
+        node = self._local.get(name)
+        if node is not None:
+            return tuple(_functions_of(node)), False
+        target = self._imports.get(name)
+        if target is None:
+            return None
+        module_name, symbol = target
+        if symbol is None:
+            return None
+        tree = self._source(module_name)
+        if tree is None:
+            return None
+        node, funcs = _find_symbol(tree, symbol)
+        if node is None:
+            return None
+        return tuple(funcs), True
+
+
+def _module_source_file(adg: ADG, module_name: str) -> str | None:
+    """The file defining *module_name*, matching a rooted FQN by suffix.
+
+    The graph roots paths at the repository directory (`backend.open_webui...`)
+    while an import names the package (`open_webui...`), so an unambiguous
+    suffix match is the join. Two files sharing the suffix is ambiguous.
+    """
+    files = {
+        node.file_path for node in adg.nodes
+        if node.kind is FQNKind.MODULE and node.file_path
+        and (str(node.fqn) == module_name
+             or str(node.fqn).endswith("." + module_name))
+    }
+    return files.pop() if len(files) == 1 else None
 
 
 def _resolve_handler(tree: ast.Module,
@@ -340,14 +500,6 @@ def _linked_edges(tree: ast.Module,
     defs = {node.name: node for node in tree.body
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))}
 
-    def functions_of(node: ast.AST) -> list[ast.AST]:
-        if isinstance(node, ast.ClassDef):
-            return [n for n in node.body
-                    if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            return [node]
-        return []
-
     def targets_of(func: ast.AST) -> list[tuple[ast.AST, ast.Call | None]]:
         targets: list[tuple[ast.AST, ast.Call | None]] = []
         if isinstance(func, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -372,7 +524,7 @@ def _linked_edges(tree: ast.Module,
                 node = defs.get(name)
                 if node is None:
                     continue
-                for callee in functions_of(node):
+                for callee in _functions_of(node):
                     if id(callee) in by_id:
                         continue
                     new = _Link(callee, name, [])
@@ -394,7 +546,7 @@ def _linked_edges(tree: ast.Module,
             if (call is None
                     or not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))):
                 continue
-            for callee in functions_of(node):
+            for callee in _functions_of(node):
                 existing = by_id.get(id(callee))
                 if existing is not None:
                     existing.calls.append((link.callee, call))
@@ -484,6 +636,303 @@ def _bound_requester_params(func: ast.AST, call: ast.Call,
     return {name for name in bound if not _is_rebound(func, name)}
 
 
+def _dependency_call(node: ast.AST | None) -> ast.Call | None:
+    """The `Depends(...)`/`Security(...)` call in a default or annotation."""
+    for child in ast.walk(node) if node is not None else ():
+        if isinstance(child, ast.Call) and _dotted(child.func) in {"Depends", "Security"}:
+            return child
+    return None
+
+
+def _dependency_is_requester(call: ast.Call) -> bool:
+    """The dependency's callable returns the requester, not a permission flag."""
+    if not call.args:
+        return False
+    dependency = call.args[0]
+    if isinstance(dependency, ast.Call):
+        dependency = dependency.func
+    name = _dotted(dependency) or ""
+    return bool(_REQUESTER_DEPENDENCY.fullmatch(name.rsplit(".", 1)[-1]))
+
+
+def _di_requester_params(func: ast.AST) -> frozenset[str]:
+    """Parameters the framework injects as the authenticated requester.
+
+    FastAPI's `user=Depends(get_verified_user)` (and the `Security` form, in a
+    default or an `Annotated[...]` annotation) hands the handler the requester
+    under a plain name, which the vocabulary cannot know from the name alone.
+    """
+    spec = getattr(func, "args", None)
+    if spec is None:
+        return frozenset()
+    positional = list(getattr(spec, "posonlyargs", [])) + list(spec.args)
+    defaults = list(spec.defaults)
+    offset = len(positional) - len(defaults)
+    pairs = [(arg, defaults[index - offset] if index >= offset else None)
+             for index, arg in enumerate(positional)]
+    pairs += list(zip(spec.kwonlyargs, spec.kw_defaults))
+    requester: set[str] = set()
+    for arg, default in pairs:
+        call = _dependency_call(default) or _dependency_call(arg.annotation)
+        if call is not None and _dependency_is_requester(call):
+            requester.add(arg.arg)
+    return frozenset(requester)
+
+
+def _is_falsy(value: ast.AST | None) -> bool:
+    """A return of this value denies access (None, False, "", [], {})."""
+    if value is None:
+        return True
+    if isinstance(value, ast.Constant):
+        return not value.value
+    if isinstance(value, (ast.List, ast.Tuple, ast.Set)):
+        return not value.elts
+    if isinstance(value, ast.Dict):
+        return not value.keys
+    if isinstance(value, ast.Call) and not value.args and not value.keywords:
+        return _dotted(value.func) in {"set", "frozenset", "dict", "list",
+                                       "tuple", "bool"}
+    return False
+
+
+def _grant_returns(func: ast.AST) -> list[ast.Return]:
+    """Returns in the helper's own body that grant, not its nested defs.
+
+    A falsy return (`False`, `None`, empty container) denies. Every other
+    return is a path that must be justified -- including one in an `except`,
+    where a fail-open handler would otherwise hide behind the `try` path
+    (#258).
+    """
+    grants: list[ast.Return] = []
+
+    def walk(node: ast.AST) -> None:
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef,
+                                  ast.ClassDef, ast.Lambda)):
+                continue
+            if isinstance(child, ast.Return) and not _is_falsy(child.value):
+                grants.append(child)
+            walk(child)
+
+    walk(func)
+    return grants
+
+
+# The value of an augmented assignment or a binding we cannot follow; treating
+# it as "no requester" keeps the miss visible instead of falling back to an
+# earlier assignment and inventing a check that does not dominate the grant.
+_UNRESOLVED = object()
+
+
+def _target_names(target: ast.AST) -> Iterable[str]:
+    """Names a binding target assigns: `a`, `(a, b)`, `[a, *rest]`."""
+    if isinstance(target, ast.Name):
+        yield target.id
+    elif isinstance(target, (ast.Tuple, ast.List)):
+        for element in target.elts:
+            yield from _target_names(element)
+    elif isinstance(target, ast.Starred):
+        yield from _target_names(target.value)
+
+
+def _target_binds(targets: Iterable[ast.AST], name: str) -> bool:
+    return any(name in _target_names(target) for target in targets)
+
+
+def _assigned_value(stmt: ast.stmt, name: str) -> tuple[bool, ast.AST | object | None]:
+    """Whether *stmt* assigns *name*, and the value it assigns.
+
+    A bare annotation binds nothing; an augmented assignment is `_UNRESOLVED`.
+    """
+    if isinstance(stmt, ast.Assign):
+        targets, value = stmt.targets, stmt.value
+    elif isinstance(stmt, ast.AnnAssign):
+        if stmt.value is None:
+            return False, None
+        targets, value = (stmt.target,), stmt.value
+    elif isinstance(stmt, ast.AugAssign):
+        targets, value = (stmt.target,), _UNRESOLVED
+    else:
+        return False, None
+    if not _target_binds(targets, name):
+        return False, None
+    return True, value
+
+
+def _contains_assignment(node: ast.AST, name: str) -> bool:
+    """A statement anywhere under *node* (outside a nested def) binds *name*.
+
+    Loop targets, `with ... as`, and walrus assignments rebind the name too;
+    missing them would let an earlier requester-derived value stand in for a
+    check that no longer runs.
+    """
+    if isinstance(node, (ast.Assign, ast.AugAssign)) or (
+            isinstance(node, ast.AnnAssign) and node.value is not None):
+        targets = node.targets if isinstance(node, ast.Assign) else (node.target,)
+        if _target_binds(targets, name):
+            return True
+    elif isinstance(node, (ast.For, ast.AsyncFor)):
+        if _target_binds((node.target,), name):
+            return True
+    elif isinstance(node, (ast.With, ast.AsyncWith)):
+        if any(item.optional_vars is not None
+               and _target_binds((item.optional_vars,), name)
+               for item in node.items):
+            return True
+    elif isinstance(node, ast.NamedExpr):
+        if isinstance(node.target, ast.Name) and node.target.id == name:
+            return True
+    for child in ast.iter_child_nodes(node):
+        if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef,
+                              ast.ClassDef, ast.Lambda)):
+            continue
+        if _contains_assignment(child, name):
+            return True
+    return False
+
+
+def _statement_list(parent: ast.AST, child: ast.AST) -> list[ast.stmt] | None:
+    """The statement list of *parent* that directly contains *child*."""
+    for attr in ("body", "orelse", "finalbody"):
+        statements = getattr(parent, attr, None)
+        if isinstance(statements, list) and any(stmt is child for stmt in statements):
+            return statements
+    return None
+
+
+def _statement_parents(func: ast.AST) -> dict[int, ast.AST]:
+    """id(child) -> parent, for parent links used by the assignment walk."""
+    return {id(child): parent for parent in ast.walk(func)
+            for child in ast.iter_child_nodes(parent)}
+
+
+def _nearest_assignment(func: ast.AST, name: str,
+                        use: ast.AST) -> ast.AST | object | None:
+    """The value assigned to *name* that dominates *use*, innermost block first.
+
+    Only an assignment in the same statement list before the statement on the
+    path dominates: an assignment in a sibling branch does not. An augmented
+    assignment yields `_UNRESOLVED`, since its result cannot be traced from the
+    text alone.
+    """
+    parents = _statement_parents(func)
+    node: ast.AST = use
+    while id(node) in parents:
+        parent = parents[id(node)]
+        statements = _statement_list(parent, node)
+        if statements is not None:
+            index = next(i for i, stmt in enumerate(statements) if stmt is node)
+            value: ast.AST | object | None = None
+            for stmt in statements[:index]:
+                assigns, direct = _assigned_value(stmt, name)
+                if assigns:
+                    value = direct
+                elif _contains_assignment(stmt, name):
+                    # A conditional or loop assignment may or may not run;
+                    # assuming the earlier value would invent a check.
+                    value = _UNRESOLVED
+            if value is not None:
+                return value
+        node = parent
+    return None
+
+
+def _expression_names_requester(func: ast.AST, expr: ast.AST, use: ast.AST,
+                                requester_tokens: set[str]) -> bool:
+    """The expression names the requester, directly or through an assignment.
+
+    `shared = shared_with(file); if shared:` is judged by the fetch, and
+    `ids = accessible_for(user.id, ...); if ids:` by the call.
+    """
+    if _mentions_requester(expr, requester_tokens):
+        return True
+    for dotted in _names_in(expr):
+        local = re.split(r"[.\[]", dotted)[0]
+        if local in requester_tokens:
+            return True
+        value = _nearest_assignment(func, local, use)
+        if (value is not None and value is not _UNRESOLVED
+                and _mentions_requester(value, requester_tokens)):
+            return True
+    return False
+
+
+def _authorizes(func: ast.AST, expr: ast.AST, truth: bool, use: ast.AST,
+                requester_tokens: set[str]) -> bool:
+    """*expr* evaluated to *truth* requires the requester to be this requester.
+
+    Polarity matters: `x == user` authorizes when true, `x != user` authorizes
+    when false, and an `or` authorizes only when every disjunct does, since any
+    one disjunct can grant on its own.
+    """
+    if isinstance(expr, ast.UnaryOp) and isinstance(expr.op, ast.Not):
+        return _authorizes(func, expr.operand, not truth, use, requester_tokens)
+    if isinstance(expr, ast.BoolOp):
+        if not truth:
+            return False
+        if isinstance(expr.op, ast.And):
+            return any(_authorizes(func, value, True, use, requester_tokens)
+                       for value in expr.values)
+        return all(_authorizes(func, value, True, use, requester_tokens)
+                   for value in expr.values)
+    if isinstance(expr, ast.IfExp):
+        return (_authorizes(func, expr.body, truth, use, requester_tokens)
+                and _authorizes(func, expr.orelse, truth, use, requester_tokens))
+    if isinstance(expr, ast.Compare):
+        if len(expr.ops) != 1 or len(expr.comparators) != 1:
+            return False
+        names = _expression_names_requester(func, expr, use, requester_tokens)
+        if isinstance(expr.ops[0], (ast.Eq, ast.Is)):
+            return truth and names
+        if isinstance(expr.ops[0], (ast.NotEq, ast.IsNot)):
+            return not truth and names
+        return False
+    return truth and _expression_names_requester(
+        func, expr, use, requester_tokens)
+
+
+def _grant_path_names_requester(func: ast.AST, ret: ast.Return,
+                                requester_tokens: set[str]) -> bool:
+    """The path to *ret* is gated by the requester in a condition or a value.
+
+    The path is the chain of enclosing conditions (with the polarity of the
+    branch the return sits in) and loop iterables, plus the returned value.
+    Any one condition that requires the requester gates every execution that
+    reaches the return; an OR is only sound when every disjunct does.
+    """
+    parents = _parents(func)
+    conditions: list[tuple[ast.AST, bool]] = []
+    node: ast.AST = ret
+    while node in parents:
+        parent = parents[node]
+        if isinstance(parent, ast.If):
+            # A return in the else branch runs when the test is false.
+            conditions.append((parent.test, node in parent.body))
+        elif isinstance(parent, (ast.While, ast.For, ast.AsyncFor)):
+            # Only the body is gated: an `else` runs after the loop ends, which
+            # a break can cause, so the test/iterable being false proves nothing.
+            if node in parent.body:
+                test = parent.test if isinstance(parent, ast.While) else parent.iter
+                conditions.append((test, True))
+        node = parent
+    # Judge each condition at the condition's own position: an assignment made
+    # inside the grant branch is not in force when the condition runs.
+    if any(_authorizes(func, cond, truth, cond, requester_tokens)
+           for cond, truth in conditions):
+        return True
+    return ret.value is not None and _authorizes(
+        func, ret.value, True, ret, requester_tokens)
+
+
+def _every_grant_names_requester(func: ast.AST,
+                                 requester_tokens: set[str]) -> bool:
+    """Every grant path in the helper body names the requester (#258)."""
+    grants = _grant_returns(func)
+    return bool(grants) and all(
+        _grant_path_names_requester(func, ret, requester_tokens)
+        for ret in grants)
+
+
 def _conditional_guard(func: ast.AST, compare: ast.AST) -> bool:
     """A scope comparison that only runs when an object field is truthy."""
     parents = _parents(func)
@@ -502,14 +951,20 @@ def _conditional_guard(func: ast.AST, compare: ast.AST) -> bool:
 
 def extract_guards(source: str, handler_fqn: str,
                    object_parameters: Iterable[str] = (),
-                   typed_parameters: Iterable[str] = ()) -> tuple[Guard, ...]:
+                   typed_parameters: Iterable[str] = (),
+                   resolve_callees: Callable[
+                       [str], tuple[tuple[ast.AST, ...], bool] | None] | None = None,
+                   ) -> tuple[Guard, ...]:
     """The guards *handler_fqn* applies, as records; first-seen order.
 
     *typed_parameters* are path params the route converter already parses as
-    int/uuid. Deterministic AST analysis only — no LLM, no network.
+    int/uuid. *resolve_callees* resolves a bare call name to its defining
+    bodies and whether they were imported; without it the analysis is
+    file-scoped. Deterministic AST analysis only — no LLM, no network.
     """
     return _extract_guards(
-        ast.parse(source), handler_fqn, object_parameters, typed_parameters)
+        ast.parse(source), handler_fqn, object_parameters, typed_parameters,
+        resolve_callees)
 
 
 def _comparison_guard(func: ast.AST, node: ast.Compare, origin: str,
@@ -542,7 +997,10 @@ def _comparison_guard(func: ast.AST, node: ast.Compare, origin: str,
 
 
 def _call_guard(func: ast.AST, node: ast.Call, tokens: set[str],
-                requester_tokens: set[str] = frozenset()) -> Guard | None:
+                requester_tokens: set[str] = frozenset(),
+                resolve_callees: Callable[
+                    [str], tuple[tuple[ast.AST, ...], bool] | None] | None = None,
+                ) -> Guard | None:
     text = _text(node)
     inner = _dotted(node.func.func) if isinstance(node.func, ast.Call) else None
     if (inner
@@ -556,10 +1014,31 @@ def _call_guard(func: ast.AST, node: ast.Call, tokens: set[str],
     if _SCOPE_CALL.search(name) and (
             _mentions(node, tokens) or _mentions_requester(node, requester_tokens)):
         conditional = _conditional_guard(func, node)
+        scopes = not conditional
+        # A bare-name scope call is a helper. An imported helper is judged by
+        # its body: it scopes only when every grant path names the requester,
+        # and an unresolvable helper is a miss, never a silently-scoping guard.
+        # Attribute calls (`obj.allowed_for_session`) stay name-based (#258).
+        if resolve_callees is not None and "." not in name:
+            found = resolve_callees(name)
+            if found is None:
+                scopes = False
+            else:
+                callees, imported = found
+                if imported:
+                    caller_tokens = set(requester_tokens) | set(
+                        _di_requester_params(func))
+                    bound: set[str] = set()
+                    for callee in callees:
+                        bound |= _bound_requester_params(
+                            callee, node, caller_tokens)
+                    scopes = scopes and bool(callees) and all(
+                        _every_grant_names_requester(callee, bound)
+                        for callee in callees)
         return Guard(
             symbol=name,
             predicate=text,
-            scopes_object=not conditional,
+            scopes_object=scopes,
             conditional=conditional,
         )
     return None
@@ -911,7 +1390,10 @@ def _chain_parts(func: ast.AST, chain_guards: dict[int, Guard | None]) -> set[in
 
 def _guards_in(func: ast.AST, origin: str, tokens: set[str], params: set[str],
                converted: set[str], typed: set[str],
-               requester_tokens: set[str]) -> list[Guard]:
+               requester_tokens: set[str],
+               resolve_callees: Callable[
+                   [str], tuple[tuple[ast.AST, ...], bool] | None] | None = None,
+               ) -> list[Guard]:
     parents = _parents(func)
     # Only the outermost call of a chain carries the whole query text.
     chain_mid = {id(node) for node in ast.walk(func)
@@ -931,7 +1413,7 @@ def _guards_in(func: ast.AST, origin: str, tokens: set[str], params: set[str],
                                       converted, typed, requester_tokens)
         elif isinstance(node, ast.Call) and id(node) not in chain_mid:
             guard = chain_guards.get(id(node)) or _call_guard(
-                func, node, tokens, requester_tokens)
+                func, node, tokens, requester_tokens, resolve_callees)
         else:
             continue
         if guard is not None:
@@ -941,7 +1423,10 @@ def _guards_in(func: ast.AST, origin: str, tokens: set[str], params: set[str],
 
 def _extract_guards(tree: ast.Module, handler_fqn: str,
                     object_parameters: Iterable[str],
-                    typed_parameters: Iterable[str] = ()) -> tuple[Guard, ...]:
+                    typed_parameters: Iterable[str] = (),
+                    resolve_callees: Callable[
+                        [str], tuple[tuple[ast.AST, ...], bool] | None] | None = None,
+                    ) -> tuple[Guard, ...]:
     handlers = _resolve_handler(tree, handler_fqn)
     links = _linked_edges(tree, handlers)
     bindings = _requester_bindings(links, {id(func) for func in handlers})
@@ -956,7 +1441,7 @@ def _extract_guards(tree: ast.Module, handler_fqn: str,
         for link in links
         for guard in _guards_in(
             link.callee, link.origin, tokens, params, converted, typed,
-            set(bindings.get(id(link.callee), ())))
+            set(bindings.get(id(link.callee), ())), resolve_callees)
     ]
     return tuple(dict.fromkeys(guards))
 
@@ -1007,20 +1492,44 @@ def backfill_handler_facts(adg: ADG, repo_path: Path) -> ADG:
             paths_by_handler[defining].append(route.raw_path)
 
     trees: dict[str, ast.Module | None] = {}
+    resolvers: dict[str, ImportedDefinitions] = {}
+    module_files: dict[str, str | None] = {}
 
-    def facts(handler: str, file_path: str) -> tuple[tuple[str, ...], tuple[Guard, ...]]:
-        paths = paths_by_handler[handler]
+    def tree_at(file_path: str) -> ast.Module | None:
         if file_path not in trees:
             try:
                 trees[file_path] = ast.parse((repo_path / file_path).read_bytes())
             except (OSError, SyntaxError):
                 trees[file_path] = None
-        tree = trees[file_path]
+        return trees[file_path]
+
+    def resolver_for(file_path: str, tree: ast.Module) -> ImportedDefinitions:
+        if file_path not in resolvers:
+            module_fqn = next(
+                (str(node.fqn) for node in adg.nodes
+                 if node.kind is FQNKind.MODULE and node.file_path == file_path),
+                "")
+            def module_source(module: str) -> ast.Module | None:
+                if module not in module_files:
+                    module_files[module] = _module_source_file(adg, module)
+                path = module_files[module]
+                return tree_at(path) if path is not None else None
+
+            resolvers[file_path] = ImportedDefinitions(
+                tree, module_fqn, module_source,
+                is_package=file_path.endswith("__init__.py"))
+        return resolvers[file_path]
+
+    def facts(handler: str, file_path: str) -> tuple[tuple[str, ...], tuple[Guard, ...]]:
+        paths = paths_by_handler[handler]
+        tree = tree_at(file_path)
         if tree is None:
             return object_parameters(paths), ()
         params = _handler_object_parameters(tree, handler, object_parameters(paths))
         typed = typed_object_parameters(paths)
-        guards = _extract_guards(tree, handler, params, typed)
+        guards = _extract_guards(
+            tree, handler, params, typed,
+            resolver_for(file_path, tree).resolve)
         return params, guards
 
     updated = []
