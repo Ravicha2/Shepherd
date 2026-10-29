@@ -4,9 +4,12 @@ and the guards it applies.
 Framework idioms only — no case, repo, route or advisory names. Guard
 extraction is the deterministic extraction core of the POC-A pre-gate, ported
 file-scoped: a handler's decorators and callees are resolved within its own
-module. A fetch chain is judged as one unit, a requester filter scopes only on
-an ownership field (#253), and a callee parameter bound to a requester
-expression at the call site is the requester inside that callee (#257).
+module, and an imported scope-call helper is resolved through its import to the
+defining module. A fetch chain is judged as one unit, a requester filter scopes
+only on an ownership field (#253), a callee parameter bound to a requester
+expression at the call site is the requester inside that callee (#257), and an
+imported scope-call helper scopes only when every path in its body that grants
+access names a requester (#258).
 """
 
 from __future__ import annotations
@@ -14,12 +17,12 @@ from __future__ import annotations
 import ast
 import re
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, replace
 from pathlib import Path
 
 from services.adg.route_inventory import build_route_inventory
-from services.models import ADG, Guard
+from services.models import ADG, FQNKind, Guard
 from services.resolver import MatchStatus, fqn_matches_pattern
 
 _FLASK_PARAM = re.compile(r"<(?:(?P<converter>\w+):)?(?P<name>\w+)>")
@@ -131,10 +134,12 @@ def object_scope_candidates(
 
 
 # --- guard extraction -------------------------------------------------------
-# The extraction core of the POC-A pre-gate (scope_pregate.py), file-scoped:
-# handlers and their decorators/callees are resolved within the handler's own
-# module. Guards whose definitions live in another module are not walked.
-# ponytail: same-module linking; add a repo-wide resolver if a case needs it.
+# The extraction core of the POC-A pre-gate (scope_pregate.py): handlers and
+# their decorators/callees are linked within the handler's own module, and a
+# bare-name scope call is followed through its import to the defining module
+# (#258). Guards are not emitted from an imported helper's body — the helper
+# is judged as one unit, so a scoping comparison beside an unscoped grant path
+# cannot clear the handler.
 
 def _dotted(node: ast.AST | None) -> str | None:
     """`a.b.c` for Name/Attribute chains, else None."""
@@ -225,6 +230,111 @@ def _find_symbol(tree: ast.Module,
                    if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
         return node, methods
     return node, [node]
+
+
+def _functions_of(node: ast.AST) -> list[ast.AST]:
+    """The callable bodies a definition name stands for; a class yields its methods."""
+    if isinstance(node, ast.ClassDef):
+        return [n for n in node.body
+                if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        return [node]
+    return []
+
+
+def _absolute_module(current: str, module: str | None, level: int,
+                     is_package: bool = False) -> str | None:
+    """The module a `from` import names, resolving relative levels.
+
+    A relative import inside a package's `__init__` is anchored at that
+    package; inside a plain module it is anchored at the parent package.
+    """
+    if level:
+        parts = [part for part in current.split(".") if part]
+        drop = max(level - 1, 0) if is_package else level
+        if drop >= len(parts) + 1:
+            return None
+        parts = parts[:-drop] if drop else parts
+    else:
+        parts = []
+    if module:
+        parts.extend(module.split("."))
+    return ".".join(parts) or None
+
+
+def _imported_names(tree: ast.Module,
+                    module_fqn: str,
+                    is_package: bool = False) -> dict[str, tuple[str, str | None]]:
+    """Local name -> (module it came from, symbol), for bare-name calls."""
+    out: dict[str, tuple[str, str | None]] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            base = _absolute_module(module_fqn, node.module, node.level, is_package)
+            if base is None:
+                continue
+            for alias in node.names:
+                out[alias.asname or alias.name] = (base, alias.name)
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.asname:
+                    out[alias.asname] = (alias.name, None)
+                else:
+                    out[alias.name.split(".")[0]] = (alias.name, None)
+    return out
+
+
+class ImportedDefinitions:
+    """Resolve a bare name in a module to the functions that define it.
+
+    Same-module definitions resolve directly; an imported name is followed to
+    its defining module's source (the `module_source` lookup) and parsed with
+    `_find_symbol`. `resolve` returns `(functions, imported)` or None when the
+    name cannot be tied to a body, so the caller can treat it as unverified
+    rather than assuming it scopes (#258).
+    """
+
+    def __init__(self, tree: ast.Module, module_fqn: str,
+                 module_source: Callable[[str], ast.Module | None],
+                 is_package: bool = False) -> None:
+        self._local = {node.name: node for node in tree.body
+                       if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef,
+                                            ast.ClassDef))}
+        self._imports = _imported_names(tree, module_fqn, is_package)
+        self._source = module_source
+
+    def resolve(self, name: str) -> tuple[tuple[ast.AST, ...], bool] | None:
+        node = self._local.get(name)
+        if node is not None:
+            return tuple(_functions_of(node)), False
+        target = self._imports.get(name)
+        if target is None:
+            return None
+        module_name, symbol = target
+        if symbol is None:
+            return None
+        tree = self._source(module_name)
+        if tree is None:
+            return None
+        node, funcs = _find_symbol(tree, symbol)
+        if node is None:
+            return None
+        return tuple(funcs), True
+
+
+def _module_source_file(adg: ADG, module_name: str) -> str | None:
+    """The file defining *module_name*, matching a rooted FQN by suffix.
+
+    The graph roots paths at the repository directory (`backend.open_webui...`)
+    while an import names the package (`open_webui...`), so an unambiguous
+    suffix match is the join. Two files sharing the suffix is ambiguous.
+    """
+    files = {
+        node.file_path for node in adg.nodes
+        if node.kind is FQNKind.MODULE and node.file_path
+        and (str(node.fqn) == module_name
+             or str(node.fqn).endswith("." + module_name))
+    }
+    return files.pop() if len(files) == 1 else None
 
 
 def _resolve_handler(tree: ast.Module,
@@ -340,14 +450,6 @@ def _linked_edges(tree: ast.Module,
     defs = {node.name: node for node in tree.body
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))}
 
-    def functions_of(node: ast.AST) -> list[ast.AST]:
-        if isinstance(node, ast.ClassDef):
-            return [n for n in node.body
-                    if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            return [node]
-        return []
-
     def targets_of(func: ast.AST) -> list[tuple[ast.AST, ast.Call | None]]:
         targets: list[tuple[ast.AST, ast.Call | None]] = []
         if isinstance(func, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -372,7 +474,7 @@ def _linked_edges(tree: ast.Module,
                 node = defs.get(name)
                 if node is None:
                     continue
-                for callee in functions_of(node):
+                for callee in _functions_of(node):
                     if id(callee) in by_id:
                         continue
                     new = _Link(callee, name, [])
@@ -394,7 +496,7 @@ def _linked_edges(tree: ast.Module,
             if (call is None
                     or not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))):
                 continue
-            for callee in functions_of(node):
+            for callee in _functions_of(node):
                 existing = by_id.get(id(callee))
                 if existing is not None:
                     existing.calls.append((link.callee, call))
@@ -484,6 +586,152 @@ def _bound_requester_params(func: ast.AST, call: ast.Call,
     return {name for name in bound if not _is_rebound(func, name)}
 
 
+def _di_requester_params(func: ast.AST) -> frozenset[str]:
+    """Parameters the framework injects as the authenticated requester.
+
+    FastAPI's `user=Depends(get_verified_user)` (and the `Security` form) hands
+    the handler the requester under a plain name, which the vocabulary cannot
+    know from the name alone. Reading the dependency default is the idiom.
+    """
+    spec = getattr(func, "args", None)
+    if spec is None:
+        return frozenset()
+    positional = list(getattr(spec, "posonlyargs", [])) + list(spec.args)
+    defaults = list(spec.defaults)
+    pairs = list(zip(positional[len(positional) - len(defaults):], defaults))
+    pairs += list(zip(spec.kwonlyargs, spec.kw_defaults))
+    return frozenset(
+        arg.arg for arg, default in pairs
+        if isinstance(default, ast.Call)
+        and _dotted(default.func) in {"Depends", "Security"}
+        and _COARSE_AUTH.search(_text(default))
+    )
+
+
+def _grant_returns(func: ast.AST) -> list[ast.Return]:
+    """Returns in the helper's own body that grant, not its nested defs.
+
+    A falsy return (`False`, `None`) denies, and a return inside an `except`
+    handler is an error path, not a grant. Every other return is a path that
+    must be justified (#258).
+    """
+    grants: list[ast.Return] = []
+    inside_handler = 0
+
+    def walk(node: ast.AST) -> None:
+        nonlocal inside_handler
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef,
+                                  ast.ClassDef, ast.Lambda)):
+                continue
+            if isinstance(child, ast.ExceptHandler):
+                inside_handler += 1
+                walk(child)
+                inside_handler -= 1
+                continue
+            if isinstance(child, ast.Return) and not inside_handler:
+                value = child.value
+                if (value is None
+                        or (isinstance(value, ast.Constant) and not value.value)):
+                    continue
+                grants.append(child)
+            walk(child)
+
+    walk(func)
+    return grants
+
+
+def _nearest_assignment(func: ast.AST, name: str,
+                        before: int) -> ast.AST | None:
+    """The value assigned to *name* most recently before line *before*."""
+    best: tuple[int, ast.AST] | None = None
+    for node in ast.walk(func):
+        if isinstance(node, ast.Assign):
+            targets, value = node.targets, node.value
+        elif isinstance(node, ast.AnnAssign) and node.value is not None:
+            targets, value = (node.target,), node.value
+        else:
+            continue
+        if not any(isinstance(target, ast.Name) and target.id == name
+                   for target in targets):
+            continue
+        if node.lineno <= before and (best is None or node.lineno > best[0]):
+            best = (node.lineno, value)
+    return best[1] if best is not None else None
+
+
+def _expression_names_requester(func: ast.AST, expr: ast.AST, before: int,
+                                requester_tokens: set[str]) -> bool:
+    """The expression names the requester, directly or through an assignment.
+
+    `shared = shared_with(file); if shared:` is judged by the fetch, and
+    `ids = accessible_for(user.id, ...); if ids:` by the call.
+    """
+    if _mentions_requester(expr, requester_tokens):
+        return True
+    for dotted in _names_in(expr):
+        local = re.split(r"[.\[]", dotted)[0]
+        if local in requester_tokens:
+            return True
+        value = _nearest_assignment(func, local, before)
+        if value is not None and _mentions_requester(value, requester_tokens):
+            return True
+    return False
+
+
+def _unsound_or(func: ast.AST, expr: ast.AST, before: int,
+                requester_tokens: set[str]) -> bool:
+    """An OR in the condition lets a branch grant without the requester.
+
+    For `A or B` to scope, every disjunct must name the requester; one
+    requester-less disjunct is a grant path that bypasses the check.
+    """
+    return any(
+        isinstance(node, ast.BoolOp) and isinstance(node.op, ast.Or)
+        and not all(_expression_names_requester(func, value, before,
+                                                 requester_tokens)
+                    for value in node.values)
+        for node in ast.walk(expr))
+
+
+def _grant_path_names_requester(func: ast.AST, ret: ast.Return,
+                                requester_tokens: set[str]) -> bool:
+    """The path to *ret* names the requester in its condition or in a value.
+
+    The path is the chain of enclosing conditions and loop iterables plus the
+    returned value. An OR in that chain is only sound when every disjunct
+    names the requester, since any disjunct alone can grant the return.
+    """
+    parents = _parents(func)
+    conditions: list[ast.AST] = []
+    node: ast.AST = ret
+    while node in parents:
+        parent = parents[node]
+        if isinstance(parent, (ast.If, ast.While)):
+            conditions.append(parent.test)
+        elif isinstance(parent, (ast.For, ast.AsyncFor)):
+            conditions.append(parent.iter)
+        node = parent
+    if any(_unsound_or(func, cond, ret.lineno, requester_tokens)
+           for cond in conditions):
+        return False
+    expressions = list(conditions)
+    if ret.value is not None:
+        expressions.append(ret.value)
+    return any(_expression_names_requester(func, expr, ret.lineno,
+                                            requester_tokens)
+               for expr in expressions)
+
+
+def _every_grant_names_requester(func: ast.AST,
+                                 requester_tokens: set[str]) -> bool:
+    """Every grant path in the helper body names the requester (#258)."""
+    grants = _grant_returns(func)
+    return bool(grants) and all(
+        _grant_path_names_requester(func, ret, requester_tokens)
+        for ret in grants)
+
+
 def _conditional_guard(func: ast.AST, compare: ast.AST) -> bool:
     """A scope comparison that only runs when an object field is truthy."""
     parents = _parents(func)
@@ -502,14 +750,20 @@ def _conditional_guard(func: ast.AST, compare: ast.AST) -> bool:
 
 def extract_guards(source: str, handler_fqn: str,
                    object_parameters: Iterable[str] = (),
-                   typed_parameters: Iterable[str] = ()) -> tuple[Guard, ...]:
+                   typed_parameters: Iterable[str] = (),
+                   resolve_callees: Callable[
+                       [str], tuple[tuple[ast.AST, ...], bool] | None] | None = None,
+                   ) -> tuple[Guard, ...]:
     """The guards *handler_fqn* applies, as records; first-seen order.
 
     *typed_parameters* are path params the route converter already parses as
-    int/uuid. Deterministic AST analysis only — no LLM, no network.
+    int/uuid. *resolve_callees* resolves a bare call name to its defining
+    bodies and whether they were imported; without it the analysis is
+    file-scoped. Deterministic AST analysis only — no LLM, no network.
     """
     return _extract_guards(
-        ast.parse(source), handler_fqn, object_parameters, typed_parameters)
+        ast.parse(source), handler_fqn, object_parameters, typed_parameters,
+        resolve_callees)
 
 
 def _comparison_guard(func: ast.AST, node: ast.Compare, origin: str,
@@ -542,7 +796,10 @@ def _comparison_guard(func: ast.AST, node: ast.Compare, origin: str,
 
 
 def _call_guard(func: ast.AST, node: ast.Call, tokens: set[str],
-                requester_tokens: set[str] = frozenset()) -> Guard | None:
+                requester_tokens: set[str] = frozenset(),
+                resolve_callees: Callable[
+                    [str], tuple[tuple[ast.AST, ...], bool] | None] | None = None,
+                ) -> Guard | None:
     text = _text(node)
     inner = _dotted(node.func.func) if isinstance(node.func, ast.Call) else None
     if (inner
@@ -556,10 +813,31 @@ def _call_guard(func: ast.AST, node: ast.Call, tokens: set[str],
     if _SCOPE_CALL.search(name) and (
             _mentions(node, tokens) or _mentions_requester(node, requester_tokens)):
         conditional = _conditional_guard(func, node)
+        scopes = not conditional
+        # A bare-name scope call is a helper. An imported helper is judged by
+        # its body: it scopes only when every grant path names the requester,
+        # and an unresolvable helper is a miss, never a silently-scoping guard.
+        # Attribute calls (`obj.allowed_for_session`) stay name-based (#258).
+        if resolve_callees is not None and "." not in name:
+            found = resolve_callees(name)
+            if found is None:
+                scopes = False
+            else:
+                callees, imported = found
+                if imported:
+                    caller_tokens = set(requester_tokens) | set(
+                        _di_requester_params(func))
+                    bound: set[str] = set()
+                    for callee in callees:
+                        bound |= _bound_requester_params(
+                            callee, node, caller_tokens)
+                    scopes = scopes and bool(callees) and all(
+                        _every_grant_names_requester(callee, bound)
+                        for callee in callees)
         return Guard(
             symbol=name,
             predicate=text,
-            scopes_object=not conditional,
+            scopes_object=scopes,
             conditional=conditional,
         )
     return None
@@ -911,7 +1189,10 @@ def _chain_parts(func: ast.AST, chain_guards: dict[int, Guard | None]) -> set[in
 
 def _guards_in(func: ast.AST, origin: str, tokens: set[str], params: set[str],
                converted: set[str], typed: set[str],
-               requester_tokens: set[str]) -> list[Guard]:
+               requester_tokens: set[str],
+               resolve_callees: Callable[
+                   [str], tuple[tuple[ast.AST, ...], bool] | None] | None = None,
+               ) -> list[Guard]:
     parents = _parents(func)
     # Only the outermost call of a chain carries the whole query text.
     chain_mid = {id(node) for node in ast.walk(func)
@@ -931,7 +1212,7 @@ def _guards_in(func: ast.AST, origin: str, tokens: set[str], params: set[str],
                                       converted, typed, requester_tokens)
         elif isinstance(node, ast.Call) and id(node) not in chain_mid:
             guard = chain_guards.get(id(node)) or _call_guard(
-                func, node, tokens, requester_tokens)
+                func, node, tokens, requester_tokens, resolve_callees)
         else:
             continue
         if guard is not None:
@@ -941,7 +1222,10 @@ def _guards_in(func: ast.AST, origin: str, tokens: set[str], params: set[str],
 
 def _extract_guards(tree: ast.Module, handler_fqn: str,
                     object_parameters: Iterable[str],
-                    typed_parameters: Iterable[str] = ()) -> tuple[Guard, ...]:
+                    typed_parameters: Iterable[str] = (),
+                    resolve_callees: Callable[
+                        [str], tuple[tuple[ast.AST, ...], bool] | None] | None = None,
+                    ) -> tuple[Guard, ...]:
     handlers = _resolve_handler(tree, handler_fqn)
     links = _linked_edges(tree, handlers)
     bindings = _requester_bindings(links, {id(func) for func in handlers})
@@ -956,7 +1240,7 @@ def _extract_guards(tree: ast.Module, handler_fqn: str,
         for link in links
         for guard in _guards_in(
             link.callee, link.origin, tokens, params, converted, typed,
-            set(bindings.get(id(link.callee), ())))
+            set(bindings.get(id(link.callee), ())), resolve_callees)
     ]
     return tuple(dict.fromkeys(guards))
 
@@ -1007,20 +1291,41 @@ def backfill_handler_facts(adg: ADG, repo_path: Path) -> ADG:
             paths_by_handler[defining].append(route.raw_path)
 
     trees: dict[str, ast.Module | None] = {}
+    resolvers: dict[str, ImportedDefinitions] = {}
 
-    def facts(handler: str, file_path: str) -> tuple[tuple[str, ...], tuple[Guard, ...]]:
-        paths = paths_by_handler[handler]
+    def tree_at(file_path: str) -> ast.Module | None:
         if file_path not in trees:
             try:
                 trees[file_path] = ast.parse((repo_path / file_path).read_bytes())
             except (OSError, SyntaxError):
                 trees[file_path] = None
-        tree = trees[file_path]
+        return trees[file_path]
+
+    def resolver_for(file_path: str, tree: ast.Module) -> ImportedDefinitions:
+        if file_path not in resolvers:
+            module_fqn = next(
+                (str(node.fqn) for node in adg.nodes
+                 if node.kind is FQNKind.MODULE and node.file_path == file_path),
+                "")
+            def module_source(module: str) -> ast.Module | None:
+                path = _module_source_file(adg, module)
+                return tree_at(path) if path is not None else None
+
+            resolvers[file_path] = ImportedDefinitions(
+                tree, module_fqn, module_source,
+                is_package=file_path.endswith("__init__.py"))
+        return resolvers[file_path]
+
+    def facts(handler: str, file_path: str) -> tuple[tuple[str, ...], tuple[Guard, ...]]:
+        paths = paths_by_handler[handler]
+        tree = tree_at(file_path)
         if tree is None:
             return object_parameters(paths), ()
         params = _handler_object_parameters(tree, handler, object_parameters(paths))
         typed = typed_object_parameters(paths)
-        guards = _extract_guards(tree, handler, params, typed)
+        guards = _extract_guards(
+            tree, handler, params, typed,
+            resolver_for(file_path, tree).resolve)
         return params, guards
 
     updated = []

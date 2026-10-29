@@ -12,6 +12,7 @@ framework idiom — no case, repo, route or advisory names.
 
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 from textwrap import dedent
 
@@ -19,6 +20,7 @@ import pytest
 
 from services.adg import parse_repo
 from services.adg.object_scope import (
+    ImportedDefinitions,
     backfill_handler_facts,
     extract_guards,
     object_parameters,
@@ -570,6 +572,135 @@ def test_a_call_site_inside_the_last_linked_helper_still_counts() -> None:
     assert extract_guards(source, "read", ("flow_id",)) == ()
 
 
+def _imported(mapping: dict[str, str]):
+    """Module name -> parsed tree, the lookup an imported helper resolves through."""
+    def source(module_name: str) -> ast.Module | None:
+        text = mapping.get(module_name)
+        return ast.parse(dedent(text)) if text is not None else None
+    return source
+
+
+def _helper_resolver(handler: str, **modules: str) -> ImportedDefinitions:
+    return ImportedDefinitions(
+        ast.parse(dedent(handler)), "app.routes", _imported(modules))
+
+
+def test_an_imported_helper_whose_every_grant_path_names_the_requester_scopes() -> None:
+    handler = """
+        from app.access import has_access
+
+        def get_file(item_id, user=Depends(get_verified_user)):
+            if has_access(item_id, user):
+                return user
+    """
+    helper = """
+        def has_access(item_id, user):
+            file = load_file(item_id)
+            if file.user_id == user.id:
+                return True
+            shared = shared_with(file)
+            if shared:
+                accessible = accessible_for(user.id, shared)
+                if accessible:
+                    return True
+            return False
+    """
+    resolver = _helper_resolver(handler, **{"app.access": helper})
+
+    guards = extract_guards(
+        dedent(handler), "get_file", ("item_id",),
+        resolve_callees=resolver.resolve)
+
+    assert Guard(
+        symbol="has_access",
+        predicate="has_access(item_id, user)",
+        scopes_object=True,
+    ) in guards
+
+
+def test_one_requester_less_grant_path_makes_the_imported_helper_unscoped() -> None:
+    """The ownership comparison at the top does not redeem a later grant that
+    never names the requester. The helper's own guards are not emitted, so the
+    handler cannot be cleared by the comparison alone."""
+    handler = """
+        from app.access import has_access
+
+        def get_file(item_id, user=Depends(get_verified_user)):
+            if has_access(item_id, user):
+                return user
+    """
+    helper = """
+        def has_access(item_id, user):
+            file = load_file(item_id)
+            if file.user_id == user.id:
+                return True
+            chats = shared_chats(file)
+            if chats:
+                return True
+            return False
+    """
+    resolver = _helper_resolver(handler, **{"app.access": helper})
+
+    guards = extract_guards(
+        dedent(handler), "get_file", ("item_id",),
+        resolve_callees=resolver.resolve)
+
+    assert guards == (
+        Guard(
+            symbol="has_access",
+            predicate="has_access(item_id, user)",
+            scopes_object=False,
+        ),
+    )
+
+
+def test_an_or_branch_that_grants_without_the_requester_makes_the_helper_unscoped() -> None:
+    handler = """
+        from app.access import has_access
+
+        def get_file(item_id, user=Depends(get_verified_user)):
+            if has_access(item_id, user):
+                return user
+    """
+    helper = """
+        def has_access(item_id, user):
+            if shared_with(item_id) or owner_of(item_id) == user.id:
+                return True
+            return False
+    """
+    resolver = _helper_resolver(handler, **{"app.access": helper})
+
+    guards = extract_guards(
+        dedent(handler), "get_file", ("item_id",),
+        resolve_callees=resolver.resolve)
+
+    assert guards == (
+        Guard(symbol="has_access", predicate="has_access(item_id, user)",
+              scopes_object=False),
+    )
+
+
+def test_an_unresolved_helper_is_never_a_silently_scoping_guard() -> None:
+    source = dedent(
+        """
+        def get_file(item_id, user=Depends(get_verified_user)):
+            if has_access(item_id, user):
+                return user
+        """
+    )
+    resolver = _helper_resolver(source)
+
+    assert extract_guards(
+        source, "get_file", ("item_id",),
+        resolve_callees=resolver.resolve) == (
+        Guard(
+            symbol="has_access",
+            predicate="has_access(item_id, user)",
+            scopes_object=False,
+        ),
+    )
+
+
 def test_an_ownership_column_of_another_model_does_not_scope() -> None:
     source = dedent(
         """
@@ -782,6 +913,22 @@ class TestPinnedGuardFixtures:
         fixed = _filled_at("pretix", "4b5651862c57c6e384822d1d23292342126c479a")
         assert any(guard.symbol == "cf.allowed_for_session" and guard.scopes_object
                    for guard in fixed.node_of[mixin_fqn].guards)
+
+    def test_open_webui_imported_helper_grant_path_flips_across_the_fix(self) -> None:
+        # The guard is an imported helper. Its body's ownership comparison is
+        # not enough: the vulnerable body has a grant path that never names the
+        # requester, so the helper does not scope and the handler fires.
+        handler = "backend.open_webui.routers.files.get_file_by_id"
+        vulnerable = _guards_at(
+            "open-webui", "4d2f18981051205016bd24d39521e25a33581225", handler)
+        fixed = _guards_at(
+            "open-webui", "2e52ad8ff2f8d9ed9f38f76e9bc19c8f92d91fc3", handler)
+
+        assert any(guard.symbol == "has_access_to_file"
+                   and not guard.scopes_object for guard in vulnerable)
+        assert not any(guard.scopes_object for guard in vulnerable)
+        assert any(guard.symbol == "has_access_to_file" and guard.scopes_object
+                   for guard in fixed)
 
     def test_weblate_object_identifier_route_flips_across_the_fix(self) -> None:
         vulnerable = _guards_at(
