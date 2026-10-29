@@ -725,7 +725,9 @@ def _validate_edge(
       - `prohibits_*`: external object passes unvalidated (linter checks absence);
         internal object must match the ADG.
     """
-    all_fqns = {str(n.fqn) for n in adg.nodes}
+    all_fqns = {
+        str(n.fqn) for n in adg.nodes if n.kind is not FQNKind.EXTERNAL
+    }
     roots = _root_segments(adg)
 
     # Subject
