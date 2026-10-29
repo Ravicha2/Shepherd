@@ -831,6 +831,56 @@ def test_a_falsy_container_return_is_not_a_grant_path() -> None:
     """)
 
 
+def test_a_name_imported_from_two_modules_is_unresolved() -> None:
+    handler = """
+        from app.first import has_access
+        from app.second import has_access
+
+        def get_file(item_id, user=Depends(get_verified_user)):
+            if has_access(item_id, user):
+                return user
+    """
+    helper = """
+        def has_access(item_id, user):
+            return owner_of(item_id) == user.id
+    """
+    resolver = _helper_resolver(
+        handler, **{"app.first": helper, "app.second": helper})
+
+    (guard,) = extract_guards(
+        dedent(handler), "get_file", ("item_id",),
+        resolve_callees=resolver.resolve)
+
+    assert guard.symbol == "has_access"
+    assert not guard.scopes_object
+
+
+def test_a_function_local_import_makes_the_name_unresolved() -> None:
+    """The local import may shadow the module-level one for this call; the
+    resolver cannot tell which body runs, so it must not scope from either."""
+    handler = """
+        from app.access import has_access
+
+        def get_file(item_id, user=Depends(get_verified_user)):
+            from app.other import has_access
+            if has_access(item_id, user):
+                return user
+    """
+    helper = """
+        def has_access(item_id, user):
+            return owner_of(item_id) == user.id
+    """
+    resolver = _helper_resolver(
+        handler, **{"app.access": helper, "app.other": helper})
+
+    (guard,) = extract_guards(
+        dedent(handler), "get_file", ("item_id",),
+        resolve_callees=resolver.resolve)
+
+    assert guard.symbol == "has_access"
+    assert not guard.scopes_object
+
+
 def test_an_ownership_column_of_another_model_does_not_scope() -> None:
     source = dedent(
         """

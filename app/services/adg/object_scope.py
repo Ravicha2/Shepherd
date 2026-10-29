@@ -296,6 +296,7 @@ def _imported_names(tree: ast.Module,
     """
     out: dict[str, tuple[str, str | None]] = {}
     ambiguous: set[str] = set()
+    module_level = {id(node) for node in _imports_at_module_level(tree)}
     for node in _imports_at_module_level(tree):
         if isinstance(node, ast.ImportFrom):
             base = _absolute_module(module_fqn, node.module, node.level, is_package)
@@ -313,6 +314,20 @@ def _imported_names(tree: ast.Module,
             if local in out and out[local] != target:
                 ambiguous.add(local)
             out[local] = target
+    # A function-local import binds that function's namespace, so a call to the
+    # name anywhere in the file may reach a different body than the module-level
+    # import names. The name is unresolved rather than guessed.
+    for node in ast.walk(tree):
+        if id(node) in module_level:
+            continue
+        if isinstance(node, ast.ImportFrom):
+            shadowed = [alias.asname or alias.name for alias in node.names]
+        elif isinstance(node, ast.Import):
+            shadowed = [alias.asname or alias.name.split(".")[0]
+                        for alias in node.names]
+        else:
+            continue
+        ambiguous.update(shadowed)
     for local in ambiguous:
         out.pop(local, None)
     return out
