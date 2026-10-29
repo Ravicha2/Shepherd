@@ -222,6 +222,34 @@ def _resolve_handler(tree: ast.Module,
     return []
 
 
+def _kwargs_object_ids(funcs: Iterable[ast.AST]) -> tuple[str, ...]:
+    """Object ids a handler's fetch calls read from `kwargs[...]`.
+
+    The key is derived from the fetch's own arguments, so an abbreviated
+    identifier is accepted without a vocabulary entry: whatever `kwargs` /
+    `self.kwargs` key a load-by-id call reads is an object identifier.
+    """
+    keys: list[str] = []
+    for func in funcs:
+        for fetch in _assigned_objects(func).values():
+            for node in ast.walk(fetch):
+                if not isinstance(node, ast.Subscript):
+                    continue
+                if _dotted(node.value) not in {"kwargs", "self.kwargs"}:
+                    continue
+                key = node.slice
+                if isinstance(key, ast.Constant) and isinstance(key.value, str):
+                    keys.append(key.value)
+    return tuple(dict.fromkeys(keys))
+
+
+def _handler_object_parameters(tree: ast.Module, handler_fqn: str,
+                               path_parameters: Iterable[str]) -> tuple[str, ...]:
+    """Route path params plus the ids the handler's fetches read from kwargs."""
+    return tuple(dict.fromkeys(
+        (*path_parameters, *_kwargs_object_ids(_resolve_handler(tree, handler_fqn)))))
+
+
 def _converted_params(funcs: list[ast.AST], params: set[str]) -> set[str]:
     """Path params coerced before comparison (`int(user_id)` / `x = int(x)`)."""
     converted: set[str] = set()
@@ -686,7 +714,7 @@ def _extract_guards(tree: ast.Module, handler_fqn: str,
                     typed_parameters: Iterable[str] = ()) -> tuple[Guard, ...]:
     linked = _linked(tree, _resolve_handler(tree, handler_fqn))
     funcs = [func for func, _origin in linked]
-    params = set(object_parameters)
+    params = set(object_parameters) | set(_kwargs_object_ids(funcs))
     objects = {name for func in funcs for name in _assigned_objects(func)}
     tokens = params | objects
     converted = _converted_params(funcs, params)
@@ -699,31 +727,66 @@ def _extract_guards(tree: ast.Module, handler_fqn: str,
     return tuple(dict.fromkeys(guards))
 
 
+def _defining_handler(adg: ADG, handler_fqn: str) -> str | None:
+    """The node that defines *handler_fqn*, following INHERITS when it is absent.
+
+    A route names `ViewSet.download`; the method may live on a mixin or base
+    class. Breadth-first over the class's bases keeps the nearest definition
+    first, so an override on the class itself always wins (and is found by the
+    membership check before any base is visited).
+    """
+    if handler_fqn in adg.node_of:
+        return handler_fqn
+    class_fqn, _, method = handler_fqn.rpartition(".")
+    if not class_fqn:
+        return None
+    queue = [class_fqn]
+    seen = {class_fqn}
+    while queue:
+        cls = queue.pop(0)
+        candidate = f"{cls}.{method}"
+        if candidate in adg.node_of:
+            return candidate
+        for edge in adg.edges_from(cls, "INHERITS"):
+            if edge.target not in seen:
+                seen.add(edge.target)
+                queue.append(edge.target)
+    return None
+
+
 def backfill_handler_facts(adg: ADG, repo_path: Path) -> ADG:
     """Return a new ADG with handler nodes carrying their object params + guards.
 
     Post-parse pass: the inventory join needs the finished ADG
     (`build_route_inventory(repo_path, adg=adg)`), so this cannot run inside
     the treesitter walk (#245). Node count and every other field are unchanged.
+
+    Route facts are attributed to the node that defines the handler: when the
+    inventory FQN has no node (a method inherited from a mixin or base class),
+    the defining node is resolved through INHERITS (#254).
     """
     inventory = build_route_inventory(repo_path, adg=adg)
     paths_by_handler: dict[str, list[str]] = defaultdict(list)
     for route in inventory.routes:
-        paths_by_handler[route.handler_fqn].append(route.raw_path)
+        defining = _defining_handler(adg, route.handler_fqn)
+        if defining is not None:
+            paths_by_handler[defining].append(route.raw_path)
 
     trees: dict[str, ast.Module | None] = {}
 
     def facts(handler: str, file_path: str) -> tuple[tuple[str, ...], tuple[Guard, ...]]:
         paths = paths_by_handler[handler]
-        params = object_parameters(paths)
-        typed = typed_object_parameters(paths)
         if file_path not in trees:
             try:
                 trees[file_path] = ast.parse((repo_path / file_path).read_bytes())
             except (OSError, SyntaxError):
                 trees[file_path] = None
         tree = trees[file_path]
-        guards = _extract_guards(tree, handler, params, typed) if tree is not None else ()
+        if tree is None:
+            return object_parameters(paths), ()
+        params = _handler_object_parameters(tree, handler, object_parameters(paths))
+        typed = typed_object_parameters(paths)
+        guards = _extract_guards(tree, handler, params, typed)
         return params, guards
 
     updated = []
