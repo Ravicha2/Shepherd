@@ -84,7 +84,12 @@ class GraphStore:
             code_hash=props.get("code_hash", ""),
             role=role,
             object_parameters=tuple(props.get("object_parameters") or ()),
-            guards=tuple(Guard(**row) for row in json.loads(props.get("guards") or "[]")),
+            # JSON has no tuples: restore `covers` so a loaded Guard compares
+            # equal to the one that was stored.
+            guards=tuple(
+                Guard(**{**row, "covers": tuple(row.get("covers") or ())})
+                for row in json.loads(props.get("guards") or "[]")
+            ),
         )
 
     def create_schema(self) -> None:
