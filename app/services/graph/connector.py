@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import json
 import logging
+from dataclasses import asdict
 
 from neo4j import GraphDatabase
 
 from services.cpt.dismissal import Dismissal
 from services.fqn import FQN
-from services.models import ADG, ConstraintEdge, ConstraintScope, DependencyRole, Edge, FQNKind, FQNNode, PredicateType
+from services.models import ADG, ConstraintEdge, ConstraintScope, DependencyRole, Edge, FQNKind, FQNNode, Guard, PredicateType
 
 log = logging.getLogger(__name__)
 
@@ -32,6 +34,9 @@ PREDICATE_TO_REL = {
     PredicateType.REQUIRES_IMPLEMENTATION: "REQUIRES_IMPLEMENTATION",
     PredicateType.REQUIRES_DEPENDENCY: "REQUIRES_DEPENDENCY",
     PredicateType.PROHIBITS_IMPLEMENTATION: "PROHIBITS_IMPLEMENTATION",
+    # A6 (#247): store_constraint_edge, _row_to_constraint_edge and the load
+    # query filters hard-index these maps, so the member must be here too.
+    PredicateType.REQUIRES_OBJECT_SCOPE: "REQUIRES_OBJECT_SCOPE",
 }
 
 REL_TO_PREDICATE = {val: key for key, val in PREDICATE_TO_REL.items()}
@@ -78,6 +83,13 @@ class GraphStore:
             end_byte=props.get("end_byte", 0),
             code_hash=props.get("code_hash", ""),
             role=role,
+            object_parameters=tuple(props.get("object_parameters") or ()),
+            # JSON has no tuples: restore `covers` so a loaded Guard compares
+            # equal to the one that was stored.
+            guards=tuple(
+                Guard(**{**row, "covers": tuple(row.get("covers") or ())})
+                for row in json.loads(props.get("guards") or "[]")
+            ),
         )
 
     def create_schema(self) -> None:
@@ -107,13 +119,18 @@ class GraphStore:
                 "n.kind = $kind, n.file_path = $file_path, "
                 "n.line_start = $line_start, n.line_end = $line_end, "
                 "n.start_byte = $start_byte, n.end_byte = $end_byte, "
-                "n.role = $role, n.code_hash = $code_hash",
+                "n.role = $role, n.code_hash = $code_hash, "
+                "n.object_parameters = $object_parameters, "
+                "n.guards = $guards",
                 fqn=str(node.fqn), kind=node.kind.value,
                 file_path=node.file_path,
                 line_start=node.line_start, line_end=node.line_end,
                 start_byte=node.start_byte, end_byte=node.end_byte,
                 role=node.role.value,
                 code_hash=node.code_hash,
+                object_parameters=list(node.object_parameters),
+                guards=json.dumps([asdict(guard) for guard in node.guards],
+                                  sort_keys=True, separators=(",", ":")),
             )
 
     # --- Edge CRUD ---

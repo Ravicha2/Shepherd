@@ -5,7 +5,7 @@ import logging
 from dataclasses import dataclass, field
 
 from services.fqn import FQN
-from services.models import ADG, ChangedFQN, ConstraintEdge, ConstraintScope, DependencyRole, DiffResult, Edge, FQNKind, PredicateType
+from services.models import ADG, ChangedFQN, ConstraintEdge, ConstraintScope, DependencyRole, DiffResult, Edge, FQNKind, FQNNode, PredicateType
 from services.cpt.resolution import Violation, governed_module, resolve, suppress_outweighed_prohibits, suppress_outweighed_requires
 from services.resolver import MatchStatus, fqn_matches_pattern
 from collections.abc import Mapping
@@ -432,6 +432,49 @@ def check_change_triggered_predicates(
     return violations
 
 
+def check_object_scope_predicates(
+    matched_constraints: dict[tuple, MatchedConstraint],
+    node_of: Mapping[str, FQNNode],
+) -> list[Violation]:
+    """REQUIRES_OBJECT_SCOPE: a handler that loads a route object must scope it.
+
+    Reads the handler node's guard facts directly — no BFS, no adjacency. The
+    subject wildcard also matches modules and non-route functions; handlers with
+    no object parameters never fire, so the filter is the object-fact check.
+    Every route object parameter must be covered: a guard that scopes one
+    loaded object does not clear a handler that loads two. An empty `covers`
+    means the guard covers every parameter (guards stored before the field).
+    """
+    violations: list[Violation] = []
+    for matched_constraint in matched_constraints.values():
+        constraint = matched_constraint.constraint
+        if constraint.predicate is not PredicateType.REQUIRES_OBJECT_SCOPE:
+            continue
+        for subject_fqn, subject_status in matched_constraint.subject_matches:
+            node = node_of.get(str(subject_fqn))
+            if node is None or not node.object_parameters:
+                continue
+            required = set(node.object_parameters)
+            scoping = [guard for guard in node.guards if guard.scopes_object]
+            if all(any(not guard.covers or param in guard.covers
+                       for guard in scoping)
+                   for param in required):
+                continue
+            params = ", ".join(node.object_parameters)
+            violations.append(Violation(
+                constraint=constraint,
+                changed_fqn=subject_fqn,
+                matched_fqn=subject_fqn,
+                match_status=subject_status,
+                evidence=(
+                    f"{subject_fqn} loads {params} without an object-scope guard "
+                    f"for {constraint.object}: {constraint.predicate.value}"
+                ),
+                change_type="structural",
+            ))
+    return violations
+
+
 def _causal_code_fingerprint(violation: Violation, node_by_fqn) -> str | None:
     """SHA-256 over the code of every node the violation's judgement rests on.
 
@@ -547,6 +590,7 @@ def detect(diff_result: DiffResult, adg: ADG) -> CPTResult:
     all_violations: list[Violation] = []
     all_violations.extend(check_structural_predicates(matched, adjacency, node_roles=node_roles, module_scope=module_scope))
     all_violations.extend(check_change_triggered_predicates(matched, adjacency, diff_result.changed_fqns, node_roles=node_roles, module_scope=module_scope))
+    all_violations.extend(check_object_scope_predicates(matched, adg.node_of))
 
     raw_violations: list[Violation] = list(all_violations)
 
@@ -554,7 +598,12 @@ def detect(diff_result: DiffResult, adg: ADG) -> CPTResult:
 
     active_requires: list[ConstraintEdge] = []
     for match_constraint in matched.values():
-        if match_constraint.constraint.predicate.value.startswith("requires_"):
+        predicate = match_constraint.constraint.predicate
+        # A6: requires_object_scope shares the prefix but is its own rule family.
+        # Counting it as a presence requirement would let a hand-built
+        # object-scope row suppress a prohibits row on the same object.
+        if (predicate.value.startswith("requires_")
+                and predicate is not PredicateType.REQUIRES_OBJECT_SCOPE):
             active_requires.append(match_constraint.constraint)
     violations = suppress_outweighed_prohibits(violations, active_requires)
 

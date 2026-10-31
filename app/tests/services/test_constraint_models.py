@@ -23,7 +23,11 @@ from services.models import (
 
 
 class TestPredicateType:
-    """PredicateType has four values for ADR constraint predicates."""
+    """PredicateType has four ADR-004 predicates plus the A6 object-scope rule."""
+
+    def test_requires_object_scope_value(self) -> None:
+        """A6: the object-scope predicate is a named member outside the 2x2."""
+        assert PredicateType.REQUIRES_OBJECT_SCOPE.value == "requires_object_scope"
 
     def test_prohibits_dependency_value(self) -> None:
         assert PredicateType.PROHIBITS_DEPENDENCY.value == "prohibits_dependency"
@@ -38,8 +42,8 @@ class TestPredicateType:
         assert PredicateType.PROHIBITS_IMPLEMENTATION.value == "prohibits_implementation"
 
     def test_enum_membership(self) -> None:
-        """PredicateType has exactly four members."""
-        assert len(PredicateType) == 4
+        """PredicateType has exactly the four ADR-004 members plus object scope."""
+        assert len(PredicateType) == 5
 
     def test_from_value(self) -> None:
         """PredicateType can be constructed from its string value."""
@@ -47,6 +51,7 @@ class TestPredicateType:
         assert PredicateType("requires_implementation") is PredicateType.REQUIRES_IMPLEMENTATION
         assert PredicateType("requires_dependency") is PredicateType.REQUIRES_DEPENDENCY
         assert PredicateType("prohibits_implementation") is PredicateType.PROHIBITS_IMPLEMENTATION
+        assert PredicateType("requires_object_scope") is PredicateType.REQUIRES_OBJECT_SCOPE
 
     def test_invalid_value_raises(self) -> None:
         """Invalid predicate string raises ValueError."""

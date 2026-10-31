@@ -62,3 +62,17 @@ class NameResolver:
         if not matches:
             return None
         return min(matches, key=lambda fqn: (str(fqn) != text, len(fqn.parts), str(fqn)))
+
+    def resolve_unique(self, text: str) -> FQN | None:
+        """Resolve *text* only when exactly one FQN ends with it.
+
+        Unlike resolve(), an ambiguous name returns None rather than picking a
+        winner: grounding an emitted object on a coin-flip is worse than
+        reporting it ungrounded (#256).
+        """
+        if "." not in text and text in _BUILTINS:
+            return None
+        matches = self._suffix_index.get(text)
+        if not matches or len(matches) != 1:
+            return None
+        return matches[0]

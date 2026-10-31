@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from services.adg.merge import merge_constraint_edges
+from services.adg.object_scope import backfill_handler_facts
 from services.adg.treesitter import parse_repo
 from services.cpt.dismissal import Dismissal, filter_dismissed
 from services.cpt.engine import CPTResult, Violation, detect as cpt_detect
@@ -78,8 +79,9 @@ def commit_update(
     # 3. Wipe structural data
     store.delete_structural_data()
 
-    # 4. Re-parse repo
-    adg = parse_repo(repo_path)
+    # 4. Re-parse repo, then post-parse back-fill (#245): the inventory join
+    # needs the finished ADG, so the facts cannot ride the treesitter walk.
+    adg = backfill_handler_facts(parse_repo(repo_path), repo_path)
 
     # 5. Store structural nodes + edges (MERGE upgrades EXTERNAL placeholders)
     for node in adg.nodes:

@@ -16,6 +16,7 @@ from rich.table import Table
 
 from cli.config import RepoConfig, load_config
 from services.adg import parse_repo
+from services.adg.object_scope import backfill_handler_facts
 from services.adg.gold import GOLD_ADR_PINS, GOLD_PINS, dump_gold_edges, gold_path, gold_triples, triple_differences, triples
 from services.adg.route_inventory import build_route_inventory, repo_at_sha
 from services.cpt import GitAdapter, process_diff
@@ -682,6 +683,9 @@ def seed_build(
     console.print(f"  Found {len(adg.nodes)} nodes, {len(adg.edges)} edges")
 
     merged = _merge_constraints(repo_cfg, repo_path, adg, config, source)
+
+    # Post-parse back-fill: the inventory join needs the finished ADG (#245).
+    merged = backfill_handler_facts(merged, repo_path)
     external_count = sum(1 for n in merged.nodes if n.kind == FQNKind.EXTERNAL)
     console.print(f"  {len(merged.constraint_edges)} constraint edges, {external_count} EXTERNAL nodes")
 

@@ -8,6 +8,7 @@ from functools import cached_property
 from types import MappingProxyType
 
 from services.fqn import FQN
+from services.resolver import NameResolver
 
 
 class FQNKind(Enum):
@@ -37,6 +38,29 @@ class ConstraintScope(Enum):
     TOOLING = "tooling"
 
 
+@dataclass(frozen=True)
+class Guard:
+    """One guard a handler applies (#246).
+
+    `symbol` is the guard callable (decorator or call), or for a bare
+    comparison the function that applies it. `scopes_object` is the verdict:
+    the predicate names the loaded object and the requester and is neither
+    dead nor conditionally applied. `covers` names the route object
+    parameters that verdict actually scopes; empty means "covers every
+    parameter", so guards stored before the field keep their behaviour. The
+    remaining fields are the soundness checks ported from the object-scope
+    pre-gate.
+    """
+
+    symbol: str
+    predicate: str
+    scopes_object: bool
+    conditional: bool = False
+    dead: bool = False
+    bypass: bool = False
+    covers: tuple[str, ...] = ()
+
+
 @dataclass
 class FQNNode:
     fqn: FQN
@@ -51,6 +75,12 @@ class FQNNode:
     # Content only — no name, no path — so a rename keeps it and an edit
     # changes it (#186: dismissal identity's code-state component).
     code_hash: str = ""
+    # Object parameter names this handler loads from its routes (#245). Empty
+    # for non-handlers; populated by the ingestion back-fill pass.
+    object_parameters: tuple[str, ...] = ()
+    # The guards this handler applies (#246). Empty for non-handlers; populated
+    # by the same ingestion back-fill pass as object_parameters.
+    guards: tuple[Guard, ...] = ()
 
     @classmethod
     def external(cls, fqn: str, role: DependencyRole = DependencyRole.UNKNOWN) -> FQNNode:
@@ -169,6 +199,20 @@ class ADG:
         return MappingProxyType({str(node.fqn): node for node in self.nodes})
 
     @cached_property
+    def name_resolver(self) -> NameResolver:
+        """Suffix index over every *real* node FQN, built once per graph (#256).
+
+        Object grounding resolves an emitted dotted name to the one real node
+        that ends with it. Synthetic EXTERNAL placeholders are excluded: they
+        are created for ungrounded names, so indexing them would let a
+        placeholder ground itself. Built lazily: only the lowering path needs
+        it, and the index costs O(nodes x depth) to construct.
+        """
+        return NameResolver({
+            node.fqn for node in self.nodes if node.kind is not FQNKind.EXTERNAL
+        })
+
+    @cached_property
     def role_of(self) -> Mapping[str, DependencyRole]:
         """fqn -> role. `detect` filters DEV_TOOL targets through this, so a
         missing role would change reachability, not just a label."""
@@ -272,6 +316,10 @@ class PredicateType(Enum):
     REQUIRES_IMPLEMENTATION = "requires_implementation"
     REQUIRES_DEPENDENCY = "requires_dependency"
     PROHIBITS_IMPLEMENTATION = "prohibits_implementation"
+    # A6 (#247): a handler that loads a route object must scope that object to
+    # the requester. Deliberately outside ADR 004's 2x2; evaluated by its own
+    # node-fact checker, so it must stay out of the presence-rule prefix sweeps.
+    REQUIRES_OBJECT_SCOPE = "requires_object_scope"
 
 
 @dataclass
