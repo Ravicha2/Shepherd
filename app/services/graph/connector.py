@@ -84,10 +84,12 @@ class GraphStore:
             code_hash=props.get("code_hash", ""),
             role=role,
             object_parameters=tuple(props.get("object_parameters") or ()),
-            # JSON has no tuples: restore `covers` so a loaded Guard compares
-            # equal to the one that was stored.
+            # JSON has no tuples: restore `covers` and `branches` so a loaded
+            # Guard compares equal to the one that was stored.
             guards=tuple(
-                Guard(**{**row, "covers": tuple(row.get("covers") or ())})
+                Guard(**{**row,
+                         "covers": tuple(row.get("covers") or ()),
+                         "branches": tuple(row.get("branches") or ())})
                 for row in json.loads(props.get("guards") or "[]")
             ),
         )

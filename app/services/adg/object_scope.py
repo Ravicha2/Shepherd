@@ -481,11 +481,18 @@ def _inside_anonymous_branch(func: ast.AST, node: ast.AST) -> bool:
 
 @dataclass
 class _Link:
-    """A caller-reached function and every call site that reached it."""
+    """A caller-reached function and every call site that reached it.
+
+    `roots` names the handler methods the function descends from (#275): a
+    class handler pools its methods, so a guard reached through one branch
+    must not speak for the others. A function handler has one root and no
+    branches to tell apart, so its links carry an empty set.
+    """
 
     callee: ast.AST
     origin: str
     calls: list[tuple[ast.AST, ast.Call]]
+    roots: set[str]
 
 
 def _linked_edges(tree: ast.Module,
@@ -511,7 +518,9 @@ def _linked_edges(tree: ast.Module,
                        if isinstance(node, ast.Call))
         return targets
 
-    out = [_Link(func, func.name, []) for func in funcs]
+    out = [_Link(func, func.name, [],
+                 {func.name} if len(funcs) > 1 else set())
+           for func in funcs]
     by_id = {id(link.callee): link for link in out}
     frontier = list(out)
     for _ in range(depth):
@@ -525,9 +534,12 @@ def _linked_edges(tree: ast.Module,
                 if node is None:
                     continue
                 for callee in _functions_of(node):
-                    if id(callee) in by_id:
+                    existing = by_id.get(id(callee))
+                    if existing is not None:
+                        # Reached from another branch: the callee serves both.
+                        existing.roots |= link.roots
                         continue
-                    new = _Link(callee, name, [])
+                    new = _Link(callee, name, [], set(link.roots))
                     by_id[id(callee)] = new
                     nxt.append(new)
         out.extend(nxt)
@@ -1436,14 +1448,30 @@ def _extract_guards(tree: ast.Module, handler_fqn: str,
     tokens = params | objects
     converted = _converted_params(funcs, params)
     typed = _typed_params(funcs, params) | set(typed_parameters)
-    guards = [
-        guard
-        for link in links
+    # A class handler pools its methods; #275 branch attribution tags every
+    # guard with the method branches it was reached from, and the same guard
+    # found under two branches merges into one entry naming both.
+    multi = len(handlers) > 1
+    found: list[Guard] = []
+    for link in links:
         for guard in _guards_in(
-            link.callee, link.origin, tokens, params, converted, typed,
-            set(bindings.get(id(link.callee), ())), resolve_callees)
-    ]
-    return tuple(dict.fromkeys(guards))
+                link.callee, link.origin, tokens, params, converted, typed,
+                set(bindings.get(id(link.callee), ())), resolve_callees):
+            if multi and link.roots:
+                guard = replace(guard, branches=tuple(sorted(
+                    set(guard.branches) | link.roots)))
+            found.append(guard)
+    merged: dict[tuple, Guard] = {}
+    for guard in found:
+        key = (guard.symbol, guard.predicate, guard.scopes_object,
+               guard.conditional, guard.dead, guard.bypass, guard.covers)
+        seen = merged.get(key)
+        if seen is None:
+            merged[key] = guard
+        elif set(seen.branches) != set(guard.branches):
+            merged[key] = replace(seen, branches=tuple(sorted(
+                set(seen.branches) | set(guard.branches))))
+    return tuple(merged.values())
 
 
 def _defining_handler(adg: ADG, handler_fqn: str) -> str | None:

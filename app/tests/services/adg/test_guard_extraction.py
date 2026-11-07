@@ -1222,3 +1222,56 @@ class TestPinnedGuardFixtures:
             assert not any(guard.scopes_object for guard in vulnerable), handler
             assert any(guard.symbol == "_read_flow" and guard.scopes_object
                        for guard in fixed), handler
+
+
+def test_a_class_handler_guard_names_its_method_branch() -> None:
+    # #275: a class handler pools its methods, so a guard found under `get`
+    # must not speak for `post`. The branch rides on the guard record.
+    source = dedent("""
+        class View:
+            def get(self, request, item_id):
+                item = get_object_or_404(Item, pk=item_id)
+                if item.owner_id != request.user.id:
+                    raise Http404()
+
+            def post(self, request, item_id):
+                item = get_object_or_404(Item, pk=item_id)
+                return item
+    """)
+    (guard,) = [g for g in extract_guards(source, "View", ("item_id",))
+                if g.scopes_object]
+    assert guard.branches == ("get",)
+
+
+def test_a_shared_helper_guard_names_every_branch_it_serves() -> None:
+    source = dedent("""
+        class View:
+            def get(self, request, item_id):
+                return _check(request, item_id)
+
+            def post(self, request, item_id):
+                return _check(request, item_id)
+
+        def _check(request, item_id):
+            item = get_object_or_404(Item, pk=item_id)
+            if item.owner_id != request.user.id:
+                raise Http404()
+    """)
+    scoped = [g for g in extract_guards(source, "View", ("item_id",))
+              if g.scopes_object]
+    assert len(scoped) == 1
+    assert scoped[0].branches == ("get", "post")
+
+
+def test_a_function_handler_guard_has_no_branches() -> None:
+    # A function handler has one dispatch branch; empty `branches` means the
+    # guard applies to every request, so guards stored before #275 keep it.
+    source = dedent("""
+        def download(request, item_id):
+            item = get_object_or_404(Item, pk=item_id)
+            if item.owner_id != request.user.id:
+                raise Http404()
+    """)
+    (guard,) = [g for g in extract_guards(source, "download", ("item_id",))
+                if g.scopes_object]
+    assert guard.branches == ()

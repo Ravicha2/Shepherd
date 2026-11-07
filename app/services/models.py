@@ -47,9 +47,12 @@ class Guard:
     the predicate names the loaded object and the requester and is neither
     dead nor conditionally applied. `covers` names the route object
     parameters that verdict actually scopes; empty means "covers every
-    parameter", so guards stored before the field keep their behaviour. The
-    remaining fields are the soundness checks ported from the object-scope
-    pre-gate.
+    parameter", so guards stored before the field keep their behaviour.
+    `branches` names the handler methods the guard was reached from (#275):
+    a class handler pools its methods, so a guard found under one method
+    must not speak for the others. Empty means "every dispatch branch", so
+    guards stored before the field keep their behaviour. The remaining
+    fields are the soundness checks ported from the object-scope pre-gate.
     """
 
     symbol: str
@@ -59,6 +62,7 @@ class Guard:
     dead: bool = False
     bypass: bool = False
     covers: tuple[str, ...] = ()
+    branches: tuple[str, ...] = ()
 
 
 @dataclass
